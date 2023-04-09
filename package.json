@@ -14,8 +14,9 @@
   "contributes": {
     "commands": [
       {
-        "command": "typst-preview.helloWorld",
-        "title": "Hello World"
+        "command": "typst-preview.preview",
+        "title": "type-preview: Preview current file",
+        "description": "Launch typst-ws server"
       }
     ]
   },
