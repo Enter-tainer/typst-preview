@@ -1,13 +1,13 @@
 {
   "name": "typst-preview",
-  "displayName": "typst-preview",
+  "displayName": "Typst Preview",
   "description": "preview your typst document in instant",
   "publisher": "mgt19937",
   "repository": {
     "type": "git",
     "url": "https://github.com/Enter-tainer/typst-preview-vscode"
   },
-  "version": "0.1.1",
+  "version": "0.1.2",
   "engines": {
     "vscode": "^1.77.0"
   },
