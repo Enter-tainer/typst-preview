@@ -35,3 +35,7 @@ Big thanks to @zzh1996 for graciously granting me access to the GPT-4 API. Thank
 ### 0.1.0
 
 Initial release 
+
+### 0.1.6
+
+Add preview button
