@@ -10,9 +10,13 @@ Install this extension and open command palette (Ctrl+Shift+P) and type `>Typst 
 
 Please install [typst-ws](https://github.com/Enter-tainer/typst-ws) first.
 
+You can install from source using cargo:
+
 ```bash
 cargo install --git https://github.com/Enter-tainer/typst-ws
 ```
+
+Or you can download [prebuilt binary](https://nightly.link/Enter-tainer/typst-ws/workflows/build/master) and put it in your PATH.
 ## Extension Settings
 
 TODO
