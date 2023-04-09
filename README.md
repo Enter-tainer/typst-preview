@@ -21,6 +21,11 @@ TODO
 - Ctrl+wheel is kind of strange
 - Render output mayby kind of blurry
 
+## Acknowledgements
+
+Big thanks to @zzh1996 for graciously granting me access to the GPT-4 API. Thanks to his generosity, I was able to complete this extension in such a short time.
+
+(Yes, the javascript part is mostly done by GPT)
 ## Release Notes
 
 ### 0.1.0
