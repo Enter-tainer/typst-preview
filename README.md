@@ -16,7 +16,7 @@ You can install from source using cargo:
 cargo install --git https://github.com/Enter-tainer/typst-ws
 ```
 
-Or you can download [prebuilt binary](https://nightly.link/Enter-tainer/typst-ws/workflows/build/master) and put it in your PATH.
+Or you can download [prebuilt binary](https://nightly.link/Enter-tainer/typst-ws/workflows/build/master) for your platform, rename it to `typst-ws`, and put it in your `PATH`.
 ## Extension Settings
 
 TODO
