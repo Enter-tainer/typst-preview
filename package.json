@@ -16,14 +16,32 @@
   ],
   "activationEvents": [],
   "main": "./out/extension.js",
+  "languages": [
+    {
+      "id": "typst",
+      "extensions": [
+        ".typ"
+      ]
+    }
+  ],
   "contributes": {
     "commands": [
       {
         "command": "typst-preview.preview",
         "title": "Typst Preview: Preview current file",
-        "description": "Launch typst-ws server"
+        "description": "Launch typst-ws server",
+        "icon": "$(open-preview)"
       }
-    ]
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "typst-preview.preview",
+          "when": "resourceLangId == typst",
+          "group": "navigation"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "yarn run compile",
