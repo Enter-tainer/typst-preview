@@ -7,7 +7,7 @@
     "type": "git",
     "url": "https://github.com/Enter-tainer/typst-preview-vscode"
   },
-  "version": "0.1.0",
+  "version": "0.1.1",
   "engines": {
     "vscode": "^1.77.0"
   },
@@ -20,7 +20,7 @@
     "commands": [
       {
         "command": "typst-preview.preview",
-        "title": "type-preview: Preview current file",
+        "title": "Typst Preview: Preview current file",
         "description": "Launch typst-ws server"
       }
     ]
