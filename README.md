@@ -6,6 +6,8 @@ Install this extension from [marketplace](https://marketplace.visualstudio.com/i
 
 ![demo](demo.png)
 
+https://user-images.githubusercontent.com/25521218/230921917-e535340e-a535-44c3-964b-d33bc0b0cc88.mp4
+
 ## Requirements
 
 Please install [typst-ws](https://github.com/Enter-tainer/typst-ws) first.
