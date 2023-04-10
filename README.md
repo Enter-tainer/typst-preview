@@ -39,3 +39,8 @@ Initial release
 ### 0.1.6
 
 Add preview button
+
+### 0.1.7
+
+- Preview on type
+- Add config entry for `typst-ws` path
