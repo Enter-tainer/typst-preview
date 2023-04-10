@@ -13,19 +13,19 @@
   </style>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
+      const container = document.getElementById('imageContainer');
       const scaleFactor = 1.1;
       window.currentScale = 1;
-      let imageContainerWidth = document.getElementById('imageContainer').offsetWidth;
+      let imageContainerWidth = container.offsetWidth;
 
       window.onresize = () => {
-        const newImageContainerWidth = document.getElementById('imageContainer').offsetWidth;
+        const newImageContainerWidth = container.offsetWidth;
         window.currentScale = window.currentScale * (newImageContainerWidth / imageContainerWidth);
         imageContainerWidth = newImageContainerWidth;
-        imageContainer.style.transformOrigin = "0px 0px";
-        imageContainer.style.transform = `scale(${window.currentScale})`;
+        container.style.transformOrigin = "0px 0px";
+        container.style.transform = `scale(${window.currentScale})`;
       }
 
-      const container = document.getElementById('imageContainer');
       container.addEventListener('wheel', function (event) {
         console.log(event)
         if (event.ctrlKey) {
