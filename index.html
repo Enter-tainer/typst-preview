@@ -57,6 +57,7 @@
     let cnt = 0;
     let meta_data = null;
     let canvas_handle = [];
+    let isFirstScale = true;
 
     const socket = new WebSocket('ws://127.0.0.1:23625');
     socket.binaryType = "arraybuffer";
@@ -74,10 +75,14 @@
         console.log(meta_data);
         cnt = meta_data.page_num;
 
-        // compute scaling factor according to the paper size
-        window.currentScale = imageContainer.offsetWidth / meta_data.width;
-        imageContainer.style.transformOrigin = "0px 0px";
-        imageContainer.style.transform = `scale(${window.currentScale})`;
+        // only run once at start to respect user scaling
+        if (isFirstScale) {
+          // compute scaling factor according to the paper size
+          window.currentScale = imageContainer.offsetWidth / meta_data.width;
+          imageContainer.style.transformOrigin = "0px 0px";
+          imageContainer.style.transform = `scale(${window.currentScale})`;
+          isFirstScale = false;
+        }
 
         while (canvas_handle.length > cnt) {
           const removed = canvas_handle.pop();
