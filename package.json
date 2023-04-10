@@ -41,6 +41,16 @@
           "group": "navigation"
         }
       ]
+    },
+    "configuration": {
+      "title": "Typst Preview",
+      "properties": {
+        "typst-ws.executable": {
+          "type": "string",
+          "default": "typst-ws",
+          "description": "Path to typst-ws executable"
+        }
+      }
     }
   },
   "scripts": {
