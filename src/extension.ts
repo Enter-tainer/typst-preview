@@ -10,6 +10,10 @@ function loadHTMLFile(context: vscode.ExtensionContext, relativePath: string) {
 	return fileContents;
 }
 
+function getTypstWsPath(): string {
+	return vscode.workspace.getConfiguration().get<string>('typst-ws.executable') || 'typst-ws';
+}
+
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
@@ -28,7 +32,7 @@ export function activate(context: vscode.ExtensionContext) {
 		if (activeEditor) {
 			let filePath = activeEditor.document.uri.fsPath;
 			console.log('File path:', filePath);
-			const serverProcess = spawn(`typst-ws`, ['watch', filePath]);
+			const serverProcess = spawn(getTypstWsPath(), ['watch', filePath]);
 			serverProcess.stdout.on('data', (data) => {
 				console.log(`${data}`);
 			});
