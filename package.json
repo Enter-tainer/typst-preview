@@ -7,7 +7,7 @@
     "type": "git",
     "url": "https://github.com/Enter-tainer/typst-preview-vscode"
   },
-  "version": "0.1.7",
+  "version": "0.1.8",
   "engines": {
     "vscode": "^1.77.0"
   },

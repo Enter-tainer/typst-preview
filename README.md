@@ -1,4 +1,4 @@
-# typst-preview README
+# Typst Preview VSCode
 
 Preview your Typst files in vscode instantly
 
