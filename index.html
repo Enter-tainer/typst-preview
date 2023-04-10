@@ -14,10 +14,10 @@
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       const container = document.getElementById('imageContainer');
-      const scaleFactor = 1.1;
-      window.currentScale = 1;
+      window.currentScale = 1;  // a global variable for storing scaling factor
       let imageContainerWidth = container.offsetWidth;
 
+      // drag (panal resizing) -> rescaling
       window.onresize = () => {
         const newImageContainerWidth = container.offsetWidth;
         window.currentScale = window.currentScale * (newImageContainerWidth / imageContainerWidth);
@@ -26,7 +26,9 @@
         container.style.transform = `scale(${window.currentScale})`;
       }
 
+      // Ctrl+scroll rescaling
       container.addEventListener('wheel', function (event) {
+        const scaleFactor = 1.1;  // 1.1x per scroll
         console.log(event)
         if (event.ctrlKey) {
           event.preventDefault();
@@ -72,6 +74,7 @@
         console.log(meta_data)
         cnt = meta_data.page_num
 
+        // compute scaling factor according to the paper size
         window.currentScale = imageContainer.offsetWidth / meta_data.width
         imageContainer.style.transformOrigin = "0px 0px"
         imageContainer.style.transform = `scale(${window.currentScale})`
