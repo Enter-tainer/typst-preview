@@ -64,7 +64,7 @@ export function activate(context: vscode.ExtensionContext) {
 			});
 
 			serverProcess.on('exit', (code) => {
-				if (code !== 0) {
+				if (code !== null && code !== 0) {
 					vscode.window.showErrorMessage(`typst-ws process exited with code ${code}`);
 				}
 				console.log(`child process exited with code ${code}`);
