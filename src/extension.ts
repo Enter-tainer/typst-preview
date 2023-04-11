@@ -15,14 +15,15 @@ function getTypstWsPath(): string {
 	return vscode.workspace.getConfiguration().get<string>('typst-ws.executable') || 'typst-ws';
 }
 
+const serverProcesses: Array<any> = [];
+const shadowFilePaths: Array<string> = [];
+
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
 
 	// Use the console to output diagnostic information (console.log) and errors (console.error)
 	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "typst-preview" is now active!');
-
 	// The command has been defined in the package.json file
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
@@ -54,22 +55,25 @@ export function activate(context: vscode.ExtensionContext) {
 				}
 			});
 			const serverProcess = spawn(getTypstWsPath(), ['watch', shadowFilePath]);
+			serverProcess.on('error', (err) => {
+				console.error('Failed to start server process');
+				vscode.window.showErrorMessage(`Failed to start typst-ws process: ${err}`);
+			});
 			serverProcess.stdout.on('data', (data) => {
 				console.log(`${data}`);
 			});
 
-			serverProcess.stderr.on('data', (data) => {
-				console.log(`${data}`);
-			});
-
 			serverProcess.on('exit', (code) => {
+				if (code !== 0) {
+					vscode.window.showErrorMessage(`typst-ws process exited with code ${code}`);
+				}
 				console.log(`child process exited with code ${code}`);
 			});
+
+			serverProcesses.push(serverProcesses);
+			shadowFilePaths.push(shadowFilePath);
+
 			console.log('Launched server');
-			const webviewOptions = {
-				enableScripts: true,
-				enableWebsockets: true,
-			};
 
 			// Create and show a new WebView
 			const panel = vscode.window.createWebviewPanel(
@@ -82,11 +86,11 @@ export function activate(context: vscode.ExtensionContext) {
 			);
 
 			panel.onDidDispose(async () => {
-				serverProcess.kill();
-				panel.dispose();
 				// remove shadow file
 				await vscode.workspace.fs.delete(vscode.Uri.file(shadowFilePath));
-				console.log("killing preview service");
+				serverProcess.kill();
+				console.log('killed preview services and removed shadow file: ' + shadowFilePath);
+				panel.dispose();
 			});
 
 			// 将已经准备好的 HTML 设置为 Webview 内容
@@ -101,4 +105,18 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 // This method is called when your extension is deactivated
-export function deactivate() { }
+export async function deactivate() {
+	console.log(shadowFilePaths);
+	for (const shadowFilePath of shadowFilePaths) {
+		try {
+			await vscode.workspace.fs.delete(vscode.Uri.file(shadowFilePath));
+		} catch (e) {
+			console.error('Failed to remove shadow file: ' + shadowFilePath);
+			console.error(e);
+		}
+	}
+	console.log('killing preview services');
+	for (const serverProcess of serverProcesses) {
+		serverProcess.kill();
+	}
+}
