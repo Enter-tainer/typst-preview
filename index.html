@@ -12,115 +12,112 @@
     }
   </style>
   <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      const container = document.getElementById('imageContainer');
-      window.currentScale = 1;  // a global variable for storing scaling factor
-      let imageContainerWidth = container.offsetWidth;
+    window.onload = function () {
+      const imageContainer = document.getElementById('imageContainer');
+      let currentScale = 1;  // variable for storing scaling factor
+      let imageContainerWidth = imageContainer.offsetWidth;
 
       // drag (panal resizing) -> rescaling
       window.onresize = () => {
-        const newImageContainerWidth = container.offsetWidth;
-        window.currentScale = window.currentScale * (newImageContainerWidth / imageContainerWidth);
+        const newImageContainerWidth = imageContainer.offsetWidth;
+        currentScale = currentScale * (newImageContainerWidth / imageContainerWidth);
         imageContainerWidth = newImageContainerWidth;
-        container.style.transformOrigin = "0px 0px";
-        container.style.transform = `scale(${window.currentScale})`;
+        imageContainer.style.transformOrigin = "0px 0px";
+        imageContainer.style.transform = `scale(${currentScale})`;
       }
 
       // Ctrl+scroll rescaling
-      container.addEventListener('wheel', function (event) {
+      imageContainer.addEventListener('wheel', function (event) {
         const scaleFactor = 1.1;  // 1.1x per scroll
-        console.log(event);
         if (event.ctrlKey) {
           event.preventDefault();
 
           // Get wheel scroll direction and calculate new scale
           const delta = (event.deltaY < 0) ? scaleFactor : 1 / scaleFactor;
-          if (window.currentScale * delta >= 5 || window.currentScale * delta <= 0.2) {
+          if (currentScale * delta >= 5 || currentScale * delta <= 0.2) {
             // clamp
             return;
           }
-          window.currentScale = window.currentScale * delta;
+          currentScale = currentScale * delta;
 
           // Update transform origin to mouse position
-          const mouseX = event.clientX / window.currentScale * (1 - delta);
-          const mouseY = event.clientY / window.currentScale * (1 - delta);
-          container.style.transformOrigin = `${mouseX}px ${mouseY}px`;
+          const mouseX = event.clientX / currentScale * (1 - delta);
+          const mouseY = event.clientY / currentScale * (1 - delta);
+          imageContainer.style.transformOrigin = `${mouseX}px ${mouseY}px`;
 
           // Apply new scale
-          container.style.transform = `scale(${window.currentScale})`;
+          imageContainer.style.transform = `scale(${currentScale})`;
         }
       });
-    });
+
+      // 0: should receive json
+      let cnt = 0;
+      let meta_data = null;
+      let canvas_handle = [];
+      let isFirstScale = true;
+
+      const socket = new WebSocket('ws://127.0.0.1:23625');
+      socket.binaryType = "arraybuffer";
+      socket.addEventListener('open', () => {
+        console.log('WebSocket connection opened');
+      });
+
+      // 当收到WebSocket数据时
+      socket.addEventListener('message', (event) => {
+        // 解析收到的JSON数组
+        if (cnt == 0) {
+          meta_data = JSON.parse(event.data);
+          console.log('recv meta: ');
+          console.log(meta_data);
+          cnt = meta_data.page_num;
+
+          // only run once at start to respect user scaling
+          if (isFirstScale) {
+            // compute scaling factor according to the paper size
+            imageContainerWidth = imageContainer.offsetWidth;
+            currentScale = imageContainerWidth / meta_data.width;
+            imageContainer.style.transformOrigin = "0px 0px";
+            imageContainer.style.transform = `scale(${currentScale})`;
+            isFirstScale = false;
+          }
+
+          while (canvas_handle.length > cnt) {
+            const removed = canvas_handle.pop();
+            imageContainer.removeChild(removed);
+          }
+          while (canvas_handle.length < cnt) {
+            const canvas = document.createElement('canvas');
+            canvas.width = meta_data.width;
+            canvas.height = meta_data.height;
+            canvas.style.boxShadow = '0px 4px 12px rgba(89, 85, 101, .2)';
+            canvas.style.padding = '16px 0';
+            imageContainer.appendChild(canvas);
+            canvas_handle.push(canvas);
+          }
+        } else {
+          const canvas = canvas_handle[meta_data.page_num - cnt]
+          const ctx = canvas.getContext('2d');
+          const imageData = new ImageData(new Uint8ClampedArray(event.data), meta_data.width, meta_data.height);
+          ctx.putImageData(imageData, 0, 0);
+          cnt--;
+        }
+      });
+
+      // 当WebSocket连接关闭时
+      socket.addEventListener('close', () => {
+        console.log('WebSocket connection closed');
+      });
+
+      // 当发生错误时
+      socket.addEventListener('error', (error) => {
+        console.error('WebSocket Error: ', error);
+      });
+    };
   </script>
 </head>
 
 <body>
   <div id="imageContainer"></div>
-  <script>
-    // 0: should receive json
-    let cnt = 0;
-    let meta_data = null;
-    let canvas_handle = [];
-    let isFirstScale = true;
-
-    const socket = new WebSocket('ws://127.0.0.1:23625');
-    socket.binaryType = "arraybuffer";
-    const imageContainer = document.getElementById('imageContainer');
-    socket.addEventListener('open', () => {
-      console.log('WebSocket connection opened');
-    })
-
-    // 当收到WebSocket数据时
-    socket.addEventListener('message', (event) => {
-      // 解析收到的JSON数组
-      if (cnt == 0) {
-        meta_data = JSON.parse(event.data);
-        console.log('recv meta: ');
-        console.log(meta_data);
-        cnt = meta_data.page_num;
-
-        // only run once at start to respect user scaling
-        if (isFirstScale) {
-          // compute scaling factor according to the paper size
-          window.currentScale = imageContainer.offsetWidth / meta_data.width;
-          imageContainer.style.transformOrigin = "0px 0px";
-          imageContainer.style.transform = `scale(${window.currentScale})`;
-          isFirstScale = false;
-        }
-
-        while (canvas_handle.length > cnt) {
-          const removed = canvas_handle.pop();
-          imageContainer.removeChild(removed);
-        }
-        while (canvas_handle.length < cnt) {
-          const canvas = document.createElement('canvas');
-          canvas.width = meta_data.width;
-          canvas.height = meta_data.height;
-          canvas.style.boxShadow = '0px 4px 12px rgba(89, 85, 101, .2)';
-          canvas.style.padding = '16px 0';
-          imageContainer.appendChild(canvas);
-          canvas_handle.push(canvas);
-        }
-        return;
-      } else {
-        const canvas = canvas_handle[meta_data.page_num - cnt]
-        const ctx = canvas.getContext('2d');
-        const imageData = new ImageData(new Uint8ClampedArray(event.data), meta_data.width, meta_data.height);
-        ctx.putImageData(imageData, 0, 0);
-        cnt--;
-      }
-    });
-
-    // 当WebSocket连接关闭时
-    socket.addEventListener('close', () => {
-      console.log('WebSocket connection closed');
-    });
-
-    // 当发生错误时
-    socket.addEventListener('error', (error) => {
-      console.error('WebSocket Error: ', error);
-    });
-  </script>
 </body>
 
 </html>
