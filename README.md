@@ -25,7 +25,7 @@ TODO
 ## Known Issues
 
 - Ctrl+wheel is kind of strange
-- Render output mayby kind of blurry
+- Render output might be kind of blurry
 
 ## Acknowledgements
 
