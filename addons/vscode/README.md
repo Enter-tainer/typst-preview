@@ -8,17 +8,6 @@ Install this extension from [marketplace](https://marketplace.visualstudio.com/i
 
 https://user-images.githubusercontent.com/25521218/230921917-e535340e-a535-44c3-964b-d33bc0b0cc88.mp4
 
-## Requirements
-
-Please install [typst-ws](https://github.com/Enter-tainer/typst-ws) first.
-
-You can install from source using cargo:
-
-```bash
-cargo install --git https://github.com/Enter-tainer/typst-ws
-```
-
-Or you can download [prebuilt binary](https://nightly.link/Enter-tainer/typst-ws/workflows/build/master) for your platform, rename it to `typst-ws`, and put it in your `PATH`.
 ## Extension Settings
 
 TODO
