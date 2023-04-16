@@ -15,20 +15,7 @@
 			"outFiles": [
 				"${workspaceFolder}/addons/vscode/out/**/*.js"
 			],
-			"preLaunchTask": "${defaultBuildTask}"
-		},
-		{
-			"name": "Extension Tests",
-			"type": "extensionHost",
-			"request": "launch",
-			"args": [
-				"--extensionDevelopmentPath=${workspaceFolder}/addons/vscode",
-				"--extensionTestsPath=${workspaceFolder}/addons/vscode/out/test/suite/index"
-			],
-			"outFiles": [
-				"${workspaceFolder}/addons/vscode/out/test/**/*.js"
-			],
-			"preLaunchTask": "${defaultBuildTask}"
+			"preLaunchTask": "VS Code Extension Prelaunch"
 		}
 	]
 }

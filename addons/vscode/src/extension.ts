@@ -2,7 +2,7 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 import { spawn } from 'child_process';
-import { readFile } from 'fs/promises';
+import { access, readFile } from 'fs/promises';
 import * as path from 'path';
 
 async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: string) {
@@ -11,8 +11,29 @@ async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: stri
 	return fileContents;
 }
 
-function getTypstWsPath(): string {
-	return vscode.workspace.getConfiguration().get<string>('typst-ws.executable') || 'typst-ws';
+async function getTypstWsPath(context: vscode.ExtensionContext): Promise<string> {
+	const suffix = process.platform === "win32" ? ".exe" : "";
+	const binaryName = "typst-ws" + suffix;
+	const bundledPath = path.resolve(__dirname, binaryName);
+	const exists = async (path: string) => {
+		try {
+			await access(path);
+			return true;
+		} catch {
+			return false;
+		}
+	};
+	const configPath = vscode.workspace.getConfiguration().get<string>('typst-ws.executable');
+	console.log(bundledPath, configPath);
+	if (configPath !== undefined && configPath.length !== 0) {
+		return configPath;
+	}
+	if (await exists(bundledPath)) {
+		return bundledPath;
+	} else {
+		vscode.window.showWarningMessage(`Failed to find typst-ws executable at ${bundledPath}, maybe we didn't ship it for your platform? Using typst-ws from PATH`);
+		return binaryName;
+	}
 }
 
 const serverProcesses: Array<any> = [];
@@ -54,10 +75,11 @@ export function activate(context: vscode.ExtensionContext) {
 					await update();
 				}
 			});
-			const serverProcess = spawn(getTypstWsPath(), ['watch', shadowFilePath]);
+			const serverPath = await getTypstWsPath(context);
+			const serverProcess = spawn(serverPath, ['watch', shadowFilePath]);
 			serverProcess.on('error', (err) => {
 				console.error('Failed to start server process');
-				vscode.window.showErrorMessage(`Failed to start typst-ws process: ${err}`);
+				vscode.window.showErrorMessage(`Failed to start typst-ws(${serverPath}) process: ${err}`);
 			});
 			serverProcess.stdout.on('data', (data) => {
 				console.log(`${data}`);
