@@ -39,3 +39,9 @@ Add preview button
 ### 0.2.1
 
 - Bundle typst-ws within vsix. You no longer need to install typst-ws
+
+### 0.2.2
+
+- Fix server process not killed on exit(maybe)
+- Add config for OnSave/OnType
+- Add output channel for logging
