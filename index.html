@@ -6,6 +6,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WebSocket Multiple Image Display</title>
   <style>
+    
+    body {
+      background-color: #cccccc;
+    }
+    
     #imageContainer {
       margin: 0;
       transform-origin: 0 0;
@@ -13,6 +18,10 @@
 
     canvas:not(:last-child) {
       padding-bottom: 32px;
+    }
+    
+    canvas {
+      box-shadow: 0px 4px 12px rgba(89, 85, 101, .2);
     }
 
   </style>
@@ -106,7 +115,6 @@
             const canvas = document.createElement('canvas');
             canvas.width = meta_data.width;
             canvas.height = meta_data.height;
-            canvas.style.boxShadow = '0px 4px 12px rgba(89, 85, 101, .2)';
             imageContainer.appendChild(canvas);
             canvas_handle.push(canvas);
           }
