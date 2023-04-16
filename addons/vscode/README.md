@@ -35,3 +35,7 @@ Add preview button
 
 - Preview on type
 - Add config entry for `typst-ws` path
+
+### 0.2.1
+
+- Bundle typst-ws within vsix. You no longer need to install typst-ws

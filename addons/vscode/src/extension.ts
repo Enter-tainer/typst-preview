@@ -23,7 +23,7 @@ async function getTypstWsPath(context: vscode.ExtensionContext): Promise<string>
 			return false;
 		}
 	};
-	const configPath = vscode.workspace.getConfiguration().get<string>('typst-ws.executable');
+	const configPath = vscode.workspace.getConfiguration().get<string>('typst-preview.executable');
 	console.log(bundledPath, configPath);
 	if (configPath !== undefined && configPath.length !== 0) {
 		return configPath;
@@ -48,44 +48,53 @@ export function activate(context: vscode.ExtensionContext) {
 	// The command has been defined in the package.json file
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
+	const outputChannel = vscode.window.createOutputChannel('typst-preview');
 	let disposable = vscode.commands.registerCommand('typst-preview.preview', async () => {
 		// The code you place here will be executed every time your command is executed
 		// Display a message box to the user
-		let activeEditor = vscode.window.activeTextEditor;
+		const activeEditor = vscode.window.activeTextEditor;
+		const refreshStyle = vscode.workspace.getConfiguration().get<string>('typst-preview.refresh') || "onSave";
 		if (activeEditor) {
-			let filePath = activeEditor.document.uri.fsPath;
+			const filePath = activeEditor.document.uri.fsPath;
 			console.log('File path:', filePath);
 			// get file dir using path
-			let rootDir = path.dirname(filePath);
-			let filename = path.basename(filePath);
-			let shadowFilePath = path.join(rootDir, '.typst-preview.' + filename);
-			console.log('shadow file path:', shadowFilePath);
-			// copy file content to shadow file
-			let fileContent = activeEditor.document.getText();
-			await vscode.workspace.fs.writeFile(vscode.Uri.file(shadowFilePath), Buffer.from(fileContent));
-			const update = async () => {
-				// save file content to shadow file
-				if (activeEditor?.document) {
-					let fileContent = activeEditor?.document.getText();
-					await vscode.workspace.fs.writeFile(vscode.Uri.file(shadowFilePath), Buffer.from(fileContent));
-				}
-			};
-			vscode.workspace.onDidChangeTextDocument(async (e) => {
-				if (e.document === activeEditor?.document) {
-					await update();
-				}
-			});
+			const rootDir = path.dirname(filePath);
+			const filename = path.basename(filePath);
+			const shadowFilePath = path.join(rootDir, '.typst-preview.' + filename);
+			const filePathToWatch = refreshStyle === "onSave" ? filePath : shadowFilePath;
+			if (refreshStyle === "onType") {
+				console.log('shadow file path:', shadowFilePath);
+				// copy file content to shadow file
+				const fileContent = activeEditor.document.getText();
+				await vscode.workspace.fs.writeFile(vscode.Uri.file(shadowFilePath), Buffer.from(fileContent));
+				const update = async () => {
+					// save file content to shadow file
+					if (activeEditor?.document) {
+						const fileContent = activeEditor?.document.getText();
+						await vscode.workspace.fs.writeFile(vscode.Uri.file(shadowFilePath), Buffer.from(fileContent));
+					}
+				};
+				vscode.workspace.onDidChangeTextDocument(async (e) => {
+					if (e.document === activeEditor?.document) {
+						await update();
+					}
+				});
+				shadowFilePaths.push(shadowFilePath);
+			}
 			const serverPath = await getTypstWsPath(context);
-			const serverProcess = spawn(serverPath, ['watch', shadowFilePath]);
-			serverProcess.on('error', (err) => {
+			const serverProcess = spawn(serverPath, ['watch', filePathToWatch]);
+			console.log(`Watching ${filePathToWatch} for changes`);
+			serverProcess.on('error', (err: any) => {
 				console.error('Failed to start server process');
 				vscode.window.showErrorMessage(`Failed to start typst-ws(${serverPath}) process: ${err}`);
 			});
-			serverProcess.stdout.on('data', (data) => {
-				console.log(`${data}`);
+			serverProcess.stdout.on('data', (data: Buffer) => {
+				outputChannel.append(data.toString());
 			});
-
-			serverProcess.on('exit', (code) => {
+			serverProcess.stderr.on('data', (data: Buffer) => {
+				outputChannel.append(data.toString());
+			});
+			serverProcess.on('exit', (code: any) => {
 				if (code !== null && code !== 0) {
 					vscode.window.showErrorMessage(`typst-ws process exited with code ${code}`);
 				}
@@ -93,7 +102,6 @@ export function activate(context: vscode.ExtensionContext) {
 			});
 
 			serverProcesses.push(serverProcesses);
-			shadowFilePaths.push(shadowFilePath);
 
 			console.log('Launched server');
 
@@ -109,9 +117,12 @@ export function activate(context: vscode.ExtensionContext) {
 
 			panel.onDidDispose(async () => {
 				// remove shadow file
-				await vscode.workspace.fs.delete(vscode.Uri.file(shadowFilePath));
+				if (refreshStyle === "onType") {
+					await vscode.workspace.fs.delete(vscode.Uri.file(shadowFilePath));
+					console.log('removed shadow file');
+				}
 				serverProcess.kill();
-				console.log('killed preview services and removed shadow file: ' + shadowFilePath);
+				console.log('killed preview services');
 				panel.dispose();
 			});
 
@@ -124,6 +135,11 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	context.subscriptions.push(disposable);
+	process.on('SIGINT', () => {
+		for (const serverProcess of serverProcesses) {
+			serverProcess.kill();
+		}
+	});
 }
 
 // This method is called when your extension is deactivated

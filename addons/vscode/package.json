@@ -45,10 +45,24 @@
     "configuration": {
       "title": "Typst Preview",
       "properties": {
-        "typst-ws.executable": {
+        "typst-preview.executable": {
           "type": "string",
           "default": "",
-          "description": "Path to typst-ws executable"
+          "description": "Path to typst-ws executable. If not set, the extension will use bundled typst-ws. If bundled binary is not found, it will use typst-ws installed in PATH"
+        },
+        "typst-preview.refresh": {
+          "title": "Refresh preview",
+          "description": "Refresh preview when the document is saved or when the document is changed",
+          "type": "string",
+          "enum": [
+            "onSave",
+            "onType"
+          ],
+          "default": "onSave",
+          "enumDescriptions": [
+            "Refresh preview on save",
+            "Refresh preview on type"
+          ]
         }
       }
     }
@@ -70,10 +84,11 @@
     "@typescript-eslint/eslint-plugin": "^5.56.0",
     "@typescript-eslint/parser": "^5.56.0",
     "@vscode/test-electron": "^2.3.0",
+    "@vscode/vsce": "^2.19.0",
     "eslint": "^8.36.0",
     "glob": "^8.1.0",
     "mocha": "^10.2.0",
-    "typescript": "^4.9.5",
-    "@vscode/vsce": "^2.19.0"
-  }
+    "typescript": "^4.9.5"
+  },
+  "dependencies": {}
 }
