@@ -1,21 +1,60 @@
-// See https://go.microsoft.com/fwlink/?LinkId=733558
-// for the documentation about the tasks.json format
 {
 	"version": "2.0.0",
 	"tasks": [
 		{
+			"label": "VS Code Extension Prelaunch",
+			"dependsOn": [
+				"Compile VS Code Extension",
+				"Build Binary",
+				"Copy Binary to VS Code Extension"
+			],
+			"dependsOrder": "sequence",
+			"problemMatcher": []
+		},
+		{
+			"label": "Compile VS Code Extension",
 			"type": "npm",
-			"script": "watch",
-			"problemMatcher": "$tsc-watch",
-			"isBackground": true,
-			"presentation": {
-				"reveal": "never"
+			"script": "compile",
+			"path": "addons/vscode",
+			"group": "build",
+			"problemMatcher": []
+		},
+		{
+			"label": "Build Binary",
+			"type": "cargo",
+			"command": "build",
+			"args": [
+				"--release"
+			],
+			"problemMatcher": [
+				"$rustc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Copy Binary to VS Code Extension",
+			"type": "shell",
+			"windows": {
+				"command": "cp",
+				"args": [
+					"${workspaceFolder}\\target\\release\\typst-ws.exe",
+					"${workspaceFolder}\\addons\\vscode\\out\\"
+				]
 			},
-			"group": {
-				"kind": "build",
-				"isDefault": true
+			"linux": {
+				"command": "cp",
+				"args": [
+					"${workspaceFolder}/target/release/typst-ws",
+					"${workspaceFolder}/addons/vscode/out/"
+				]
 			},
-			"path": "addons/vscode/"
+			"osx": {
+				"command": "cp",
+				"args": [
+					"${workspaceFolder}/target/release/typst-ws",
+					"${workspaceFolder}/addons/vscode/out/"
+				]
+			}
 		}
 	]
 }

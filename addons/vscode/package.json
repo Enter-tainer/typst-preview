@@ -47,7 +47,7 @@
       "properties": {
         "typst-ws.executable": {
           "type": "string",
-          "default": "typst-ws",
+          "default": "",
           "description": "Path to typst-ws executable"
         }
       }
