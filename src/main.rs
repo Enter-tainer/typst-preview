@@ -1,4 +1,5 @@
 mod args;
+mod encoding;
 
 use clap::Parser;
 use codespan_reporting::diagnostic::{Diagnostic, Label};
@@ -23,6 +24,14 @@ use std::str::FromStr;
 use std::sync::Arc;
 use termcolor::{ColorChoice, StandardStream, WriteColor};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::time::Instant;
+use tracing::span::Attributes;
+use tracing::{span, Id, Level, Subscriber};
+use tracing_subscriber::layer::Context;
+use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
+use tracing_subscriber::registry::LookupSpan;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::Layer;
 
 use tokio::sync::Mutex;
 use tokio_tungstenite::tungstenite::Message;
@@ -37,6 +46,7 @@ use typst::World;
 use walkdir::WalkDir;
 
 use crate::args::{CliArguments, Command, CompileCommand};
+use crate::encoding::rle_encode;
 
 type CodespanResult<T> = Result<T, CodespanError>;
 type CodespanError = codespan_reporting::files::Error;
@@ -115,10 +125,45 @@ impl FontsSettings {
     }
 }
 
+struct Timing {
+    started_at: Instant,
+}
+
+pub struct CustomLayer;
+
+impl<S> Layer<S> for CustomLayer
+where
+    S: Subscriber,
+    S: for<'lookup> LookupSpan<'lookup>,
+{
+    fn on_new_span(&self, _attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
+        let span = ctx.span(id).unwrap();
+
+        span.extensions_mut().insert(Timing {
+            started_at: Instant::now(),
+        });
+    }
+
+    fn on_close(&self, id: Id, ctx: Context<'_, S>) {
+        let span = ctx.span(&id).unwrap();
+
+        let started_at = span.extensions().get::<Timing>().unwrap().started_at;
+
+        println!(
+            "span {} took {}ms",
+            span.metadata().name(),
+            (Instant::now() - started_at).as_millis(),
+        );
+    }
+}
+
 /// Entry point.
 #[tokio::main]
 async fn main() {
-    let _ = env_logger::builder()  .filter_level(log::LevelFilter::Info).try_init();
+    // tracing_subscriber::registry().with(CustomLayer).init();
+    let _ = env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .try_init();
     let arguments = CliArguments::parse();
     let conns = Arc::new(Mutex::new(Vec::new()));
     {
@@ -257,6 +302,7 @@ async fn watch(
     }
 }
 
+#[tracing::instrument(skip_all)]
 async fn broadcast_result(
     conns: Arc<Mutex<Vec<WebSocketStream<TcpStream>>>>,
     imgs: Vec<tiny_skia::Pixmap>,
@@ -281,15 +327,20 @@ async fn broadcast_result(
             error!("failed to send to client: {}", err);
             to_be_remove.push(i);
         }
+        let mut byte_cnt = 0;
         for page in imgs.iter() {
-            let _ = conn.send(Message::Binary(page.data().to_vec())).await; // don't care result here
+            let data = rle_encode::<4>(page.data());
+            byte_cnt += data.len();
+            let _ = conn.send(Message::Binary(data)).await; // don't care result here
         }
+        info!("sent {} bytes to client", byte_cnt);
     }
     // remove
     conn_lock.retain(with_index(|index, _item| !to_be_remove.contains(&index)));
 }
 
 /// Compile a single time.
+#[tracing::instrument(skip_all)]
 fn compile_once(
     world: &mut SystemWorld,
     command: &CompileSettings,
@@ -308,6 +359,8 @@ fn compile_once(
                 .pages
                 .iter()
                 .map(|frame| {
+                    let span = span!(Level::TRACE, "render to bitmap");
+                    let _enter = span.enter();
                     typst::export::render(
                         frame,
                         2.0,

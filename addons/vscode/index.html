@@ -26,6 +26,19 @@
 
   </style>
   <script>
+    function decode_rle(input, len) {
+      const output = new Uint8ClampedArray(len);
+      let i = 0;
+      for (let j = 0; j < input.length; j += 5) {
+        const count = input[j];
+        const value = input.slice(j + 1, j + 5);
+        for (let k = 0; k < count; k++) {
+          output.set(value, i);
+          i += 4;
+        }
+      }
+      return output;
+    }
     window.onload = function () {
       const imageContainer = document.getElementById('imageContainer');
       let currentScale = 1;  // variable for storing scaling factor
@@ -121,7 +134,9 @@
         } else {
           const canvas = canvas_handle[meta_data.page_num - cnt]
           const ctx = canvas.getContext('2d');
-          const imageData = new ImageData(new Uint8ClampedArray(event.data), meta_data.width, meta_data.height);
+          const rleEncodedData = new Uint8ClampedArray(event.data)
+          const rleDecodedData = decode_rle(rleEncodedData, meta_data.width * meta_data.height * 4);
+          const imageData = new ImageData(rleDecodedData, meta_data.width, meta_data.height);
           ctx.putImageData(imageData, 0, 0);
           cnt--;
         }
