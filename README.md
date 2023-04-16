@@ -9,3 +9,8 @@ https://user-images.githubusercontent.com/25521218/230921917-e535340e-a535-44c3-
 This repo contains:
 - the native part of the extension, in rust
 - a vscode extension, in typescript
+
+## Acknowledgements
+
+- typst: The rust part of this repo is a thin wrapper around typst.
+- typst-lsp: The CI and the vscode extension are heavily inspired by typst-lsp.
