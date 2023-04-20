@@ -45,3 +45,7 @@ Add preview button
 - Fix server process not killed on exit(maybe)
 - Add config for OnSave/OnType
 - Add output channel for logging
+
+### 0.2.3
+
+- Performance Improvement: only update pages when they are visible. This should improve performance when you have a lot of pages.
