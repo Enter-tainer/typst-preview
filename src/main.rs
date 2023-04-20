@@ -5,26 +5,28 @@ use codespan_reporting::diagnostic::{Diagnostic, Label};
 use codespan_reporting::term::{self, termcolor};
 use comemo::Prehashed;
 use elsa::FrozenVec;
-use futures::SinkExt;
+use futures::stream::{SplitSink, SplitStream};
+use futures::{SinkExt, StreamExt};
 use log::{error, info};
 use memmap2::Mmap;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use once_cell::unsync::OnceCell;
 use same_file::Handle;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use siphasher::sip128::{Hasher128, SipHasher};
 use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::hash::Hash;
 use std::io::{self, Write};
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 use termcolor::{ColorChoice, StandardStream, WriteColor};
 use tokio::net::{TcpListener, TcpStream};
 
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 use typst::diag::{FileError, FileResult, SourceError, StrResult};
@@ -114,19 +116,118 @@ impl FontsSettings {
         }
     }
 }
+#[derive(Debug)]
+struct Client {
+    tx: Mutex<SplitSink<WebSocketStream<TcpStream>, Message>>,
+    rx: Mutex<SplitStream<WebSocketStream<TcpStream>>>,
+    visible_range: Mutex<Option<Range<usize>>>,
+    dirty_marks: Mutex<Vec<bool>>,
+}
+
+impl Client {
+    async fn reset_dirty_mark(&self, len: usize) {
+        let mut dirty_marks = self.dirty_marks.lock().await;
+        dirty_marks.resize(len, true);
+        dirty_marks.fill(true);
+    }
+    async fn send(&self, imgs: &[tiny_skia::Pixmap]) -> bool {
+        #[derive(Debug, Serialize)]
+        struct Info {
+            page_total: usize,
+            page_numbers: Vec<usize>,
+            width: u32,
+            height: u32,
+        }
+        let visible_range = self
+            .visible_range
+            .lock()
+            .await
+            .clone()
+            .unwrap_or(0..imgs.len());
+        let mut pages_to_send = vec![];
+        {
+            let dirty_marks = self.dirty_marks.lock().await;
+            for i in visible_range.clone() {
+                if dirty_marks[i] {
+                    pages_to_send.push(i);
+                }
+            }
+        }
+        if pages_to_send.is_empty() {
+            return true;
+        }
+        let pages_to_send = pages_to_send;
+        let json = serde_json::to_string(&Info {
+            page_total: imgs.len(),
+            page_numbers: pages_to_send.clone(),
+            width: imgs[0].width(),
+            height: imgs[0].height(),
+        })
+        .unwrap();
+        if let Err(err) = self.tx.lock().await.send(Message::Text(json)).await {
+            error!("failed to send to client: {}", err);
+            return false;
+        }
+        let mut dirty_marks = self.dirty_marks.lock().await;
+        for &i in pages_to_send.iter() {
+            dirty_marks[i] = false;
+            let _ = self
+                .tx
+                .lock()
+                .await
+                .send(Message::Binary(imgs[i].data().to_vec()))
+                .await; // don't care result here
+        }
+        info!(
+            "visible range {:?}, sent pages {:?}",
+            visible_range, pages_to_send
+        );
+        true
+    }
+
+    async fn poll_visible_range(&self, imgs: Arc<RwLock<Vec<tiny_skia::Pixmap>>>) -> bool {
+        while let Some(msg) = self.rx.lock().await.next().await {
+            #[derive(Debug, Deserialize)]
+            struct VisibleRangeInfo {
+                page_start: usize,
+                page_end: usize,
+            }
+            match msg {
+                Ok(msg) => {
+                    if let Message::Text(text) = msg {
+                        let range: VisibleRangeInfo = serde_json::from_str(&text).unwrap();
+                        *self.visible_range.lock().await = Some(range.page_start..range.page_end);
+                        self.send(imgs.read().await.as_slice()).await;
+                    }
+                }
+                Err(err) => {
+                    error!("failed to receive from client: {}", err);
+                    return false;
+                }
+            }
+        }
+        true
+    }
+}
 
 /// Entry point.
 #[tokio::main]
 async fn main() {
-    let _ = env_logger::builder()  .filter_level(log::LevelFilter::Info).try_init();
+    let _ = env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .try_init();
     let arguments = CliArguments::parse();
     let conns = Arc::new(Mutex::new(Vec::new()));
+    let imgs = Arc::new(RwLock::new(Vec::new()));
     {
         let conns = conns.clone();
+        let imgs = imgs.clone();
         let arguments = arguments.clone();
         tokio::spawn(async {
             let res = match &arguments.command {
-                Command::Watch(_) => watch(CompileSettings::with_arguments(arguments), conns).await,
+                Command::Watch(_) => {
+                    watch(CompileSettings::with_arguments(arguments), conns, imgs).await
+                }
                 Command::Fonts(_) => fonts(FontsSettings::with_arguments(arguments)),
             };
 
@@ -147,7 +248,18 @@ async fn main() {
     while let Ok((stream, _)) = listener.accept().await {
         let conn = accept_connection(stream).await;
         {
-            conns.lock().await.push(conn);
+            let (tx, rx) = conn.split();
+            let client = Arc::new(Client {
+                tx: Mutex::new(tx),
+                rx: Mutex::new(rx),
+                visible_range: Mutex::new(None),
+                dirty_marks: Mutex::new(Vec::new()),
+            });
+            conns.lock().await.push(client.clone());
+            {
+                let imgs = imgs.clone();
+                tokio::spawn(async move { client.poll_visible_range(imgs).await });
+            }
         }
     }
 }
@@ -188,7 +300,8 @@ where
 /// Execute a compilation command.
 async fn watch(
     command: CompileSettings,
-    conns: Arc<Mutex<Vec<WebSocketStream<TcpStream>>>>,
+    conns: Arc<Mutex<Vec<Arc<Client>>>>,
+    imgs: Arc<RwLock<Vec<tiny_skia::Pixmap>>>,
 ) -> StrResult<()> {
     let root = if let Some(root) = &command.root {
         root.clone()
@@ -206,11 +319,14 @@ async fn watch(
 
     // Create the world that serves sources, fonts and files.
     let mut world = SystemWorld::new(root, &command.font_paths);
-    let imgs: Vec<_> = compile_once(&mut world, &command)?;
+    {
+        *imgs.write().await = compile_once(&mut world, &command)?;
+    }
     {
         let conns = conns.clone();
+        let imgs = imgs.clone();
         tokio::spawn(async move {
-            broadcast_result(conns, imgs).await;
+            broadcast_result(conns, &imgs.read().await).await;
         });
     }
     // Setup file watching.
@@ -245,11 +361,15 @@ async fn watch(
             recompile |= world.relevant(&event);
         }
         if recompile {
-            let imgs: Vec<_> = compile_once(&mut world, &command)?;
-            if !imgs.is_empty() {
+            let new_imgs: Vec<_> = compile_once(&mut world, &command)?;
+            if !new_imgs.is_empty() {
+                {
+                    *imgs.write().await = new_imgs;
+                }
                 let conns = conns.clone();
+                let imgs = imgs.clone();
                 tokio::spawn(async move {
-                    broadcast_result(conns, imgs).await;
+                    broadcast_result(conns, &imgs.read().await).await;
                 });
             }
             comemo::evict(30);
@@ -257,32 +377,14 @@ async fn watch(
     }
 }
 
-async fn broadcast_result(
-    conns: Arc<Mutex<Vec<WebSocketStream<TcpStream>>>>,
-    imgs: Vec<tiny_skia::Pixmap>,
-) {
+async fn broadcast_result(conns: Arc<Mutex<Vec<Arc<Client>>>>, imgs: &[tiny_skia::Pixmap]) {
     let mut conn_lock = conns.lock().await;
     info!("render done, sending to {} clients", conn_lock.len());
     let mut to_be_remove: Vec<usize> = vec![];
     for (i, conn) in conn_lock.iter_mut().enumerate() {
-        #[derive(Debug, Serialize)]
-        struct Info {
-            page_num: usize,
-            width: u32,
-            height: u32,
-        }
-        let json = serde_json::to_string(&Info {
-            page_num: imgs.len(),
-            width: imgs[0].width(),
-            height: imgs[0].height(),
-        })
-        .unwrap();
-        if let Err(err) = conn.send(Message::Text(json)).await {
-            error!("failed to send to client: {}", err);
+        conn.reset_dirty_mark(imgs.len()).await;
+        if !conn.send(imgs).await {
             to_be_remove.push(i);
-        }
-        for page in imgs.iter() {
-            let _ = conn.send(Message::Binary(page.data().to_vec())).await; // don't care result here
         }
     }
     // remove
