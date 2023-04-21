@@ -31,3 +31,8 @@ Add preview button
 ## 0.2.3
 
 - Performance Improvement: only update pages when they are visible. This should improve performance when you have a lot of pages.
+
+## 0.2.4
+
+- Automatically choose a free port to listen. This should fix the problem where you can't preview multiple files at the same time.
+- Server will exit right after client disconnects, preventing resource leak.

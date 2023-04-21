@@ -21,6 +21,7 @@ use std::hash::Hash;
 use std::io::{self, Write};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
+use std::process::exit;
 use std::str::FromStr;
 use std::sync::Arc;
 use termcolor::{ColorChoice, StandardStream, WriteColor};
@@ -206,7 +207,8 @@ impl Client {
                 }
             }
         }
-        true
+        error!("client disconnected");
+        exit(-1);
     }
 }
 
