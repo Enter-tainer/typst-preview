@@ -3,11 +3,12 @@
   "displayName": "Typst Preview",
   "description": "preview your typst document in instant",
   "publisher": "mgt19937",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/Enter-tainer/typst-preview-vscode"
   },
-  "version": "0.2.3",
+  "version": "0.2.4",
   "engines": {
     "vscode": "^1.77.0"
   },
