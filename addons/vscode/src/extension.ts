@@ -1,7 +1,7 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
-import { spawn } from 'child_process';
+import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import { access, readFile } from 'fs/promises';
 import * as path from 'path';
 
@@ -38,6 +38,41 @@ async function getTypstWsPath(context: vscode.ExtensionContext): Promise<string>
 
 const serverProcesses: Array<any> = [];
 const shadowFilePaths: Array<string> = [];
+
+function runServer(command: string, args: string[], outputChannel: vscode.OutputChannel): Promise<[string, ChildProcessWithoutNullStreams]> {
+	const serverProcess = spawn(command, args);
+	serverProcess.on('error', (err: any) => {
+		console.error('Failed to start server process');
+		vscode.window.showErrorMessage(`Failed to start typst-ws(${command}) process: ${err}`);
+	});
+	serverProcess.stdout.on('data', (data: Buffer) => {
+		outputChannel.append(data.toString());
+	});
+	serverProcess.stderr.on('data', (data: Buffer) => {
+		outputChannel.append(data.toString());
+	});
+	serverProcess.on('exit', (code: any) => {
+		if (code !== null && code !== 0) {
+			vscode.window.showErrorMessage(`typst-ws process exited with code ${code}`);
+		}
+		console.log(`child process exited with code ${code}`);
+	});
+
+	serverProcesses.push(serverProcesses);
+	return new Promise((resolve, reject) => {
+		serverProcess.stderr.on('data', (data: Buffer) => {
+			if (data.toString().includes("Listening on")) {
+				// port is 127.0.0.1:{port}, use regex
+				const port = data.toString().match(/127\.0\.0\.1:(\d+)/)?.[1];
+				if (port === undefined) {
+					reject("Failed to get port from log: " + data.toString());
+				} else {
+					resolve([port, serverProcess]);
+				}
+			}
+		});
+	});
+}
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -82,28 +117,9 @@ export function activate(context: vscode.ExtensionContext) {
 				shadowFilePaths.push(shadowFilePath);
 			}
 			const serverPath = await getTypstWsPath(context);
-			const serverProcess = spawn(serverPath, ['watch', filePathToWatch]);
 			console.log(`Watching ${filePathToWatch} for changes`);
-			serverProcess.on('error', (err: any) => {
-				console.error('Failed to start server process');
-				vscode.window.showErrorMessage(`Failed to start typst-ws(${serverPath}) process: ${err}`);
-			});
-			serverProcess.stdout.on('data', (data: Buffer) => {
-				outputChannel.append(data.toString());
-			});
-			serverProcess.stderr.on('data', (data: Buffer) => {
-				outputChannel.append(data.toString());
-			});
-			serverProcess.on('exit', (code: any) => {
-				if (code !== null && code !== 0) {
-					vscode.window.showErrorMessage(`typst-ws process exited with code ${code}`);
-				}
-				console.log(`child process exited with code ${code}`);
-			});
-
-			serverProcesses.push(serverProcesses);
-
-			console.log('Launched server');
+			const [port, serverProcess] = await runServer(serverPath, ["--host", "127.0.0.1:0", "watch", filePathToWatch], outputChannel);
+			console.log('Launched server, port:', port);
 
 			// Create and show a new WebView
 			const panel = vscode.window.createWebviewPanel(
@@ -128,7 +144,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 			// 将已经准备好的 HTML 设置为 Webview 内容
 			const html = await loadHTMLFile(context, './index.html');
-			panel.webview.html = html;
+			panel.webview.html = html.replace("ws://127.0.0.1:23625", `ws://127.0.0.1:${port}`);
 		} else {
 			vscode.window.showWarningMessage('No active editor');
 		}
