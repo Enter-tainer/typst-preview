@@ -10,6 +10,13 @@ This repo contains:
 - the native part of the extension, in rust
 - a vscode extension, in typescript
 
+## How it works?
+
+- The server is started, watching file changes, and listening to a websocket port.
+- The webview client connects to the websocket port.
+- The client sends the current visible range whenever the user scrolls/resizes the preview panel.
+- The server sends rendered framebuffers to the client whenever the typst document is updated.
+
 ## Acknowledgements
 
 - typst: The rust part of this repo is a thin wrapper around typst.
