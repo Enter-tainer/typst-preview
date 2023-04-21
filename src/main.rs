@@ -243,7 +243,7 @@ async fn main() {
     // Create the event loop and TCP listener we'll accept connections on.
     let try_socket = TcpListener::bind(&addr).await;
     let listener = try_socket.expect("Failed to bind");
-    info!("Listening on: {}", addr);
+    info!("Listening on: {}", listener.local_addr().unwrap());
 
     while let Ok((stream, _)) = listener.accept().await {
         let conn = accept_connection(stream).await;
