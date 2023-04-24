@@ -26,6 +26,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use termcolor::{ColorChoice, StandardStream, WriteColor};
 use tokio::net::{TcpListener, TcpStream};
+use typst::doc::Frame;
 
 use tokio::sync::{Mutex, RwLock};
 use tokio_tungstenite::tungstenite::Message;
@@ -123,13 +124,23 @@ struct Client {
     rx: Mutex<SplitStream<WebSocketStream<TcpStream>>>,
     visible_range: Mutex<Option<Range<usize>>>,
     dirty_marks: Mutex<Vec<bool>>,
+    pages_hashes: Mutex<Vec<u128>>,
 }
 
 impl Client {
-    async fn reset_dirty_mark(&self, len: usize) {
+    async fn update_hashes(&self, new_hashes: Vec<u128>) {
         let mut dirty_marks = self.dirty_marks.lock().await;
-        dirty_marks.resize(len, true);
-        dirty_marks.fill(true);
+        dirty_marks.resize(new_hashes.len(), true);
+        let mut pages_hashes = self.pages_hashes.lock().await;
+        let mut updated_pages = vec![];
+        for (i, &hash) in new_hashes.iter().enumerate() {
+            if i < pages_hashes.len() && hash != pages_hashes[i] {
+                dirty_marks[i] = true;
+                updated_pages.push(i);
+            }
+        }
+        *pages_hashes = new_hashes;
+        info!("updated pages: {:?}", updated_pages);
     }
     async fn send(&self, imgs: &[tiny_skia::Pixmap]) -> bool {
         #[derive(Debug, Serialize)]
@@ -256,6 +267,7 @@ async fn main() {
                 rx: Mutex::new(rx),
                 visible_range: Mutex::new(None),
                 dirty_marks: Mutex::new(Vec::new()),
+                pages_hashes: Mutex::new(Vec::new()),
             });
             conns.lock().await.push(client.clone());
             {
@@ -322,14 +334,14 @@ async fn watch(
     // Create the world that serves sources, fonts and files.
     let mut world = SystemWorld::new(root, &command.font_paths);
     {
-        *imgs.write().await = compile_once(&mut world, &command)?;
-    }
-    {
-        let conns = conns.clone();
-        let imgs = imgs.clone();
-        tokio::spawn(async move {
-            broadcast_result(conns, &imgs.read().await).await;
-        });
+        if let Some((new_imgs, hashes)) = compile_once(&mut world, &command)? {
+            *imgs.write().await = new_imgs;
+            let conns = conns.clone();
+            let imgs = imgs.clone();
+            tokio::spawn(async move {
+                broadcast_result(conns, &imgs.read().await, hashes).await;
+            });
+        }
     }
     // Setup file watching.
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
@@ -363,28 +375,33 @@ async fn watch(
             recompile |= world.relevant(&event);
         }
         if recompile {
-            let new_imgs: Vec<_> = compile_once(&mut world, &command)?;
-            if !new_imgs.is_empty() {
-                {
-                    *imgs.write().await = new_imgs;
+            if let Some((new_imgs, hashes)) = compile_once(&mut world, &command)? {
+                if !new_imgs.is_empty() {
+                    {
+                        *imgs.write().await = new_imgs;
+                    }
+                    let conns = conns.clone();
+                    let imgs = imgs.clone();
+                    tokio::spawn(async move {
+                        broadcast_result(conns, &imgs.read().await, hashes).await;
+                    });
                 }
-                let conns = conns.clone();
-                let imgs = imgs.clone();
-                tokio::spawn(async move {
-                    broadcast_result(conns, &imgs.read().await).await;
-                });
+                comemo::evict(30);
             }
-            comemo::evict(30);
         }
     }
 }
 
-async fn broadcast_result(conns: Arc<Mutex<Vec<Arc<Client>>>>, imgs: &[tiny_skia::Pixmap]) {
+async fn broadcast_result(
+    conns: Arc<Mutex<Vec<Arc<Client>>>>,
+    imgs: &[tiny_skia::Pixmap],
+    hashes: Vec<u128>,
+) {
     let mut conn_lock = conns.lock().await;
     info!("render done, sending to {} clients", conn_lock.len());
     let mut to_be_remove: Vec<usize> = vec![];
     for (i, conn) in conn_lock.iter_mut().enumerate() {
-        conn.reset_dirty_mark(imgs.len()).await;
+        conn.update_hashes(hashes.clone()).await;
         if !conn.send(imgs).await {
             to_be_remove.push(i);
         }
@@ -393,11 +410,17 @@ async fn broadcast_result(conns: Arc<Mutex<Vec<Arc<Client>>>>, imgs: &[tiny_skia
     conn_lock.retain(with_index(|index, _item| !to_be_remove.contains(&index)));
 }
 
+fn hash_frame(page: &Frame) -> u128 {
+    let mut hasher = SipHasher::new();
+    page.hash(&mut hasher);
+    hasher.finish128().as_u128()
+}
+
 /// Compile a single time.
 fn compile_once(
     world: &mut SystemWorld,
     command: &CompileSettings,
-) -> StrResult<Vec<tiny_skia::Pixmap>> {
+) -> StrResult<Option<(Vec<tiny_skia::Pixmap>, Vec<u128>)>> {
     status(command, Status::Compiling).unwrap();
 
     world.reset();
@@ -419,15 +442,20 @@ fn compile_once(
                     )
                 })
                 .collect();
+            let hashes = document
+                .pages
+                .iter()
+                .map(hash_frame)
+                .collect();
             status(command, Status::Success).unwrap();
-            Ok(pixmaps)
+            Ok(Some((pixmaps, hashes)))
         }
 
         // Print diagnostics.
         Err(errors) => {
             status(command, Status::Error).unwrap();
             print_diagnostics(world, *errors).map_err(|_| "failed to print diagnostics")?;
-            Ok(vec![])
+            Ok(None)
         }
     }
 }
