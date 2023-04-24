@@ -132,14 +132,17 @@ impl Client {
         let mut dirty_marks = self.dirty_marks.lock().await;
         dirty_marks.resize(new_hashes.len(), true);
         let mut pages_hashes = self.pages_hashes.lock().await;
-        let mut updated_pages = vec![];
         for (i, &hash) in new_hashes.iter().enumerate() {
             if i < pages_hashes.len() && hash != pages_hashes[i] {
                 dirty_marks[i] = true;
-                updated_pages.push(i);
             }
         }
         *pages_hashes = new_hashes;
+        let updated_pages = dirty_marks
+            .iter()
+            .enumerate()
+            .filter_map(|(i, &dirty)| if dirty { Some(i) } else { None })
+            .collect::<Vec<_>>();
         info!("updated pages: {:?}", updated_pages);
     }
     async fn send(&self, imgs: &[tiny_skia::Pixmap]) -> bool {
