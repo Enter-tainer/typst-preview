@@ -81,6 +81,7 @@
       let meta_data = null;
       let canvas_handle = [];
       let isFirstScale = true;
+      let processStart;
 
       const socket = new WebSocket('ws://127.0.0.1:23625');
       socket.binaryType = "arraybuffer";
@@ -92,6 +93,7 @@
       socket.addEventListener('message', (event) => {
         // 解析收到的JSON数组
         if (inflightPages == 0) {
+          processStart = performance.now();
           meta_data = JSON.parse(event.data);
           console.log(meta_data);
           inflightPages = meta_data.page_numbers.length;
@@ -117,7 +119,9 @@
             imageContainer.appendChild(canvas);
             canvas_handle.push(canvas);
           }
+          console.log(`meta data process time: ${performance.now() - processStart}ms`)
         } else {
+          const pageProcessStart = performance.now();
           const id = meta_data.page_numbers[meta_data.page_numbers.length - inflightPages];
           console.log(`page ${id} received`)
           const canvas = canvas_handle[id]
@@ -125,6 +129,10 @@
           const imageData = new ImageData(new Uint8ClampedArray(event.data), meta_data.width, meta_data.height);
           ctx.putImageData(imageData, 0, 0);
           inflightPages--;
+          console.log(`page ${id} process time: ${performance.now() - pageProcessStart}ms`)
+          if (inflightPages == 0) {
+            console.log(`total process time: ${performance.now() - processStart}ms`)
+          }
         }
       });
 
