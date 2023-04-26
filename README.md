@@ -1,6 +1,6 @@
 # Typst Preview VSCode
 
-Preview your Typst files in vscode instantly
+Preview your Typst files in vscode instantly!
 
 Install this extension from [marketplace](https://marketplace.visualstudio.com/items?itemName=mgt19937.typst-preview), open command palette (Ctrl+Shift+P), and type `>Typst Preview:`.
 
@@ -11,6 +11,8 @@ This repo contains:
 - a vscode extension, in typescript
 
 ## How it works?
+
+The extension watches for file changes, and sends the compiled framebuffers to the client. Framebuffers are used here because they are faster than pdf.
 
 - The server is started, watching file changes, and listening to a websocket port.
 - The webview client connects to the websocket port.

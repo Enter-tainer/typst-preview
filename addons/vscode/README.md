@@ -54,3 +54,8 @@ Add preview button
 
 - Automatically choose a free port to listen. This should fix the problem where you can't preview multiple files at the same time.
 - Server will exit right after client disconnects, preventing resource leak.
+
+### 0.3.0
+
+- Upgrade typst to v0.3.0
+- Fix panic when pages are removed
