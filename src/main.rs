@@ -163,8 +163,10 @@ impl Client {
         {
             let dirty_marks = self.dirty_marks.lock().await;
             for i in visible_range.clone() {
-                if dirty_marks[i] {
-                    pages_to_send.push(i);
+                if let Some(dirty_mark) = dirty_marks.get(i) {
+                    if *dirty_mark {
+                        pages_to_send.push(i);
+                    }
                 }
             }
         }

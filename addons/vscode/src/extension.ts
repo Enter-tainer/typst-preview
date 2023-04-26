@@ -40,7 +40,12 @@ const serverProcesses: Array<any> = [];
 const shadowFilePaths: Array<string> = [];
 
 function runServer(command: string, args: string[], outputChannel: vscode.OutputChannel): Promise<[string, ChildProcessWithoutNullStreams]> {
-	const serverProcess = spawn(command, args);
+	const serverProcess = spawn(command, args, {
+		env: {
+			// eslint-disable-next-line @typescript-eslint/naming-convention
+			"RUST_BACKTRACE": "1",
+		}
+	});
 	serverProcess.on('error', (err: any) => {
 		console.error('Failed to start server process');
 		vscode.window.showErrorMessage(`Failed to start typst-ws(${command}) process: ${err}`);
