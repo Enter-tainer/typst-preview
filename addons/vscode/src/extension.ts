@@ -1,8 +1,9 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
-import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
-import { access, readFile } from 'fs/promises';
+import { ChildProcessWithoutNullStreams } from 'child_process';
+import { spawn, sync as spawnSync } from 'cross-spawn';
+import { readFile } from 'fs/promises';
 import * as path from 'path';
 
 async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: string) {
@@ -11,29 +12,54 @@ async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: stri
 	return fileContents;
 }
 
-async function getTypstWsPath(context: vscode.ExtensionContext): Promise<string> {
-	const suffix = process.platform === "win32" ? ".exe" : "";
-	const binaryName = "typst-ws" + suffix;
-	const bundledPath = path.resolve(__dirname, binaryName);
-	const exists = async (path: string) => {
-		try {
-			await access(path);
-			return true;
-		} catch {
-			return false;
-		}
+export async function getTypstWsPath(): Promise<string> {
+	const state = getTypstWsPath as unknown as any;
+	(!state.BINARY_NAME) && (state.BINARY_NAME = "typst-ws");
+	(!state.getConfig) && (state.getConfig = (
+	  () => vscode.workspace.getConfiguration().get<string>('typst-preview.executable')));
+
+	const bundledPath = path.resolve(__dirname, state.BINARY_NAME);
+	const configPath = state.getConfig();
+
+	if (state.bundledPath === bundledPath && state.configPath === configPath) {
+		// console.log('getTypstWsPath cached', state.resolved);
+		return state.resolved;
+	}
+	state.bundledPath = bundledPath;
+	state.configPath = configPath;
+
+	const executableExists = (path: string) => {
+		return new Promise(resolve => {
+			try {
+				const spawnRet = spawn(path, ['--help'], {
+					timeout: 1000, /// 1 second
+				});
+				spawnRet.on('error', () => resolve(false));
+				spawnRet.on('exit', (code) => resolve(code === 0));
+			} catch {
+				resolve(false);
+			}
+		});
 	};
-	const configPath = vscode.workspace.getConfiguration().get<string>('typst-preview.executable');
-	console.log(bundledPath, configPath);
-	if (configPath !== undefined && configPath.length !== 0) {
-		return configPath;
-	}
-	if (await exists(bundledPath)) {
-		return bundledPath;
-	} else {
-		vscode.window.showWarningMessage(`Failed to find typst-ws executable at ${bundledPath}, maybe we didn't ship it for your platform? Using typst-ws from PATH`);
-		return binaryName;
-	}
+
+	const resolvePath = async () => {
+		console.log('getTypstWsPath resolving', bundledPath, configPath);
+
+		if (configPath?.length) {
+			return configPath;
+		}
+	
+		if (await executableExists(bundledPath)) {
+			return bundledPath;
+		}
+	
+		vscode.window.showWarningMessage(
+			`Failed to find ${state.BINARY_NAME} executable at ${bundledPath},`+
+			`maybe we didn't ship it for your platform? Using ${state.BINARY_NAME} from PATH`);
+		return state.BINARY_NAME;
+	};
+
+	return (state.resolved = await resolvePath());
 }
 
 export function getTypstWsFontArgs(fontPaths?: string[]): string[] {
@@ -131,7 +157,7 @@ export function activate(context: vscode.ExtensionContext) {
 				});
 				shadowFilePaths.push(shadowFilePath);
 			}
-			const serverPath = await getTypstWsPath(context);
+			const serverPath = await getTypstWsPath();
 			console.log(`Watching ${filePathToWatch} for changes`);
 			const [port, serverProcess] = await runServer(serverPath, [
 				"--host", "127.0.0.1:0",
