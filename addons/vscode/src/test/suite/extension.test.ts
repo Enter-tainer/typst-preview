@@ -16,9 +16,41 @@ suite('Extension Test Suite', () => {
 		assert.strictEqual(-1, [1, 2, 3].indexOf(0));
 	});
 
-	test('Executable Configuration Test', () => {
-		assert.strictEqual('typst-ws', vscode.workspace.getConfiguration().get<string>('typst-ws.executable'));
-	});
+	test('Executable Configuration Test', async () => {
+		assert.strictEqual('', vscode.workspace.getConfiguration().get<string>('typst-preview.executable'), 'default path');
+    
+    assert.notStrictEqual('', await ext.getTypstWsPath(), 'never resolve empty string');
+    assert.notStrictEqual(undefined, await ext.getTypstWsPath(), 'never resolve undefined');
+
+    const state = ext.getTypstWsPath as unknown as any;
+    let resolved: string;
+
+    const BINARY_NAME = state.BINARY_NAME;
+		assert.strictEqual('typst-ws', BINARY_NAME, 'default binary path is typst-ws');
+
+    resolved = await ext.getTypstWsPath();
+    assert.strictEqual(state.bundledPath, resolved, 'the bundle path exists and detected');
+
+    state.BINARY_NAME = 'bad-typst-ws';
+    assert.strictEqual('bad-typst-ws', await ext.getTypstWsPath(), 'fallback to binary name if not exists');
+
+    const oldGetConfig = state.getConfig;
+    state.getConfig = () => 'config-typst-ws';
+    assert.strictEqual('config-typst-ws', await ext.getTypstWsPath(), 'use config if set');
+    
+    state.BINARY_NAME = 'typst-ws';
+    state.getConfig = oldGetConfig;
+    resolved = await ext.getTypstWsPath();
+    assert.strictEqual(state.bundledPath, resolved, 'reactive state');
+
+    resolved = await ext.getTypstWsPath();
+    assert.strictEqual(true, resolved.endsWith(state.BINARY_NAME), 'exact file suffix');
+
+    /// fast path should hit
+    for (let i = 0; i < 1000; i++) {
+      await ext.getTypstWsPath();
+    }
+  });
 
   test("FontPaths Configuration Test", async () => {
 
@@ -40,5 +72,5 @@ suite('Extension Test Suite', () => {
     jsonIs(assert.strictEqual)(
       ["--font-path", "/path/to/font1", "--font-path", "/path/to/font2"], 
       ext.getTypstWsFontArgs(["/path/to/font1", "/path/to/font2"]));
-	});
+  });
 });
