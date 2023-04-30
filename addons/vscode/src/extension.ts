@@ -36,6 +36,16 @@ async function getTypstWsPath(context: vscode.ExtensionContext): Promise<string>
 	}
 }
 
+export function getTypstWsFontArgs(fontPaths?: string[]): string[] {
+	return (!fontPaths) ? [] : fontPaths.map(
+	  (fontPath) => ["--font-path", fontPath]).flat();
+}
+
+export function codeGetTypstWsFontArgs(): string[] {
+	return getTypstWsFontArgs(vscode.workspace.getConfiguration().get<string[]>(
+	  'typst-preview.font-paths'));
+}
+
 const serverProcesses: Array<any> = [];
 const shadowFilePaths: Array<string> = [];
 
@@ -123,7 +133,11 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 			const serverPath = await getTypstWsPath(context);
 			console.log(`Watching ${filePathToWatch} for changes`);
-			const [port, serverProcess] = await runServer(serverPath, ["--host", "127.0.0.1:0", "watch", filePathToWatch], outputChannel);
+			const [port, serverProcess] = await runServer(serverPath, [
+				"--host", "127.0.0.1:0",
+				...codeGetTypstWsFontArgs(),
+				"watch", filePathToWatch,
+			], outputChannel);
 			console.log('Launched server, port:', port);
 
 			// Create and show a new WebView

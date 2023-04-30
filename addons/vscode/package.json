@@ -51,6 +51,16 @@
           "default": "",
           "description": "Path to typst-ws executable. If not set, the extension will use bundled typst-ws. If bundled binary is not found, it will use typst-ws installed in PATH"
         },
+        "typst-preview.font-paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "title": "Font path",
+            "description": "Absolute path to a directory or file containing font assets."
+          },
+          "default": [],
+          "description": "List of *additional* paths to font assets used by typst-ws."
+        },
         "typst-preview.refresh": {
           "title": "Refresh preview",
           "description": "Refresh preview when the document is saved or when the document is changed",
