@@ -21,5 +21,5 @@ The extension watches for file changes, and sends the compiled framebuffers to t
 
 ## Acknowledgements
 
-- typst: The rust part of this repo is a thin wrapper around typst.
-- typst-lsp: The CI and the vscode extension are heavily inspired by typst-lsp.
+- [typst](https://github.com/typst/typst): The rust part of this repo is a thin wrapper around typst.
+- [typst-lsp](https://github.com/nvarner/typst-lsp): The CI and the vscode extension are heavily inspired by typst-lsp.
