@@ -1,4 +1,4 @@
-# Typst Preview VSCode
+# [Typst Preview VSCode](https://github.com/Enter-tainer/typst-preview-vscode)
 
 Preview your Typst files in vscode instantly
 
@@ -59,3 +59,8 @@ Add preview button
 
 - Upgrade typst to v0.3.0
 - Fix panic when pages are removed
+
+### 0.3.1
+
+- Publish to OpenVSX
+- allow configuring font paths

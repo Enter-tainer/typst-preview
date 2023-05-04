@@ -41,3 +41,8 @@ Add preview button
 
 - Upgrade typst to v0.3.0
 - Fix panic when pages are removed
+
+## 0.3.1
+
+- Publish to OpenVSX
+- allow configuring font paths
