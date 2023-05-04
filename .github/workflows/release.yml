@@ -162,7 +162,7 @@ jobs:
         env:
           VSCE_PAT: ${{ secrets.VSCODE_MARKETPLACE_TOKEN }}
 
-      # - name: Deploy to OpenVSX
-      #   run: npx ovsx publish --packagePath $(find . -type f -iname '*.vsix')
-      #   env:
-      #     OVSX_PAT: ${{ secrets.OPENVSX_ACCESS_TOKEN }}
+      - name: Deploy to OpenVSX
+        run: npx ovsx publish --packagePath $(find . -type f -iname '*.vsix')
+        env:
+          OVSX_PAT: ${{ secrets.OPENVSX_ACCESS_TOKEN }}
