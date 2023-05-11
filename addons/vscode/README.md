@@ -64,3 +64,7 @@ Add preview button
 
 - Publish to OpenVSX
 - allow configuring font paths
+
+### 0.3.3
+
+- Fix nix-ld compatibility by inheriting env vars(#33)

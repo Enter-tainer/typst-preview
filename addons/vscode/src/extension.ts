@@ -78,6 +78,7 @@ const shadowFilePaths: Array<string> = [];
 function runServer(command: string, args: string[], outputChannel: vscode.OutputChannel): Promise<[string, ChildProcessWithoutNullStreams]> {
 	const serverProcess = spawn(command, args, {
 		env: {
+			...process.env,
 			// eslint-disable-next-line @typescript-eslint/naming-convention
 			"RUST_BACKTRACE": "1",
 		}
