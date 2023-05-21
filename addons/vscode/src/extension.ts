@@ -35,7 +35,7 @@ export async function getTypstWsPath(): Promise<string> {
 					timeout: 1000, /// 1 second
 				});
 				spawnRet.on('error', () => resolve(false));
-				spawnRet.on('exit', (code) => resolve(code === 0));
+				spawnRet.on('exit', (code: number) => resolve(code === 0));
 			} catch {
 				resolve(false);
 			}

@@ -1,6 +1,6 @@
 [package]
 name = "typst-ws"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["The Typst Project Developers"]
 edition = "2021"
 
@@ -13,15 +13,15 @@ bench = false
 doc = false
 
 [dependencies]
-typst = { git = "https://github.com/typst/typst.git", tag = "v0.3.0"}
-typst-library = { git = "https://github.com/typst/typst.git", tag = "v0.3.0" }
+typst = { git = "https://github.com/typst/typst.git", tag = "v0.4.0"}
+typst-library = { git = "https://github.com/typst/typst.git", tag = "v0.4.0" }
 chrono = { version = "0.4", default-features = false, features = [
   "clock",
   "std",
 ] }
 codespan-reporting = "0.11"
-comemo = "0.2.2"
-dirs = "4"
+comemo = "0.3"
+dirs = "5"
 elsa = "1.7"
 memmap2 = "0.5"
 notify = "5"
@@ -32,8 +32,8 @@ walkdir = "2"
 clap = { version = "4.2.1", features = ["derive"] }
 open = "4.0.1"
 tokio = {version = "1.27.0", features = ["full"]}
-tokio-tungstenite = "0.18.0"
-tiny-skia = "0.6.6"
+tokio-tungstenite = "0.19.0"
+tiny-skia = "0.9.0"
 env_logger = "0.10.0"
 log = "0.4.17"
 serde_json = "1.0.95"
