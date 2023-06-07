@@ -27,15 +27,15 @@ jobs:
             rust-target: aarch64-pc-windows-msvc
             platform: win32
             arch: arm64
-          - os: ubuntu-20.04
+          - os: ubuntu-latest
             rust-target: x86_64-unknown-linux-gnu
             platform: linux
             arch: x64
-          - os: ubuntu-20.04
+          - os: ubuntu-latest
             rust-target: aarch64-unknown-linux-gnu
             platform: linux
             arch: arm64
-          - os: ubuntu-20.04
+          - os: ubuntu-latest
             rust-target: arm-unknown-linux-gnueabihf
             platform: linux
             arch: armhf
@@ -67,10 +67,14 @@ jobs:
           targets: ${{ matrix.rust-target }}
       - name: Install AArch64 target toolchain
         if: matrix.rust-target == 'aarch64-unknown-linux-gnu'
-        run: sudo apt-get install gcc-aarch64-linux-gnu
+        run: |
+          sudo apt-get update
+          sudo apt-get install gcc-aarch64-linux-gnu
       - name: Install ARM target toolchain
         if: matrix.rust-target == 'arm-unknown-linux-gnueabihf'
-        run: sudo apt-get install gcc-arm-linux-gnueabihf
+        run: |
+          sudo apt-get update
+          sudo apt-get install gcc-arm-linux-gnueabihf
       - shell: pwsh
         run: |
           cargo build --release -p typst-ws --target ${{ matrix.rust-target }}
