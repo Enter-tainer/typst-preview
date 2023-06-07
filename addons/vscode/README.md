@@ -68,3 +68,11 @@ Add preview button
 ### 0.3.3
 
 - Fix nix-ld compatibility by inheriting env vars(#33)
+
+### 0.4.0
+
+- Upgrade to typst v0.4.0
+
+### 0.4.1
+
+ Makes the WebSocket connection retry itself when it is closed, with a delay of 1 second.
