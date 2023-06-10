@@ -1,5 +1,6 @@
 mod args;
 
+use chrono::Datelike;
 use clap::Parser;
 use codespan_reporting::diagnostic::{Diagnostic, Label};
 use codespan_reporting::term::{self, termcolor};
@@ -14,7 +15,7 @@ use once_cell::unsync::OnceCell;
 use same_file::Handle;
 use serde::{Deserialize, Serialize};
 use siphasher::sip128::{Hasher128, SipHasher};
-use std::cell::{RefCell, RefMut};
+use std::cell::{RefCell, RefMut, Cell};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::hash::Hash;
@@ -32,7 +33,7 @@ use tokio::sync::{Mutex, RwLock};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 use typst::diag::{FileError, FileResult, SourceError, StrResult};
-use typst::eval::Library;
+use typst::eval::{Library, Datetime};
 use typst::font::{Font, FontBook, FontInfo, FontVariant};
 use typst::geom::RgbaColor;
 use typst::syntax::{Source, SourceId};
@@ -577,6 +578,7 @@ struct SystemWorld {
     hashes: RefCell<HashMap<PathBuf, FileResult<PathHash>>>,
     paths: RefCell<HashMap<PathHash, PathSlot>>,
     sources: FrozenVec<Box<Source>>,
+    today: Cell<Option<Datetime>>,
     main: SourceId,
 }
 
@@ -614,6 +616,7 @@ impl SystemWorld {
             hashes: RefCell::default(),
             paths: RefCell::default(),
             sources: FrozenVec::new(),
+            today: Cell::new(None),
             main: SourceId::detached(),
         }
     }
@@ -644,7 +647,7 @@ impl World for SystemWorld {
     }
 
     fn source(&self, id: SourceId) -> &Source {
-        &self.sources[id.into_u16() as usize]
+        &self.sources[id.as_u16() as usize]
     }
 
     fn book(&self) -> &Prehashed<FontBook> {
@@ -666,6 +669,23 @@ impl World for SystemWorld {
             .buffer
             .get_or_init(|| read(path).map(Buffer::from))
             .clone()
+    }
+    
+    fn today(&self, offset: Option<i64>) -> Option<Datetime> {
+        if self.today.get().is_none() {
+            let datetime = match offset {
+                None => chrono::Local::now().naive_local(),
+                Some(o) => (chrono::Utc::now() + chrono::Duration::hours(o)).naive_utc(),
+            };
+
+            self.today.set(Some(Datetime::from_ymd(
+                datetime.year(),
+                datetime.month().try_into().ok()?,
+                datetime.day().try_into().ok()?,
+            )?))
+        }
+
+        self.today.get()
     }
 }
 
