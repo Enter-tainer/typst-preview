@@ -76,72 +76,17 @@
         }
       });
 
-      // 0: should receive json
-      let inflightPages = 0;
-      let meta_data = null;
-      let canvas_handle = [];
       let isFirstScale = true;
       let processStart;
 
       let socket;
       let socketOpen = false;
-      let visibleCanvasRange = []
-      const updateVisibleCanvasRange = () => {
-        function isInViewport(element) {
-          const rect = element.getBoundingClientRect();
-          return (
-            rect.top >= 0 &&
-            rect.left >= 0 &&
-            rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
-            rect.right <= (window.innerWidth || document.documentElement.clientWidth)
-          );
-        }
-        const visibleCanvas = [];
-        for (let i = 0; i < canvas_handle.length; i++) {
-          const canvas = canvas_handle[i];
-          const rect = canvas.getBoundingClientRect();
-          if (rect.top < window.innerHeight && rect.bottom > 0) {
-            visibleCanvas.push(i);
-          }
-        }
-        const newVisibleCanvasRange = {
-          page_start: visibleCanvas[0],
-          page_end: visibleCanvas[visibleCanvas.length - 1] + 1,
-        };
-        if (newVisibleCanvasRange.page_end === visibleCanvasRange.page_end && newVisibleCanvasRange.page_start === visibleCanvasRange.page_start) {
-          return;
-        }
-        visibleCanvasRange = newVisibleCanvasRange;
-        console.log(`visibleCanvasRange Changed: ${JSON.stringify(visibleCanvasRange)}`);
-        if (socketOpen) socket.send(JSON.stringify(visibleCanvasRange));
-      };
-
-      const debounce = (func, wait, immediate) => {
-        let timeout;
-        return function executedFunction() {
-          const context = this;
-          const args = arguments;
-          const later = function () {
-            timeout = null;
-            if (!immediate) func.apply(context, args);
-          };
-          const callNow = immediate && !timeout;
-          clearTimeout(timeout);
-          timeout = setTimeout(later, wait);
-          if (callNow) func.apply(context, args);
-        };
-      };
-
-      const debouncedUpdateVisibleCanvasRange = debounce(updateVisibleCanvasRange, 100);
-      window.addEventListener('scroll', debouncedUpdateVisibleCanvasRange);
-      window.addEventListener('resize', debouncedUpdateVisibleCanvasRange);
 
       function setupSocket() {
         socket = new WebSocket('ws://127.0.0.1:23625');
-        socket.binaryType = "arraybuffer";
+        // socket.binaryType = "arraybuffer";
         socket.addEventListener('open', () => {
           socketOpen = true;
-          debouncedUpdateVisibleCanvasRange();
           console.log('WebSocket connection opened');
         });
 
@@ -152,49 +97,9 @@
 
         // 当收到WebSocket数据时
         socket.addEventListener('message', (event) => {
-          // 解析收到的JSON数组
-          if (inflightPages == 0) {
-            processStart = performance.now();
-            meta_data = JSON.parse(event.data);
-            console.log(meta_data);
-            inflightPages = meta_data.page_numbers.length;
-            const total_pages = meta_data.page_total
-            // only run once at start to respect user scaling
-            if (isFirstScale) {
-              // compute scaling factor according to the paper size
-              imageContainerWidth = imageContainer.offsetWidth;
-              currentScale = imageContainerWidth / meta_data.width;
-              imageContainer.style.transformOrigin = "0px 0px";
-              imageContainer.style.transform = `scale(${currentScale})`;
-              isFirstScale = false;
-            }
-
-            while (canvas_handle.length > total_pages) {
-              const removed = canvas_handle.pop();
-              imageContainer.removeChild(removed);
-            }
-            while (canvas_handle.length < total_pages) {
-              const canvas = document.createElement('canvas');
-              canvas.width = meta_data.width;
-              canvas.height = meta_data.height;
-              imageContainer.appendChild(canvas);
-              canvas_handle.push(canvas);
-            }
-            console.log(`meta data process time: ${performance.now() - processStart}ms`)
-          } else {
-            const pageProcessStart = performance.now();
-            const id = meta_data.page_numbers[meta_data.page_numbers.length - inflightPages];
-            console.log(`page ${id} received`)
-            const canvas = canvas_handle[id]
-            const ctx = canvas.getContext('2d');
-            const imageData = new ImageData(new Uint8ClampedArray(event.data), meta_data.width, meta_data.height);
-            ctx.putImageData(imageData, 0, 0);
-            inflightPages--;
-            console.log(`page ${id} process time: ${performance.now() - pageProcessStart}ms`)
-            if (inflightPages == 0) {
-              console.log(`total process time: ${performance.now() - processStart}ms`)
-            }
-          }
+          const data = event.data;
+          let svgElement = new DOMParser().parseFromString(data, "application/xml").documentElement;
+          imageContainer.replaceChildren(svgElement);
         });
 
         // 当WebSocket连接关闭时

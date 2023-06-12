@@ -15,7 +15,7 @@ use once_cell::unsync::OnceCell;
 use same_file::Handle;
 use serde::{Deserialize, Serialize};
 use siphasher::sip128::{Hasher128, SipHasher};
-use std::cell::{RefCell, RefMut, Cell};
+use std::cell::{Cell, RefCell, RefMut};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::hash::Hash;
@@ -28,20 +28,21 @@ use std::sync::Arc;
 use termcolor::{ColorChoice, StandardStream, WriteColor};
 use tokio::net::{TcpListener, TcpStream};
 use typst::doc::Frame;
+use typst_ts_svg_exporter::SvgExporter;
 
+use crate::args::{CliArguments, Command, CompileCommand};
 use tokio::sync::{Mutex, RwLock};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 use typst::diag::{FileError, FileResult, SourceError, StrResult};
-use typst::eval::{Library, Datetime};
+use typst::eval::{Datetime, Library};
 use typst::font::{Font, FontBook, FontInfo, FontVariant};
 use typst::geom::RgbaColor;
 use typst::syntax::{Source, SourceId};
 use typst::util::{Buffer, PathExt};
 use typst::World;
+use typst_ts_core::Exporter;
 use walkdir::WalkDir;
-
-use crate::args::{CliArguments, Command, CompileCommand};
 
 type CodespanResult<T> = Result<T, CodespanError>;
 type CodespanError = codespan_reporting::files::Error;
@@ -146,83 +147,40 @@ impl Client {
             .collect::<Vec<_>>();
         info!("updated pages: {:?}", updated_pages);
     }
-    async fn send(&self, imgs: &[tiny_skia::Pixmap]) -> bool {
-        #[derive(Debug, Serialize)]
-        struct Info {
-            page_total: usize,
-            page_numbers: Vec<usize>,
-            width: u32,
-            height: u32,
-        }
-        let visible_range = self
-            .visible_range
+    async fn send(&self, svg: &str) -> bool {
+        if let Err(err) = self
+            .tx
             .lock()
             .await
-            .clone()
-            .unwrap_or(0..imgs.len());
-        let mut pages_to_send = vec![];
+            .send(Message::Text(svg.to_string()))
+            .await
         {
-            let dirty_marks = self.dirty_marks.lock().await;
-            for i in visible_range.clone() {
-                if let Some(dirty_mark) = dirty_marks.get(i) {
-                    if *dirty_mark {
-                        pages_to_send.push(i);
-                    }
-                }
-            }
-        }
-        if pages_to_send.is_empty() {
-            return true;
-        }
-        let pages_to_send = pages_to_send;
-        let json = serde_json::to_string(&Info {
-            page_total: imgs.len(),
-            page_numbers: pages_to_send.clone(),
-            width: imgs[0].width(),
-            height: imgs[0].height(),
-        })
-        .unwrap();
-        if let Err(err) = self.tx.lock().await.send(Message::Text(json)).await {
             error!("failed to send to client: {}", err);
             return false;
         }
-        let mut dirty_marks = self.dirty_marks.lock().await;
-        for &i in pages_to_send.iter() {
-            dirty_marks[i] = false;
-            let _ = self
-                .tx
-                .lock()
-                .await
-                .send(Message::Binary(imgs[i].data().to_vec()))
-                .await; // don't care result here
-        }
-        info!(
-            "visible range {:?}, sent pages {:?}",
-            visible_range, pages_to_send
-        );
         true
     }
 
-    async fn poll_visible_range(&self, imgs: Arc<RwLock<Vec<tiny_skia::Pixmap>>>) -> bool {
+    async fn poll_visible_range(&self, imgs: Arc<RwLock<String>>) -> bool {
         while let Some(msg) = self.rx.lock().await.next().await {
-            #[derive(Debug, Deserialize)]
-            struct VisibleRangeInfo {
-                page_start: usize,
-                page_end: usize,
-            }
-            match msg {
-                Ok(msg) => {
-                    if let Message::Text(text) = msg {
-                        let range: VisibleRangeInfo = serde_json::from_str(&text).unwrap();
-                        *self.visible_range.lock().await = Some(range.page_start..range.page_end);
-                        self.send(imgs.read().await.as_slice()).await;
-                    }
-                }
-                Err(err) => {
-                    error!("failed to receive from client: {}", err);
-                    return false;
-                }
-            }
+            // #[derive(Debug, Deserialize)]
+            // struct VisibleRangeInfo {
+            //     page_start: usize,
+            //     page_end: usize,
+            // }
+            // match msg {
+            //     Ok(msg) => {
+            //         if let Message::Text(text) = msg {
+            //             let range: VisibleRangeInfo = serde_json::from_str(&text).unwrap();
+            //             *self.visible_range.lock().await = Some(range.page_start..range.page_end);
+            //             self.send(imgs.read().await.as_slice()).await;
+            //         }
+            //     }
+            //     Err(err) => {
+            //         error!("failed to receive from client: {}", err);
+            //         return false;
+            //     }
+            // }
         }
         error!("client disconnected");
         exit(-1);
@@ -237,7 +195,7 @@ async fn main() {
         .try_init();
     let arguments = CliArguments::parse();
     let conns = Arc::new(Mutex::new(Vec::new()));
-    let imgs = Arc::new(RwLock::new(Vec::new()));
+    let imgs = Arc::new(RwLock::new(String::new()));
     {
         let conns = conns.clone();
         let imgs = imgs.clone();
@@ -321,7 +279,7 @@ where
 async fn watch(
     command: CompileSettings,
     conns: Arc<Mutex<Vec<Arc<Client>>>>,
-    imgs: Arc<RwLock<Vec<tiny_skia::Pixmap>>>,
+    svg: Arc<RwLock<String>>,
 ) -> StrResult<()> {
     let root = if let Some(root) = &command.root {
         root.clone()
@@ -340,12 +298,12 @@ async fn watch(
     // Create the world that serves sources, fonts and files.
     let mut world = SystemWorld::new(root, &command.font_paths);
     {
-        if let Some((new_imgs, hashes)) = compile_once(&mut world, &command)? {
-            *imgs.write().await = new_imgs;
+        if let Some((new_svg, hashes)) = compile_once(&mut world, &command)? {
+            *svg.write().await = new_svg;
             let conns = conns.clone();
-            let imgs = imgs.clone();
+            let svg = svg.clone();
             tokio::spawn(async move {
-                broadcast_result(conns, &imgs.read().await, hashes).await;
+                broadcast_result(conns, &svg.read().await, hashes).await;
             });
         }
     }
@@ -381,13 +339,13 @@ async fn watch(
             recompile |= world.relevant(&event);
         }
         if recompile {
-            if let Some((new_imgs, hashes)) = compile_once(&mut world, &command)? {
-                if !new_imgs.is_empty() {
+            if let Some((new_svg, hashes)) = compile_once(&mut world, &command)? {
+                if !new_svg.is_empty() {
                     {
-                        *imgs.write().await = new_imgs;
+                        *svg.write().await = new_svg;
                     }
                     let conns = conns.clone();
-                    let imgs = imgs.clone();
+                    let imgs = svg.clone();
                     tokio::spawn(async move {
                         broadcast_result(conns, &imgs.read().await, hashes).await;
                     });
@@ -398,11 +356,7 @@ async fn watch(
     }
 }
 
-async fn broadcast_result(
-    conns: Arc<Mutex<Vec<Arc<Client>>>>,
-    imgs: &[tiny_skia::Pixmap],
-    hashes: Vec<u128>,
-) {
+async fn broadcast_result(conns: Arc<Mutex<Vec<Arc<Client>>>>, imgs: &str, hashes: Vec<u128>) {
     let mut conn_lock = conns.lock().await;
     info!("render done, sending to {} clients", conn_lock.len());
     let mut to_be_remove: Vec<usize> = vec![];
@@ -426,7 +380,8 @@ fn hash_frame(page: &Frame) -> u128 {
 fn compile_once(
     world: &mut SystemWorld,
     command: &CompileSettings,
-) -> StrResult<Option<(Vec<tiny_skia::Pixmap>, Vec<u128>)>> {
+) -> StrResult<Option<(String, Vec<u128>)>> {
+    let renderer = SvgExporter {};
     status(command, Status::Compiling).unwrap();
 
     world.reset();
@@ -437,24 +392,10 @@ fn compile_once(
     match typst::compile(world) {
         // Export the images.
         Ok(document) => {
-            let pixmaps: Vec<_> = document
-                .pages
-                .iter()
-                .map(|frame| {
-                    typst::export::render(
-                        frame,
-                        2.0,
-                        typst::geom::Color::Rgba(RgbaColor::from_str("ffffff").unwrap()),
-                    )
-                })
-                .collect();
-            let hashes = document
-                .pages
-                .iter()
-                .map(hash_frame)
-                .collect();
+            let hashes = document.pages.iter().map(hash_frame).collect();
+            let svg = renderer.export(world, Arc::new(document)).unwrap();
             status(command, Status::Success).unwrap();
-            Ok(Some((pixmaps, hashes)))
+            Ok(Some((svg, hashes)))
         }
 
         // Print diagnostics.
@@ -670,7 +611,7 @@ impl World for SystemWorld {
             .get_or_init(|| read(path).map(Buffer::from))
             .clone()
     }
-    
+
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
         if self.today.get().is_none() {
             let datetime = match offset {

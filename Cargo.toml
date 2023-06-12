@@ -16,6 +16,7 @@ doc = false
 typst = "0.5.0"
 typst-library = "0.5.0"
 typst-ts-svg-exporter = "0.2"
+typst-ts-core = "0.2"
 
 chrono = { version = "0.4", default-features = false, features = [
   "clock",
@@ -46,6 +47,7 @@ serde = "1.0.159"
 typst = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.ts" }
 typst-library = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.ts" }
 typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "90bfba7b94b8c1db5149479398a6e70e44130404", package = "typst-ts-svg-exporter"}
+typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "90bfba7b94b8c1db5149479398a6e70e44130404", package = "typst-ts-core"}
 
 
 [build-dependencies]
