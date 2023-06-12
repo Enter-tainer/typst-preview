@@ -98,8 +98,10 @@
         // 当收到WebSocket数据时
         socket.addEventListener('message', (event) => {
           const data = event.data;
-          let svgElement = new DOMParser().parseFromString(data, "application/xml").documentElement;
-          imageContainer.replaceChildren(svgElement);
+          const replaceStart = performance.now();
+          imageContainer.innerHTML = data;
+          const replaceEnd = performance.now();
+          console.log(`replace time: ${replaceEnd - replaceStart}ms`);
         });
 
         // 当WebSocket连接关闭时
