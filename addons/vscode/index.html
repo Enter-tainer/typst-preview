@@ -1,126 +1,195 @@
 <!DOCTYPE html>
 <html lang="en">
-
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WebSocket Multiple Image Display</title>
-  <style>
-    
-    body {
-      background-color: #cccccc;
-    }
-    
-    #imageContainer {
-      margin: 0;
-      transform-origin: 0 0;
-    }
-
-    canvas:not(:last-child) {
-      padding-bottom: 32px;
-    }
-    
-    canvas {
-      box-shadow: 0px 4px 12px rgba(89, 85, 101, .2);
-    }
-
-  </style>
-  <script>
-    window.onload = function () {
-      const imageContainer = document.getElementById('imageContainer');
-      let currentScale = 1;  // variable for storing scaling factor
-      let imageContainerWidth = imageContainer.offsetWidth;
-
-      // drag (panal resizing) -> rescaling
-      window.onresize = () => {
-        const newImageContainerWidth = imageContainer.offsetWidth;
-        currentScale = currentScale * (newImageContainerWidth / imageContainerWidth);
-        imageContainerWidth = newImageContainerWidth;
-        imageContainer.style.transformOrigin = "0px 0px";
-        imageContainer.style.transform = `scale(${currentScale})`;
-      };
-
-      // Ctrl+scroll rescaling
-      // will disable auto resizing
-      // fixed factors, same as pdf.js
-      const factors = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.3, 1.5, 1.7,
-        1.9, 2.1, 2.4, 2.7, 3, 3.3, 3.7, 4.1, 4.6, 5.1, 5.7, 6.3, 7, 7.7, 8.5, 9.4, 10];
-      imageContainer.addEventListener('wheel', function (event) {
-        if (event.ctrlKey) {
-          event.preventDefault();
-
-          if (window.onresize !== null) {  // is auto resizing
-            window.onresize = null;
-          }
-
-          // Get wheel scroll direction and calculate new scale
-          if (event.deltaY < 0) {  // enlarge
-            if (currentScale >= factors.at(-1)) {  // already large than max factor
-              return;
-            } else {
-              currentScale = factors.filter(x => x > currentScale).at(0);
-            }
-          } else if (event.deltaY > 0) {  // reduce
-            if (currentScale <= factors.at(0)) {
-              return;
-            } else {
-              currentScale = factors.filter(x => x < currentScale).at(-1);
-            }
-          } else {  // no y-axis scroll
-            return;
-          }
-
-          // Apply new scale
-          imageContainer.style.transformOrigin = "0 0";
-          imageContainer.style.transform = `scale(${currentScale})`;
-        }
-      });
-
-      let isFirstScale = true;
-      let processStart;
-
-      let socket;
-      let socketOpen = false;
-
-      function setupSocket() {
-        socket = new WebSocket('ws://127.0.0.1:23625');
-        // socket.binaryType = "arraybuffer";
-        socket.addEventListener('open', () => {
-          socketOpen = true;
-          console.log('WebSocket connection opened');
-        });
-
-        socket.addEventListener('close', () => {
-          socketOpen = false;
-          setTimeout(setupSocket, 1000);
-        });
-
-        // 当收到WebSocket数据时
-        socket.addEventListener('message', (event) => {
-          const data = event.data;
-          const replaceStart = performance.now();
-          imageContainer.innerHTML = data;
-          const replaceEnd = performance.now();
-          console.log(`replace time: ${replaceEnd - replaceStart}ms`);
-        });
-
-        // 当WebSocket连接关闭时
-        socket.addEventListener('close', () => {
-          console.log('WebSocket connection closed');
-        });
-
-        // 当发生错误时
-        socket.addEventListener('error', (error) => {
-          console.error('WebSocket Error: ', error);
-        });
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebSocket Multiple Image Display</title>
+    <style>
+      body {
+        background-color: #cccccc;
       }
-      setupSocket();
-    };
-  </script>
-</head>
 
-<body style="padding: 0px 0px 0px 0px;">
-  <div id="imageContainer" style="height: 0px;"></div>
-</body>
+      #imageContainer {
+        margin: 0;
+        transform-origin: 0 0;
+      }
 
+      canvas:not(:last-child) {
+        padding-bottom: 32px;
+      }
+
+      canvas {
+        box-shadow: 0px 4px 12px rgba(89, 85, 101, 0.2);
+      }
+    </style>
+    <script>
+      window.onload = function () {
+        const imageContainer = document.getElementById("imageContainer");
+        const svgContainer = document.createElement("div");
+        let currentScale = 1; // variable for storing scaling factor
+        let imageContainerWidth = imageContainer.offsetWidth;
+
+        // drag (panal resizing) -> rescaling
+        window.onresize = () => {
+          const newImageContainerWidth = imageContainer.offsetWidth;
+          currentScale =
+            currentScale * (newImageContainerWidth / imageContainerWidth);
+          imageContainerWidth = newImageContainerWidth;
+          imageContainer.style.transformOrigin = "0px 0px";
+          imageContainer.style.transform = `scale(${currentScale})`;
+        };
+
+        // Ctrl+scroll rescaling
+        // will disable auto resizing
+        // fixed factors, same as pdf.js
+        const factors = [
+          0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.3, 1.5, 1.7,
+          1.9, 2.1, 2.4, 2.7, 3, 3.3, 3.7, 4.1, 4.6, 5.1, 5.7, 6.3, 7, 7.7, 8.5,
+          9.4, 10,
+        ];
+        imageContainer.addEventListener("wheel", function (event) {
+          if (event.ctrlKey) {
+            event.preventDefault();
+
+            if (window.onresize !== null) {
+              // is auto resizing
+              window.onresize = null;
+            }
+
+            // Get wheel scroll direction and calculate new scale
+            if (event.deltaY < 0) {
+              // enlarge
+              if (currentScale >= factors.at(-1)) {
+                // already large than max factor
+                return;
+              } else {
+                currentScale = factors.filter((x) => x > currentScale).at(0);
+              }
+            } else if (event.deltaY > 0) {
+              // reduce
+              if (currentScale <= factors.at(0)) {
+                return;
+              } else {
+                currentScale = factors.filter((x) => x < currentScale).at(-1);
+              }
+            } else {
+              // no y-axis scroll
+              return;
+            }
+
+            // Apply new scale
+            imageContainer.style.transformOrigin = "0 0";
+            imageContainer.style.transform = `scale(${currentScale})`;
+          }
+        });
+
+        let isFirstScale = true;
+        let processStart;
+
+        let socket;
+        let socketOpen = false;
+
+        function equal(prev, next) {
+          if (prev.tagName === "g") {
+            // compareAndReplaceRoot(prev, next);
+            if (next.tagName === "g") {
+              if (prev.id === next.id) {
+                return true;
+              }
+            }
+          }
+
+          return false;
+        }
+
+        function replaceChildrenFineGranuality(prev, next) {
+          for (let i = 0; i < prev.children.length; i++) {
+            const prevChild = prev.children[i];
+            const nextChild = next.children[i];
+            console.log("replacing", prevChild, nextChild);
+          }
+
+          return false;
+        }
+
+        function replaceChildren(prev, next) {
+          if (!replaceChildrenFineGranuality(prev, next)) {
+            console.log("hard replace", prev, next);
+            prev.replaceWith(next);
+          }
+        }
+
+        function compareAndReplaceRoot(prev, next) {
+          console.log("compare", prev, next, prev.children.length);
+          const toReplaceElements = [];
+          for (let i = 0; i < prev.children.length; i++) {
+            const prevChild = prev.children[i];
+            const nextChild = next.children[i];
+            if (prevChild.tagName === "g") {
+              if (equal(prevChild, nextChild)) {
+                console.log("skip page", i);
+                continue;
+              }
+              toReplaceElements.push([prevChild, nextChild]);
+            }
+          }
+          for (const [prevChild, nextChild] of toReplaceElements) {
+            prevChild.attributes = nextChild.attributes;
+            replaceChildren(prevChild, nextChild);
+          }
+        }
+
+        function setupSocket() {
+          socket = new WebSocket("ws://127.0.0.1:23625");
+          // socket.binaryType = "arraybuffer";
+          socket.addEventListener("open", () => {
+            socketOpen = true;
+            console.log("WebSocket connection opened");
+          });
+
+          socket.addEventListener("close", () => {
+            socketOpen = false;
+            setTimeout(setupSocket, 1000);
+          });
+
+          // 当收到WebSocket数据时
+          socket.addEventListener("message", (event) => {
+            const data = event.data;
+            let svgElement = new DOMParser().parseFromString(
+              data,
+              "application/xml"
+            ).documentElement;
+            // svgContainer.innerHTML = data;
+            // const svgElement = svgContainer.firstElementChild;
+            if (imageContainer.firstElementChild) {
+              console.log("next");
+              compareAndReplaceRoot(
+                imageContainer.firstElementChild,
+                svgElement
+              );
+            } else {
+              console.log("new");
+              imageContainer.replaceChildren(svgElement);
+            }
+            console.log("result", imageContainer.firstElementChild);
+          });
+
+          // 当WebSocket连接关闭时
+          socket.addEventListener("close", () => {
+            console.log("WebSocket connection closed");
+          });
+
+          // 当发生错误时
+          socket.addEventListener("error", (error) => {
+            console.error("WebSocket Error: ", error);
+          });
+        }
+        setupSocket();
+      };
+    </script>
+  </head>
+
+  <body style="padding: 0px 0px 0px 0px">
+    <div id="imageContainer" style="height: 0px"></div>
+  </body>
 </html>
