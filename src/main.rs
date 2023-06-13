@@ -28,7 +28,7 @@ use std::sync::Arc;
 use termcolor::{ColorChoice, StandardStream, WriteColor};
 use tokio::net::{TcpListener, TcpStream};
 use typst::doc::Frame;
-use typst_ts_svg_exporter::SvgExporter;
+use typst_ts_svg_exporter::IncrementalSvgExporter;
 
 use crate::args::{CliArguments, Command, CompileCommand};
 use tokio::sync::{Mutex, RwLock};
@@ -294,11 +294,12 @@ async fn watch(
     } else {
         PathBuf::new()
     };
+    let mut renderer = IncrementalSvgExporter::default();
 
     // Create the world that serves sources, fonts and files.
     let mut world = SystemWorld::new(root, &command.font_paths);
     {
-        if let Some((new_svg, hashes)) = compile_once(&mut world, &command)? {
+        if let Some((new_svg, hashes)) = compile_once(&mut world, &mut renderer, &command)? {
             *svg.write().await = new_svg;
             let conns = conns.clone();
             let svg = svg.clone();
@@ -339,7 +340,7 @@ async fn watch(
             recompile |= world.relevant(&event);
         }
         if recompile {
-            if let Some((new_svg, hashes)) = compile_once(&mut world, &command)? {
+            if let Some((new_svg, hashes)) = compile_once(&mut world, &mut renderer, &command)? {
                 if !new_svg.is_empty() {
                     {
                         *svg.write().await = new_svg;
@@ -379,9 +380,9 @@ fn hash_frame(page: &Frame) -> u128 {
 /// Compile a single time.
 fn compile_once(
     world: &mut SystemWorld,
+    renderer: &mut IncrementalSvgExporter,
     command: &CompileSettings,
 ) -> StrResult<Option<(String, Vec<u128>)>> {
-    let renderer = SvgExporter {};
     status(command, Status::Compiling).unwrap();
 
     world.reset();
@@ -393,7 +394,7 @@ fn compile_once(
         // Export the images.
         Ok(document) => {
             let hashes = document.pages.iter().map(hash_frame).collect();
-            let svg = renderer.export(world, Arc::new(document)).unwrap();
+            let svg = renderer.render(Arc::new(document));
             status(command, Status::Success).unwrap();
             Ok(Some((svg, hashes)))
         }
