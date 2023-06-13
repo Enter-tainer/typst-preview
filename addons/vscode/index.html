@@ -36,7 +36,7 @@
             currentScale * (newImageContainerWidth / imageContainerWidth);
           imageContainerWidth = newImageContainerWidth;
           imageContainer.style.transformOrigin = "0px 0px";
-          imageContainer.style.transform = `scale(${currentScale})`;
+          imageContainer.style.transform = `scale(${currentScale * 2})`;
         };
 
         // Ctrl+scroll rescaling
@@ -79,7 +79,7 @@
 
             // Apply new scale
             imageContainer.style.transformOrigin = "0 0";
-            imageContainer.style.transform = `scale(${currentScale})`;
+            imageContainer.style.transform = `scale(${currentScale * 2})`;
           }
         });
 
@@ -93,7 +93,10 @@
           if (prev.tagName === "g") {
             // compareAndReplaceRoot(prev, next);
             if (next.tagName === "g") {
-              if (prev.id === next.id) {
+              // data tid
+              const prevDataTid = prev.getAttribute("data-tid");
+              const nextDataTid = next.getAttribute("data-tid");
+              if (prevDataTid && nextDataTid && prevDataTid === nextDataTid) {
                 return true;
               }
             }
@@ -119,23 +122,148 @@
           }
         }
 
-        function compareAndReplaceRoot(prev, next) {
-          console.log("compare", prev, next, prev.children.length);
-          const toReplaceElements = [];
+        function patchAndSucceed(prev, next) {
+          console.log("patchAndSucceed", prev, next);
+          if (equal(prev, next)) {
+            return true;
+          } else {
+            next.removeAttribute("data-reuse-from");
+            replaceChildren(prev, next);
+            return false;
+          }
+        }
+
+        function patchRoot(prev, next) {
+          const availableOwnedResource = new Map();
+
+          // todo: patch defs, styles
+          // for (let i = 0; i < prev.children.length; i++) {
+          //   const prevChild = prev.children[i];
+          //   const nextChild = next.children[i];
+          //   if (prevChild.tagName === "defs") {
+          //     console.log("defs", prevChild);
+          //   } else if (prevChild.tagName === "style") {
+          //     console.log("style", prevChild);
+          //   }
+          // }
+
           for (let i = 0; i < prev.children.length; i++) {
             const prevChild = prev.children[i];
-            const nextChild = next.children[i];
-            if (prevChild.tagName === "g") {
-              if (equal(prevChild, nextChild)) {
-                console.log("skip page", i);
-                continue;
+            if (prevChild.tagName !== "g") {
+              continue;
+            }
+            const data_tid = prevChild.getAttribute("data-tid");
+            if (data_tid) {
+              if (!availableOwnedResource.has(data_tid)) {
+                availableOwnedResource.set(data_tid, [prevChild, []]);
               }
-              toReplaceElements.push([prevChild, nextChild]);
+              availableOwnedResource.get(data_tid)[1].push(i);
             }
           }
-          for (const [prevChild, nextChild] of toReplaceElements) {
-            prevChild.attributes = nextChild.attributes;
-            replaceChildren(prevChild, nextChild);
+
+          // console.log(availableOwnedResource);
+
+          const targetView = [];
+
+          for (let i = 0; i < next.children.length; i++) {
+            const nextChild = next.children[i];
+            if (nextChild.tagName !== "g") {
+              continue;
+            }
+
+            const nextDataTid = nextChild.getAttribute("data-tid");
+            if (!nextDataTid) {
+              throw new Error(
+                "not data tid for reusing g element for " + reuseTargetTid
+              );
+            }
+
+            const reuseTargetTid = nextChild.getAttribute("data-reuse-from");
+            if (!reuseTargetTid) {
+              targetView.push(["append", nextChild]);
+              continue;
+            }
+            if (!availableOwnedResource.has(reuseTargetTid)) {
+              throw new Error(
+                "no available resource for reuse " + reuseTargetTid
+              );
+            }
+
+            const rsrc = availableOwnedResource.get(reuseTargetTid);
+            const prevIdx = rsrc[1].pop();
+
+            /// no available resource
+            if (prevIdx === undefined) {
+              targetView.push(["append", nextChild]);
+              continue;
+            }
+
+            /// clean one is reused directly
+            if (nextDataTid === reuseTargetTid) {
+              targetView.push(["reuse", prevIdx]);
+              continue;
+            }
+
+            /// dirty one should be patched and reused
+            patchAndSucceed(prev.children[prevIdx], nextChild);
+            targetView.push(["reuse", prevIdx]);
+          }
+
+          console.log("interpreted target view", targetView);
+
+          const prevView = [];
+          let j = 0;
+          for (let fg = 0; fg < prev.children.length; fg++) {
+            const prevChild = prev.children[fg];
+            if (prevChild.tagName !== "g") {
+              continue;
+            }
+            for (let off = fg; off < prev.children.length; off++) {
+              const prevChild = prev.children[off];
+              if (prevChild.tagName !== "g") {
+                break;
+              }
+              while (j < targetView.length) {
+                let done = false;
+                switch (j) {
+                  case "append":
+                    prevView.push(["insert", off, nextChild]);
+                    done = true;
+                    break;
+                  case "reuse":
+                    const target_off = targetView[j][1];
+                    if (target_off > off) {
+                      prevView.push(["swap_in", off, target_off]);
+                    } else if (target_off === off) {
+                      done = true;
+                    } else {
+                      console.log(targetView, prevView, off, j);
+                      throw new Error("reuse offset is less than prev offset");
+                    }
+                    break;
+                }
+
+                j++;
+                if (done) {
+                  break;
+                }
+              }
+            }
+            break;
+          }
+
+          console.log("interpreted previous view", prevView);
+          for (const [op, off, fr] of prevView) {
+            switch (op) {
+              case "insert":
+                prev.insertBefore(fr, prev.children[off]);
+                break;
+              case "swap_in":
+                prev.insertBefore(prev.children[fr], prev.children[off]);
+                break;
+              default:
+                throw new Error("unknown op " + op);
+            }
           }
         }
 
@@ -155,23 +283,40 @@
           // 当收到WebSocket数据时
           socket.addEventListener("message", (event) => {
             const data = event.data;
-            let svgElement = new DOMParser().parseFromString(
-              data,
-              "application/xml"
-            ).documentElement;
-            // svgContainer.innerHTML = data;
-            // const svgElement = svgContainer.firstElementChild;
-            if (imageContainer.firstElementChild) {
-              console.log("next");
-              compareAndReplaceRoot(
-                imageContainer.firstElementChild,
-                svgElement
-              );
-            } else {
-              console.log("new");
-              imageContainer.replaceChildren(svgElement);
+            const message_idx = data.indexOf(",");
+            const message = [
+              data.slice(0, message_idx),
+              data.slice(message_idx + 1),
+            ];
+            console.log(message);
+
+            let t0 = performance.now();
+            let t1 = undefined;
+            let t2 = undefined;
+            switch (message[0]) {
+              case "new":
+                imageContainer.innerHTML = message[1];
+                t1 = t2 = performance.now();
+                break;
+              case "diff-v0":
+                let svgElement = new DOMParser().parseFromString(
+                  message[1],
+                  "application/xml"
+                ).documentElement;
+                t1 = performance.now();
+                patchRoot(imageContainer.firstElementChild, svgElement);
+                t2 = performance.now();
+                break;
+              default:
+                console.log("data", data);
+                break;
             }
-            console.log("result", imageContainer.firstElementChild);
+
+            console.log(
+              `parse ${(t1 - t0).toFixed(2)} ms, replace ${(t2 - t1).toFixed(
+                2
+              )} ms, total ${(t2 - t0).toFixed(2)} ms`
+            );
           });
 
           // 当WebSocket连接关闭时
