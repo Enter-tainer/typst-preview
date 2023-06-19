@@ -299,10 +299,9 @@
                 t1 = t2 = performance.now();
                 break;
               case "diff-v0":
-                let svgElement = new DOMParser().parseFromString(
-                  message[1],
-                  "application/xml"
-                ).documentElement;
+                const elem = document.createElement("div");
+                elem.innerHTML = message[1];
+                const svgElement = elem.firstElementChild;
                 t1 = performance.now();
                 patchRoot(imageContainer.firstElementChild, svgElement);
                 t2 = performance.now();
