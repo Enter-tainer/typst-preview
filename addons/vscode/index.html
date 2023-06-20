@@ -251,6 +251,8 @@
 
           const targetView = [];
 
+          const toPatch = [];
+
           for (let i = 0; i < next.children.length; i++) {
             const nextChild = next.children[i];
             if (nextChild.tagName !== "g") {
@@ -291,8 +293,12 @@
             }
 
             /// dirty one should be patched and reused
-            patchAndSucceed(prev.children[prevIdx], nextChild);
+            toPatch.push([prev.children[prevIdx], nextChild]);
             targetView.push(["reuse", prevIdx]);
+          }
+
+          for (let [prevChild, nextChild] of toPatch) {
+            patchAndSucceed(prevChild, nextChild);
           }
 
           console.log("interpreted target view", targetView);
