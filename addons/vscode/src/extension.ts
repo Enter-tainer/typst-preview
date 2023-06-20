@@ -7,8 +7,8 @@ import { readFile } from 'fs/promises';
 import * as path from 'path';
 
 async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: string) {
-	const fileUri = vscode.Uri.joinPath(context.extensionUri, relativePath);
-	const fileContents = await readFile(fileUri.fsPath, 'utf8');
+	const filePath = path.resolve(__dirname, relativePath);
+	const fileContents = await readFile(filePath, 'utf8');
 	return fileContents;
 }
 
@@ -161,7 +161,7 @@ export function activate(context: vscode.ExtensionContext) {
 			const serverPath = await getTypstWsPath();
 			console.log(`Watching ${filePathToWatch} for changes`);
 			const [port, serverProcess] = await runServer(serverPath, [
-				"--host", "127.0.0.1:0",
+				"--host", "127.0.0.1:23625",
 				...codeGetTypstWsFontArgs(),
 				"watch", filePathToWatch,
 			], outputChannel);
@@ -189,8 +189,9 @@ export function activate(context: vscode.ExtensionContext) {
 			});
 
 			// 将已经准备好的 HTML 设置为 Webview 内容
-			const html = await loadHTMLFile(context, './index.html');
-			panel.webview.html = html.replace("ws://127.0.0.1:23625", `ws://127.0.0.1:${port}`);
+			let html = await loadHTMLFile(context, './frontend/index.html');
+			html = html.replace(`="/assets`, `="${panel.webview.asWebviewUri(vscode.Uri.file(path.resolve(__dirname, 'frontend'))).toString()}/assets`);
+			// panel.webview.html = html.replace("ws://127.0.0.1:23625", `ws://127.0.0.1:${port}`);
 		} else {
 			vscode.window.showWarningMessage('No active editor');
 		}
