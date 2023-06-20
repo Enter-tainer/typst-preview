@@ -136,16 +136,34 @@
         function patchRoot(prev, next) {
           const availableOwnedResource = new Map();
 
-          // todo: patch defs, styles
-          // for (let i = 0; i < prev.children.length; i++) {
-          //   const prevChild = prev.children[i];
-          //   const nextChild = next.children[i];
-          //   if (prevChild.tagName === "defs") {
-          //     console.log("defs", prevChild);
-          //   } else if (prevChild.tagName === "style") {
-          //     console.log("style", prevChild);
-          //   }
-          // }
+          let styleCount = 0;
+          for (let i = 0; i < prev.children.length; i++) {
+            const prevChild = prev.children[i];
+            const nextChild = next.children[i];
+            if (prevChild.tagName === "defs") {
+              console.log("prev defs", prevChild);
+              console.log("next defs", nextChild);
+              for (let j = 0; j < nextChild.children.length; j++) {
+                const nextChildChild = nextChild.children[j];
+                if (nextChildChild.tagName === 'g') {
+                  const prevGlyphs = prevChild.querySelector('#glyph');
+                  console.log("append glyphs:", nextChildChild.children, "to", prevGlyphs);
+                  prevGlyphs.append(...nextChildChild.children);
+                } else {
+                  console.warn("clip path not handled", nextChildChild)
+                }
+              }
+            } else if (prevChild.tagName === "style") {
+              styleCount++;
+              if (styleCount === 2) {
+                // skip base style
+                console.log("replace extra style");
+                console.log("prev style", prevChild);
+                console.log("next style", nextChild);
+                prevChild.replaceWith(nextChild);
+              }
+            }
+          }
 
           for (let i = 0; i < prev.children.length; i++) {
             const prevChild = prev.children[i];

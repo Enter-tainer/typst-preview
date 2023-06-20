@@ -46,9 +46,10 @@ serde = "1.0.159"
 [patch.crates-io]
 typst = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.ts" }
 typst-library = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.ts" }
-typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "06a2091d1350183cc9e03e928b9518089e6ec386", package = "typst-ts-svg-exporter"}
-typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "06a2091d1350183cc9e03e928b9518089e6ec386", package = "typst-ts-core"}
-
+typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "abc69c3ed553f6b1cfdde42dec007b73cd2609a2", package = "typst-ts-svg-exporter"}
+typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "abc69c3ed553f6b1cfdde42dec007b73cd2609a2", package = "typst-ts-core"}
+# typst-ts-svg-exporter = { path = "../typst.ts/exporter/svg" }
+# typst-ts-core = { path = "../typst.ts/core" }
 
 [build-dependencies]
 clap = { version = "4.2.1", features = ["derive", "string"] }
