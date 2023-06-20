@@ -79,8 +79,9 @@
     }
   },
   "scripts": {
+    "build:frontend": "cd ../frontend && yarn run build && cd ../vscode && mkdir -p ./out/frontend && cp -r ../frontend/dist/* ./out/frontend",
     "vscode:prepublish": "yarn run compile",
-    "compile": "tsc -p ./",
+    "compile": "tsc -p ./ && yarn run build:frontend",
     "watch": "tsc -watch -p ./",
     "pretest": "yarn run compile && yarn run lint",
     "package": "vsce package",
