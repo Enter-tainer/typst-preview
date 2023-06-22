@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   PatchPair,
-  TargetViewInstruction,
   interpretTargetView,
+  changeViewPerspective,
 } from "./svg-patch";
 
 interface Attributes {
@@ -46,7 +46,7 @@ const reuseStub = (n: number | null) =>
   });
 
 function toSnapshot([targetView, patchPair]: [
-  TargetViewInstruction<MockElement>[],
+  (MockElement | number | string)[][],
   PatchPair<MockElement>[]
 ]): string[] {
   const repr = (elem: unknown) => {
@@ -59,56 +59,113 @@ function toSnapshot([targetView, patchPair]: [
   const instructions = targetView.map((i) => {
     return i.map(repr).join(",");
   });
-  const patches = patchPair.map((i) => i.map(repr));
-  return [...instructions, patches.join("+")];
+  const patches = patchPair.length
+    ? [patchPair.map((i) => i.map(repr).join("->")).join(",")]
+    : [];
+  return [...instructions, ...patches];
 }
 
-describe("interpretTargetView", () => {
-  const testReuse = (init: number, rearrange: (number | null)[]) =>
-    interpretTargetView<MockElement>(
-      injectOffsets("o", repeat(init)),
-      injectOffsets("t", rearrange.map(reuseStub))
-    );
+const indexTargetView = (init: number, rearrange: (number | null)[]) =>
+  interpretTargetView<MockElement>(
+    injectOffsets("o", repeat(init)),
+    injectOffsets("t", rearrange.map(reuseStub))
+  );
+const indexOriginView = (init: number, rearrange: (number | null)[]) =>
+  changeViewPerspective<MockElement>(
+    injectOffsets("o", repeat(init)),
+    indexTargetView(init, rearrange)[0]
+  );
 
+describe("interpretView", () => {
   it("handleNoReuse", () => {
-    const result = testReuse(1, [null]);
+    const result = indexTargetView(1, [null]);
     expect(toSnapshot(result)).toMatchInlineSnapshot(`
       [
         "append,t0",
         "remove,0",
-        "",
+      ]
+    `);
+  });
+  it("handleNoReuse_origin", () => {
+    const result = indexOriginView(1, [null]);
+    expect(toSnapshot([result, []])).toMatchInlineSnapshot(`
+      [
+        "remove,0",
+        "insert,0,t0",
       ]
     `);
   });
 
   it("handleReuse", () => {
-    const result = testReuse(1, [0]);
+    const result = indexTargetView(1, [0]);
     expect(toSnapshot(result)).toMatchInlineSnapshot(`
       [
         "reuse,0",
-        "",
       ]
     `);
   });
+  it("handleReuse_origin", () => {
+    const result = indexOriginView(1, [0]);
+    expect(toSnapshot([result, []])).toMatchInlineSnapshot("[]");
+  });
 
   it("handleMultipleReuse", () => {
-    const result = testReuse(1, [0, 0]);
+    const result = indexTargetView(1, [0, 0]);
     expect(toSnapshot(result)).toMatchInlineSnapshot(`
       [
         "reuse,0",
         "append,t1",
-        "",
+      ]
+    `);
+  });
+  it("handleMultipleReuse_origin", () => {
+    const result = indexOriginView(1, [0, 0]);
+    expect(toSnapshot([result, []])).toMatchInlineSnapshot(`
+      [
+        "insert,1,t1",
       ]
     `);
   });
 
   it("handleReuseRemove", () => {
-    const result = testReuse(2, [1]);
+    const result = indexTargetView(2, [1]);
     expect(toSnapshot(result)).toMatchInlineSnapshot(`
       [
         "reuse,1",
         "remove,0",
-        "o1,t0",
+        "o1->t0",
+      ]
+    `);
+  });
+  it("handleReuseRemove_origin", () => {
+    const result = indexOriginView(2, [1]);
+    expect(toSnapshot([result, []])).toMatchInlineSnapshot(`
+      [
+        "remove,0",
+      ]
+    `);
+  });
+
+  it("handleReuseRemove2", () => {
+    const result = indexTargetView(5, [2, 1, 4]);
+    expect(toSnapshot(result)).toMatchInlineSnapshot(`
+      [
+        "reuse,2",
+        "reuse,1",
+        "reuse,4",
+        "remove,0",
+        "remove,3",
+        "o2->t0,o4->t2",
+      ]
+    `);
+  });
+  it("handleReuseRemove2_origin", () => {
+    const result = indexOriginView(5, [2, 1, 4]);
+    expect(toSnapshot([result, []])).toMatchInlineSnapshot(`
+      [
+        "remove,0",
+        "remove,3",
+        "swap_in,0,1",
       ]
     `);
   });
