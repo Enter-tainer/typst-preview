@@ -164,7 +164,7 @@ describe("interpretView", () => {
     expect(toSnapshot([result, []])).toMatchInlineSnapshot(`
       [
         "remove,0",
-        "remove,3",
+        "remove,2",
         "swap_in,0,1",
       ]
     `);

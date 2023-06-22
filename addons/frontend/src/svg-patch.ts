@@ -149,7 +149,6 @@ export function changeViewPerspective<
   let removeIndices: number[] = [];
   for (let inst of targetView) {
     if (inst[0] === "remove") {
-      originView.push(["remove", inst[1]]);
       removeIndices.push(inst[1]);
     }
   }
@@ -164,6 +163,7 @@ export function changeViewPerspective<
         r++;
       }
       removeShift.push(undefined);
+      originView.push(["remove", removeIndices[i] - i]);
       r++;
     }
     while (r <= originChildren.length) {
@@ -179,8 +179,10 @@ export function changeViewPerspective<
     return removeShift[off]!;
   };
 
-  let j = 0;
+  let j = 0,
+    appendOffset = 0;
   const shifted = new Set<number>();
+  const appends: ["insert", number, U][] = [];
   const interpretOriginView = (off: number) => {
     // console.log(off, getShift(off));
     off = getShift(off);
@@ -192,21 +194,28 @@ export function changeViewPerspective<
       const inst = targetView[j];
       switch (inst[0]) {
         case "append":
-          originView.push(["insert", off, inst[1]]);
-          done = true;
+          appends.push(["insert", appendOffset, inst[1]]);
+          appendOffset++;
           break;
         case "reuse":
           const target_off = getShift(inst[1]);
           // console.log(off, inst[1], target_off);
-          if (target_off > off) {
+          if (target_off != off) {
             originView.push(["swap_in", off, target_off]);
             shifted.add(target_off);
+            appendOffset++;
           } else if (target_off === off) {
             done = true;
-          } else {
-            console.log(targetView, originView, off, j);
-            throw new Error("reuse offset is less than prev offset");
+            appendOffset++;
           }
+          // else { // target_off < off
+          //   // originView.push(["swap_in", off, target_off]);
+          //   // shifted.add(target_off);
+          //   // console.log("targetView", targetView);
+          //   // console.log("originView", originView);
+          //   // console.log("at", target_off, off, j);
+          //   // throw new Error("reuse offset is less than prev offset");
+          // }
           break;
         // case "remove":
         default:
@@ -228,7 +237,8 @@ export function changeViewPerspective<
     interpretOriginView(off);
   }
   interpretOriginView(originChildren.length);
-  return originView;
+
+  return [...originView, ...appends];
 }
 
 function isSVGGElement(node: Element): node is SVGGElement {
