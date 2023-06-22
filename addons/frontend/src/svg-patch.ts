@@ -42,9 +42,149 @@ function patchAndSucceed(prev: SVGGElement, next: SVGGElement) {
   }
 }
 
-export function patchRoot(prev: SVGGElement, next: SVGGElement) {
-  const availableOwnedResource = new Map();
+export interface ElementChildren {
+  tagName: string;
+  getAttribute(name: string): string | null;
+}
 
+export type TargetViewInstruction<T> =
+  | ["append", T]
+  | ["reuse", number]
+  | ["remove", number];
+export type OriginViewInstruction<T> =
+  | ["insert", number, T]
+  | ["swap_in", number, number];
+export type PatchPair<T> = [T /* origin */, T /* target */];
+
+export function interpretTargetView<T extends ElementChildren, U extends T = T>(
+  originChildren: T[],
+  targetChildren: T[],
+  filter = (_x: T): _x is U => true
+): [TargetViewInstruction<U>[], PatchPair<U>[]] {
+  const availableOwnedResource = new Map<string, [T, number[]]>();
+
+  for (let i = 0; i < originChildren.length; i++) {
+    const prevChild = originChildren[i];
+    if (!filter(prevChild)) {
+      continue;
+    }
+    const data_tid = prevChild.getAttribute("data-tid");
+    if (data_tid) {
+      if (!availableOwnedResource.has(data_tid)) {
+        availableOwnedResource.set(data_tid, [prevChild, []]);
+      }
+      availableOwnedResource.get(data_tid)![1].push(i);
+    }
+  }
+
+  const targetView: TargetViewInstruction<U>[] = [];
+
+  const toPatch: [U, U][] = [];
+
+  for (let i = 0; i < targetChildren.length; i++) {
+    const nextChild = targetChildren[i];
+    if (!filter(nextChild)) {
+      continue;
+    }
+
+    const nextDataTid = nextChild.getAttribute("data-tid");
+    if (!nextDataTid) {
+      throw new Error("not data tid for reusing g element for " + nextDataTid);
+    }
+
+    const reuseTargetTid = nextChild.getAttribute("data-reuse-from");
+    console.log("reuseTargetTid", reuseTargetTid);
+    if (!reuseTargetTid) {
+      targetView.push(["append", nextChild]);
+      continue;
+    }
+    if (!availableOwnedResource.has(reuseTargetTid)) {
+      throw new Error("no available resource for reuse " + reuseTargetTid);
+    }
+
+    const rsrc = availableOwnedResource.get(reuseTargetTid)!;
+    const prevIdx = rsrc[1].pop();
+
+    /// no available resource
+    if (prevIdx === undefined) {
+      targetView.push(["append", nextChild]);
+      continue;
+    }
+
+    /// clean one is reused directly
+    if (nextDataTid === reuseTargetTid) {
+      targetView.push(["reuse", prevIdx]);
+      continue;
+    }
+
+    /// dirty one should be patched and reused
+    toPatch.push([originChildren[prevIdx] as U, nextChild]);
+    targetView.push(["reuse", prevIdx]);
+  }
+
+  for (let [_, unusedIndices] of availableOwnedResource.values()) {
+    for (let unused of unusedIndices) {
+      targetView.push(["remove", unused]);
+    }
+  }
+
+  return [targetView, toPatch];
+}
+
+export function changeViewPerspective<T extends ElementChildren>(
+  originChildren: T[],
+  targetView: TargetViewInstruction<T>[]
+): OriginViewInstruction<T>[] {
+  const originView: OriginViewInstruction<T>[] = [];
+  let j = 0;
+  for (let fg = 0; fg < originChildren.length; fg++) {
+    const prevChild = originChildren[fg];
+    if (prevChild.tagName !== "g") {
+      continue;
+    }
+    for (let off = fg; off < originChildren.length; off++) {
+      const prevChild = originChildren[off];
+      if (prevChild.tagName !== "g") {
+        break;
+      }
+      while (j < targetView.length) {
+        let done = false;
+        const inst = targetView[j];
+        switch (inst[0]) {
+          case "append":
+            originView.push(["insert", off, inst[1]]);
+            done = true;
+            break;
+          case "reuse":
+            const target_off = inst[1];
+            if (target_off > off) {
+              originView.push(["swap_in", off, target_off]);
+            } else if (target_off === off) {
+              done = true;
+            } else {
+              console.log(targetView, originView, off, j);
+              throw new Error("reuse offset is less than prev offset");
+            }
+            break;
+        }
+
+        j++;
+        if (done) {
+          break;
+        }
+      }
+    }
+    break;
+  }
+
+  return originView;
+}
+
+function isSVGGElement(node: Element): node is SVGGElement {
+  return node.tagName === "g";
+}
+
+export function patchRoot(prev: SVGGElement, next: SVGGElement) {
   for (let i = 0; i < 3; i++) {
     const prevChild = prev.children[i];
     const nextChild = next.children[i];
@@ -67,68 +207,11 @@ export function patchRoot(prev: SVGGElement, next: SVGGElement) {
     }
   }
 
-  for (let i = 0; i < prev.children.length; i++) {
-    const prevChild = prev.children[i];
-    if (prevChild.tagName !== "g") {
-      continue;
-    }
-    const data_tid = prevChild.getAttribute("data-tid");
-    if (data_tid) {
-      if (!availableOwnedResource.has(data_tid)) {
-        availableOwnedResource.set(data_tid, [prevChild, []]);
-      }
-      availableOwnedResource.get(data_tid)[1].push(i);
-    }
-  }
-
-  // console.log(availableOwnedResource);
-
-  const targetView = [];
-
-  const toPatch: [SVGGElement, SVGGElement][] = [];
-
-  for (let i = 0; i < next.children.length; i++) {
-    const nextChild = next.children[i];
-    if (nextChild.tagName !== "g") {
-      continue;
-    }
-
-    const nextDataTid = nextChild.getAttribute("data-tid");
-    if (!nextDataTid) {
-      throw new Error("not data tid for reusing g element for " + nextDataTid);
-    }
-
-    const reuseTargetTid = nextChild.getAttribute("data-reuse-from");
-    if (!reuseTargetTid) {
-      targetView.push(["append", nextChild]);
-      continue;
-    }
-    if (!availableOwnedResource.has(reuseTargetTid)) {
-      throw new Error("no available resource for reuse " + reuseTargetTid);
-    }
-
-    const rsrc = availableOwnedResource.get(reuseTargetTid);
-    const prevIdx = rsrc[1].pop();
-
-    /// no available resource
-    if (prevIdx === undefined) {
-      targetView.push(["append", nextChild]);
-      continue;
-    }
-
-    /// clean one is reused directly
-    if (nextDataTid === reuseTargetTid) {
-      targetView.push(["reuse", prevIdx]);
-      continue;
-    }
-
-    /// dirty one should be patched and reused
-    toPatch.push([
-      prev.children[prevIdx] as SVGGElement,
-      nextChild as SVGGElement,
-    ]);
-    targetView.push(["reuse", prevIdx]);
-  }
+  const [targetView, toPatch] = interpretTargetView<SVGGElement>(
+    prev.children as unknown as SVGGElement[],
+    next.children as unknown as SVGGElement[],
+    isSVGGElement
+  );
 
   for (let [prevChild, nextChild] of toPatch) {
     patchAndSucceed(prevChild, nextChild);
@@ -136,49 +219,13 @@ export function patchRoot(prev: SVGGElement, next: SVGGElement) {
 
   console.log("interpreted target view", targetView);
 
-  const prevView = [];
-  let j = 0;
-  for (let fg = 0; fg < prev.children.length; fg++) {
-    const prevChild = prev.children[fg];
-    if (prevChild.tagName !== "g") {
-      continue;
-    }
-    for (let off = fg; off < prev.children.length; off++) {
-      const prevChild = prev.children[off];
-      if (prevChild.tagName !== "g") {
-        break;
-      }
-      while (j < targetView.length) {
-        let done = false;
-        switch (targetView[j][0]) {
-          case "append":
-            prevView.push(["insert", off, targetView[j][1]]);
-            done = true;
-            break;
-          case "reuse":
-            const target_off = targetView[j][1];
-            if (target_off > off) {
-              prevView.push(["swap_in", off, target_off]);
-            } else if (target_off === off) {
-              done = true;
-            } else {
-              console.log(targetView, prevView, off, j);
-              throw new Error("reuse offset is less than prev offset");
-            }
-            break;
-        }
+  const originView = changeViewPerspective(
+    prev.children as unknown as SVGGElement[],
+    targetView
+  );
 
-        j++;
-        if (done) {
-          break;
-        }
-      }
-    }
-    break;
-  }
-
-  console.log("interpreted previous view", prevView);
-  for (const [op, off, fr] of prevView) {
+  console.log("interpreted previous view", originView);
+  for (const [op, off, fr] of originView) {
     switch (op) {
       case "insert":
         prev.insertBefore(fr, prev.children[off]);
