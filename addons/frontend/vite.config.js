@@ -8,6 +8,11 @@ export default defineConfig({
         main: "src/main.js",
         svg: "src/svg.ts",
       },
+      output: {
+        assetFileNames: `typst-webview-assets/[name]-[hash][extname]`,
+        chunkFileNames: "typst-webview-assets/[name]-[hash].js",
+        entryFileNames: "typst-webview-assets/[name]-[hash].js",
+      },
     },
   },
 });
