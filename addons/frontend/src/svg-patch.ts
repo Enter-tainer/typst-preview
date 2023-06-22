@@ -295,6 +295,9 @@ export function patchRoot(prev: SVGGElement, next: SVGGElement) {
       case "swap_in":
         prev.insertBefore(prev.children[fr], prev.children[off]);
         break;
+      case "remove":
+        prev.children[off].remove();
+        break;
       default:
         throw new Error("unknown op " + op);
     }
