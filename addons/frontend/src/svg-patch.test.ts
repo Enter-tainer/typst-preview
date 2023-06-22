@@ -169,4 +169,43 @@ describe("interpretView", () => {
       ]
     `);
   });
+
+  it("handleReuseInsert", () => {
+    const result = indexTargetView(5, [null, 2, null, 1, null, 4, null]);
+    expect(toSnapshot(result)).toMatchInlineSnapshot(`
+      [
+        "append,t0",
+        "reuse,2",
+        "append,t2",
+        "reuse,1",
+        "append,t4",
+        "reuse,4",
+        "append,t6",
+        "remove,0",
+        "remove,3",
+        "o2->t1,o1->t3,o4->t5",
+      ]
+    `);
+  });
+  it("handleReuseInsert_origin", () => {
+    const result = indexOriginView(5, [null, 2, null, 1, null, 4, null]);
+    // after remove: [1, 2, 4]
+    // swap_in,0,1: [2, 1, 4]
+    // insert,0,t0: [t0, 2, 1, 4]
+    // insert,2,t2: [t0, 2, t2, 1, 4]
+    // insert,4,t4: [t0, 2, t2, 1, t4, 4]
+    // insert,6,t6: [t0, 2, t2, 1, t4, 4, t6]
+
+    expect(toSnapshot([result, []])).toMatchInlineSnapshot(`
+      [
+        "remove,0",
+        "remove,2",
+        "swap_in,0,1",
+        "insert,0,t0",
+        "insert,2,t2",
+        "insert,4,t4",
+        "insert,6,t6",
+      ]
+    `);
+  });
 });
