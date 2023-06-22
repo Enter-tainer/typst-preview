@@ -53,19 +53,20 @@ export type TargetViewInstruction<T> =
   | ["remove", number];
 export type OriginViewInstruction<T> =
   | ["insert", number, T]
-  | ["swap_in", number, number];
+  | ["swap_in", number, number]
+  | ["remove", number];
 export type PatchPair<T> = [T /* origin */, T /* target */];
 
 export function interpretTargetView<T extends ElementChildren, U extends T = T>(
   originChildren: T[],
   targetChildren: T[],
-  filter = (_x: T): _x is U => true
+  tIsU = (_x: T): _x is U => true
 ): [TargetViewInstruction<U>[], PatchPair<U>[]] {
   const availableOwnedResource = new Map<string, [T, number[]]>();
 
   for (let i = 0; i < originChildren.length; i++) {
     const prevChild = originChildren[i];
-    if (!filter(prevChild)) {
+    if (!tIsU(prevChild)) {
       continue;
     }
     const data_tid = prevChild.getAttribute("data-tid");
@@ -83,7 +84,7 @@ export function interpretTargetView<T extends ElementChildren, U extends T = T>(
 
   for (let i = 0; i < targetChildren.length; i++) {
     const nextChild = targetChildren[i];
-    if (!filter(nextChild)) {
+    if (!tIsU(nextChild)) {
       continue;
     }
 
@@ -93,7 +94,6 @@ export function interpretTargetView<T extends ElementChildren, U extends T = T>(
     }
 
     const reuseTargetTid = nextChild.getAttribute("data-reuse-from");
-    console.log("reuseTargetTid", reuseTargetTid);
     if (!reuseTargetTid) {
       targetView.push(["append", nextChild]);
       continue;
@@ -107,7 +107,12 @@ export function interpretTargetView<T extends ElementChildren, U extends T = T>(
 
     /// no available resource
     if (prevIdx === undefined) {
-      targetView.push(["append", nextChild]);
+      /// clean one is reused directly
+      if (nextDataTid === reuseTargetTid) {
+        throw new Error("todo: identity clone " + reuseTargetTid);
+      } else {
+        targetView.push(["append", nextChild]);
+      }
       continue;
     }
 
@@ -131,52 +136,98 @@ export function interpretTargetView<T extends ElementChildren, U extends T = T>(
   return [targetView, toPatch];
 }
 
-export function changeViewPerspective<T extends ElementChildren>(
+export function changeViewPerspective<
+  T extends ElementChildren,
+  U extends T = T
+>(
   originChildren: T[],
-  targetView: TargetViewInstruction<T>[]
-): OriginViewInstruction<T>[] {
-  const originView: OriginViewInstruction<T>[] = [];
-  let j = 0;
-  for (let fg = 0; fg < originChildren.length; fg++) {
-    const prevChild = originChildren[fg];
-    if (prevChild.tagName !== "g") {
-      continue;
+  targetView: TargetViewInstruction<U>[],
+  tIsU = (_x: T): _x is U => true
+): OriginViewInstruction<U>[] {
+  const originView: OriginViewInstruction<U>[] = [];
+
+  let removeIndices: number[] = [];
+  for (let inst of targetView) {
+    if (inst[0] === "remove") {
+      originView.push(["remove", inst[1]]);
+      removeIndices.push(inst[1]);
     }
-    for (let off = fg; off < originChildren.length; off++) {
-      const prevChild = originChildren[off];
-      if (prevChild.tagName !== "g") {
+  }
+  removeIndices = removeIndices.sort((a, b) => a - b);
+  const removeShift: (number | undefined)[] = [];
+
+  {
+    let r = 0;
+    for (let i = 0; i < removeIndices.length; i++) {
+      while (r < removeIndices[i]) {
+        removeShift.push(r - i);
+        r++;
+      }
+      removeShift.push(undefined);
+      r++;
+    }
+    while (r <= originChildren.length) {
+      removeShift.push(r - removeIndices.length);
+      r++;
+    }
+  }
+  // console.log(removeIndices, removeShift);
+  const getShift = (off: number) => {
+    if (off >= removeShift.length || removeShift[off] === undefined) {
+      throw new Error(`invalid offset ${off} for getShift ${removeShift}`);
+    }
+    return removeShift[off]!;
+  };
+
+  let j = 0;
+  const shifted = new Set<number>();
+  const interpretOriginView = (off: number) => {
+    // console.log(off, getShift(off));
+    off = getShift(off);
+    if (shifted.has(off)) {
+      return;
+    }
+    while (j < targetView.length) {
+      let done = false;
+      const inst = targetView[j];
+      switch (inst[0]) {
+        case "append":
+          originView.push(["insert", off, inst[1]]);
+          done = true;
+          break;
+        case "reuse":
+          const target_off = getShift(inst[1]);
+          // console.log(off, inst[1], target_off);
+          if (target_off > off) {
+            originView.push(["swap_in", off, target_off]);
+            shifted.add(target_off);
+          } else if (target_off === off) {
+            done = true;
+          } else {
+            console.log(targetView, originView, off, j);
+            throw new Error("reuse offset is less than prev offset");
+          }
+          break;
+        // case "remove":
+        default:
+          break;
+      }
+
+      j++;
+      if (done) {
         break;
       }
-      while (j < targetView.length) {
-        let done = false;
-        const inst = targetView[j];
-        switch (inst[0]) {
-          case "append":
-            originView.push(["insert", off, inst[1]]);
-            done = true;
-            break;
-          case "reuse":
-            const target_off = inst[1];
-            if (target_off > off) {
-              originView.push(["swap_in", off, target_off]);
-            } else if (target_off === off) {
-              done = true;
-            } else {
-              console.log(targetView, originView, off, j);
-              throw new Error("reuse offset is less than prev offset");
-            }
-            break;
-        }
-
-        j++;
-        if (done) {
-          break;
-        }
-      }
     }
-    break;
-  }
+  };
 
+  for (let off = 0; off < originChildren.length; off++) {
+    const prevChild = originChildren[off];
+    if (!tIsU(prevChild) || removeShift[off] === undefined) {
+      continue;
+    }
+    interpretOriginView(off);
+  }
+  interpretOriginView(originChildren.length);
   return originView;
 }
 
@@ -221,7 +272,8 @@ export function patchRoot(prev: SVGGElement, next: SVGGElement) {
 
   const originView = changeViewPerspective(
     prev.children as unknown as SVGGElement[],
-    targetView
+    targetView,
+    isSVGGElement
   );
 
   console.log("interpreted previous view", originView);
