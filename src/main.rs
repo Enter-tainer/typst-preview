@@ -1,4 +1,5 @@
 mod args;
+mod publisher;
 
 use chrono::Datelike;
 use clap::Parser;
@@ -12,6 +13,7 @@ use log::{error, info};
 use memmap2::Mmap;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use once_cell::unsync::OnceCell;
+use publisher::Publisher;
 use same_file::Handle;
 use serde::{Deserialize, Serialize};
 use siphasher::sip128::{Hasher128, SipHasher};
@@ -27,10 +29,11 @@ use std::str::FromStr;
 use std::sync::Arc;
 use termcolor::{ColorChoice, StandardStream, WriteColor};
 use tokio::net::{TcpListener, TcpStream};
-use typst::doc::Frame;
+use typst::doc::{Document, Frame};
 use typst_ts_svg_exporter::IncrementalSvgExporter;
 
 use crate::args::{CliArguments, Command, CompileCommand};
+use crate::publisher::PublisherImpl;
 use tokio::sync::{Mutex, RwLock};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
@@ -120,70 +123,30 @@ impl FontsSettings {
         }
     }
 }
-#[derive(Debug)]
 struct Client {
-    tx: Mutex<SplitSink<WebSocketStream<TcpStream>, Message>>,
-    rx: Mutex<SplitStream<WebSocketStream<TcpStream>>>,
-    visible_range: Mutex<Option<Range<usize>>>,
-    dirty_marks: Mutex<Vec<bool>>,
-    pages_hashes: Mutex<Vec<u128>>,
+    conn: Arc<Mutex<WebSocketStream<TcpStream>>>,
+    publisher: Publisher<Option<Document>>,
+    renderer: Arc<Mutex<IncrementalSvgExporter>>,
 }
 
 impl Client {
-    async fn update_hashes(&self, new_hashes: Vec<u128>) {
-        let mut dirty_marks = self.dirty_marks.lock().await;
-        dirty_marks.resize(new_hashes.len(), true);
-        let mut pages_hashes = self.pages_hashes.lock().await;
-        for (i, &hash) in new_hashes.iter().enumerate() {
-            if i < pages_hashes.len() && hash != pages_hashes[i] {
-                dirty_marks[i] = true;
-            }
+    pub async fn poll_ws_events(conn: Arc<Mutex<WebSocketStream<TcpStream>>>) -> Option<String> {
+        if let Some(Ok(Message::Text(text))) = conn.lock().await.next().await {
+            Some(text)
+        } else {
+            None
         }
-        *pages_hashes = new_hashes;
-        let updated_pages = dirty_marks
-            .iter()
-            .enumerate()
-            .filter_map(|(i, &dirty)| if dirty { Some(i) } else { None })
-            .collect::<Vec<_>>();
-        info!("updated pages: {:?}", updated_pages);
-    }
-    async fn send(&self, svg: &str) -> bool {
-        if let Err(err) = self
-            .tx
-            .lock()
-            .await
-            .send(Message::Text(svg.to_string()))
-            .await
-        {
-            error!("failed to send to client: {}", err);
-            return false;
-        }
-        true
     }
 
-    async fn poll_visible_range(&self, imgs: Arc<RwLock<String>>) -> bool {
-        while let Some(msg) = self.rx.lock().await.next().await {
-            // #[derive(Debug, Deserialize)]
-            // struct VisibleRangeInfo {
-            //     page_start: usize,
-            //     page_end: usize,
-            // }
-            // match msg {
-            //     Ok(msg) => {
-            //         if let Message::Text(text) = msg {
-            //             let range: VisibleRangeInfo = serde_json::from_str(&text).unwrap();
-            //             *self.visible_range.lock().await = Some(range.page_start..range.page_end);
-            //             self.send(imgs.read().await.as_slice()).await;
-            //         }
-            //     }
-            //     Err(err) => {
-            //         error!("failed to receive from client: {}", err);
-            //         return false;
-            //     }
-            // }
-        }
-        error!("client disconnected");
-        exit(-1);
+    pub async fn poll_watch_events(
+        publisher: Publisher<Option<Document>>,
+    ) -> Option<Arc<Document>> {
+        publisher
+            .wait()
+            .await
+            .as_ref()
+            .as_ref()
+            .map(|doc| Arc::new(doc.clone()))
     }
 }
 
@@ -194,16 +157,14 @@ async fn main() {
         .filter_level(log::LevelFilter::Info)
         .try_init();
     let arguments = CliArguments::parse();
-    let conns = Arc::new(Mutex::new(Vec::new()));
-    let imgs = Arc::new(RwLock::new(String::new()));
+    let publisher: Publisher<_> = PublisherImpl::new(None).into();
     {
-        let conns = conns.clone();
-        let imgs = imgs.clone();
         let arguments = arguments.clone();
+        let publisher = publisher.clone();
         tokio::spawn(async {
             let res = match &arguments.command {
                 Command::Watch(_) => {
-                    watch(CompileSettings::with_arguments(arguments), conns, imgs).await
+                    watch(CompileSettings::with_arguments(arguments), publisher).await
                 }
                 Command::Fonts(_) => fonts(FontsSettings::with_arguments(arguments)),
             };
@@ -225,19 +186,40 @@ async fn main() {
     while let Ok((stream, _)) = listener.accept().await {
         let conn = accept_connection(stream).await;
         {
-            let (tx, rx) = conn.split();
-            let client = Arc::new(Client {
-                tx: Mutex::new(tx),
-                rx: Mutex::new(rx),
-                visible_range: Mutex::new(None),
-                dirty_marks: Mutex::new(Vec::new()),
-                pages_hashes: Mutex::new(Vec::new()),
+            let publisher = publisher.clone();
+            let client = Client {
+                conn: Arc::new(Mutex::new(conn)),
+                publisher: publisher.clone(),
+                renderer: Arc::new(Mutex::new(IncrementalSvgExporter::default())),
+            };
+            tokio::spawn(async move {
+                loop {
+                    tokio::select! {
+                        Some(msg) = Client::poll_ws_events(client.conn.clone()) => {
+                            if msg == "current" {
+                                let mut renderer = client.renderer.lock().await;
+                                if let Some(res) = renderer.render_current() {
+                                    client.conn.lock().await.send(Message::Text(res)).await.unwrap();
+                                } else {
+                                    let latest_doc = publisher.latest().await;
+                                    if latest_doc.is_some() {
+                                        let render_result = renderer.render(Arc::new(latest_doc.as_ref().clone().unwrap()));
+                                        client.conn.lock().await.send(Message::Text(render_result)).await.unwrap();
+                                    } else {
+                                        client.conn.lock().await.send(Message::Text("current not avalible".into())).await.unwrap();
+                                    }
+                                }
+                            } else {
+                                client.conn.lock().await.send(Message::Text(format!("unknown command {msg}"))).await.unwrap();
+                            }
+                        },
+                        Some(doc) = Client::poll_watch_events(client.publisher.clone()) => {
+                            let svg = client.renderer.lock().await.render(doc);
+                            client.conn.lock().await.send(Message::Text(svg)).await.unwrap();
+                        },
+                    }
+                }
             });
-            conns.lock().await.push(client.clone());
-            {
-                let imgs = imgs.clone();
-                tokio::spawn(async move { client.poll_visible_range(imgs).await });
-            }
         }
     }
 }
@@ -267,20 +249,9 @@ fn print_error(msg: &str) -> io::Result<()> {
     w.reset()?;
     writeln!(w, ": {msg}.")
 }
-fn with_index<T, F>(mut f: F) -> impl FnMut(&T) -> bool
-where
-    F: FnMut(usize, &T) -> bool,
-{
-    let mut i = 0;
-    move |item| (f(i, item), i += 1).0
-}
 
 /// Execute a compilation command.
-async fn watch(
-    command: CompileSettings,
-    conns: Arc<Mutex<Vec<Arc<Client>>>>,
-    svg: Arc<RwLock<String>>,
-) -> StrResult<()> {
+async fn watch(command: CompileSettings, publisher: Publisher<Option<Document>>) -> StrResult<()> {
     let root = if let Some(root) = &command.root {
         root.clone()
     } else if let Some(dir) = command
@@ -294,19 +265,10 @@ async fn watch(
     } else {
         PathBuf::new()
     };
-    let mut renderer = IncrementalSvgExporter::default();
-
     // Create the world that serves sources, fonts and files.
     let mut world = SystemWorld::new(root, &command.font_paths);
-    {
-        if let Some((new_svg, hashes)) = compile_once(&mut world, &mut renderer, &command)? {
-            *svg.write().await = new_svg;
-            let conns = conns.clone();
-            let svg = svg.clone();
-            tokio::spawn(async move {
-                broadcast_result(conns, &svg.read().await, hashes).await;
-            });
-        }
+    if let Some(doc) = compile_once(&mut world, &command)? {
+        publisher.publish(Arc::new(Some(doc))).await;
     }
     // Setup file watching.
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
@@ -340,49 +302,16 @@ async fn watch(
             recompile |= world.relevant(&event);
         }
         if recompile {
-            if let Some((new_svg, hashes)) = compile_once(&mut world, &mut renderer, &command)? {
-                if !new_svg.is_empty() {
-                    {
-                        *svg.write().await = new_svg;
-                    }
-                    let conns = conns.clone();
-                    let imgs = svg.clone();
-                    tokio::spawn(async move {
-                        broadcast_result(conns, &imgs.read().await, hashes).await;
-                    });
-                }
+            if let Some(doc) = compile_once(&mut world, &command)? {
+                publisher.publish(Arc::new(Some(doc))).await;
                 comemo::evict(30);
             }
         }
     }
 }
 
-async fn broadcast_result(conns: Arc<Mutex<Vec<Arc<Client>>>>, imgs: &str, hashes: Vec<u128>) {
-    let mut conn_lock = conns.lock().await;
-    info!("render done, sending to {} clients", conn_lock.len());
-    let mut to_be_remove: Vec<usize> = vec![];
-    for (i, conn) in conn_lock.iter_mut().enumerate() {
-        conn.update_hashes(hashes.clone()).await;
-        if !conn.send(imgs).await {
-            to_be_remove.push(i);
-        }
-    }
-    // remove
-    conn_lock.retain(with_index(|index, _item| !to_be_remove.contains(&index)));
-}
-
-fn hash_frame(page: &Frame) -> u128 {
-    let mut hasher = SipHasher::new();
-    page.hash(&mut hasher);
-    hasher.finish128().as_u128()
-}
-
 /// Compile a single time.
-fn compile_once(
-    world: &mut SystemWorld,
-    renderer: &mut IncrementalSvgExporter,
-    command: &CompileSettings,
-) -> StrResult<Option<(String, Vec<u128>)>> {
+fn compile_once(world: &mut SystemWorld, command: &CompileSettings) -> StrResult<Option<Document>> {
     status(command, Status::Compiling).unwrap();
 
     world.reset();
@@ -392,12 +321,7 @@ fn compile_once(
 
     match typst::compile(world) {
         // Export the images.
-        Ok(document) => {
-            let hashes = document.pages.iter().map(hash_frame).collect();
-            let svg = renderer.render(Arc::new(document));
-            status(command, Status::Success).unwrap();
-            Ok(Some((svg, hashes)))
-        }
+        Ok(document) => Ok(Some(document)),
 
         // Print diagnostics.
         Err(errors) => {

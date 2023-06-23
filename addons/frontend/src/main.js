@@ -71,6 +71,7 @@ window.onload = function () {
     socket.addEventListener("open", () => {
       socketOpen = true;
       console.log("WebSocket connection opened");
+      socket.send("current");
     });
 
     socket.addEventListener("close", () => {
