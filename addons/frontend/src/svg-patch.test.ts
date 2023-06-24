@@ -20,6 +20,11 @@ class MockElement {
   getAttribute(s: string): string | null {
     return this.attrs[s] ?? null;
   }
+
+  cloneNode(deep: boolean): MockElement {
+    deep;
+    return new MockElement(this.attrs);
+  }
 }
 
 const injectOffsets = (kind: string, elems: MockElement[]): MockElement[] => {
