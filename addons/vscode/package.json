@@ -79,7 +79,7 @@
     }
   },
   "scripts": {
-    "build:frontend": "cd ../frontend && yarn run build && cd ../vscode && rimraf ./out/frontend/ && copyfiles -u=3 ../frontend/dist/**/* ./out/frontend/",
+    "build:frontend": "cd ../frontend && yarn run build && cd ../vscode && rimraf ./out/frontend/ && copyfiles -u=3 ../frontend/dist/** ./out/frontend/ && copyfiles -u=3 ../frontend/dist/**/* ./out/frontend/",
     "vscode:prepublish": "yarn run compile",
     "compile": "tsc -p ./ && yarn run build:frontend",
     "watch": "tsc -watch -p ./",
