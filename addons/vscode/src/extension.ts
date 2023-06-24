@@ -16,7 +16,7 @@ export async function getTypstWsPath(): Promise<string> {
 	const state = getTypstWsPath as unknown as any;
 	(!state.BINARY_NAME) && (state.BINARY_NAME = "typst-ws");
 	(!state.getConfig) && (state.getConfig = (
-	  () => vscode.workspace.getConfiguration().get<string>('typst-preview.executable')));
+		() => vscode.workspace.getConfiguration().get<string>('typst-preview.executable')));
 
 	const bundledPath = path.resolve(__dirname, state.BINARY_NAME);
 	const configPath = state.getConfig();
@@ -48,11 +48,11 @@ export async function getTypstWsPath(): Promise<string> {
 		if (configPath?.length) {
 			return configPath;
 		}
-	
+
 		if (await executableExists(bundledPath)) {
 			return bundledPath;
 		}
-	
+
 		vscode.window.showWarningMessage(
 			`Failed to find ${state.BINARY_NAME} executable at ${bundledPath},`+
 			`maybe we didn't ship it for your platform? Using ${state.BINARY_NAME} from PATH`);
@@ -63,13 +63,12 @@ export async function getTypstWsPath(): Promise<string> {
 }
 
 export function getTypstWsFontArgs(fontPaths?: string[]): string[] {
-	return (!fontPaths) ? [] : fontPaths.map(
-	  (fontPath) => ["--font-path", fontPath]).flat();
+	return (fontPaths ?? []).flatMap((fontPath) => ["--font-path", fontPath]);
 }
 
 export function codeGetTypstWsFontArgs(): string[] {
 	return getTypstWsFontArgs(vscode.workspace.getConfiguration().get<string[]>(
-	  'typst-preview.font-paths'));
+		'typst-preview.font-paths'));
 }
 
 const serverProcesses: Array<any> = [];
