@@ -61,6 +61,8 @@ jobs:
           node-version: 16
       - run: yarn
         working-directory: ./addons/vscode
+      - run: yarn
+        working-directory: ./addons/frontend
       - name: rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -82,7 +84,7 @@ jobs:
           cp "target/${{ matrix.rust-target }}/release/typst-ws$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "addons/vscode/out/"
           cp "target/${{ matrix.rust-target }}/release/typst-ws$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "typst-ws-${{ env.target }}$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )"
       - shell: pwsh
-        run: npm run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
+        run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
         working-directory: ./addons/vscode
       - uses: actions/upload-artifact@v2
         with:
@@ -117,10 +119,12 @@ jobs:
           mkdir -p addons/vscode/out
           cp "target/$RUST_TARGET/release/typst-ws" "addons/vscode/out/"
           cp "target/$RUST_TARGET/release/typst-ws" "typst-ws-alpine-x64"
-      - run: npm install
+      - run: yarn
         working-directory: ./addons/vscode
+      - run: yarn
+        working-directory: ./addons/frontend
       - name: package extension
-        run: npm run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
+        run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
         working-directory: ./addons/vscode
       - uses: actions/upload-artifact@v2
         with:
