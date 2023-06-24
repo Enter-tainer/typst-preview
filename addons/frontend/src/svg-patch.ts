@@ -92,8 +92,10 @@ function replaceNonSVGElements(prev: Element, next: Element) {
 }
 
 function patchAndSucceed(prev: SVGGElement, next: SVGGElement) {
-  console.log("patchAndSucceed", prev, next);
   if (equal(prev, next)) {
+    console.log("eq", prev, next);
+    next.removeAttribute("data-reuse-from");
+    replaceAttributes(prev, next);
     return true;
   } else {
     next.removeAttribute("data-reuse-from");
@@ -126,6 +128,7 @@ export function interpretTargetView<T extends ElementChildren, U extends T = T>(
   tIsU = (_x: T): _x is U => true
 ): [TargetViewInstruction<U>[], PatchPair<U>[]] {
   const availableOwnedResource = new Map<string, [T, number[]]>();
+  const targetView: TargetViewInstruction<U>[] = [];
 
   for (let i = 0; i < originChildren.length; i++) {
     const prevChild = originChildren[i];
@@ -138,10 +141,10 @@ export function interpretTargetView<T extends ElementChildren, U extends T = T>(
         availableOwnedResource.set(data_tid, [prevChild, []]);
       }
       availableOwnedResource.get(data_tid)![1].push(i);
+    } else {
+      targetView.push(["remove", i]);
     }
   }
-
-  const targetView: TargetViewInstruction<U>[] = [];
 
   const toPatch: [U, U][] = [];
 
@@ -176,12 +179,6 @@ export function interpretTargetView<T extends ElementChildren, U extends T = T>(
       } else {
         targetView.push(["append", nextChild]);
       }
-      continue;
-    }
-
-    /// clean one is reused directly
-    if (nextDataTid === reuseTargetTid) {
-      targetView.push(["reuse", prevIdx]);
       continue;
     }
 
@@ -320,14 +317,16 @@ export function patchRoot(prev: SVGGElement, next: SVGGElement) {
         prevChild.append(...nextChild.children);
       } else if (prevChild.getAttribute("id") === "clip-path") {
         console.log("clip path: replace");
-        prevChild.replaceChildren(...nextChild.children);
+        // todo: gc
+        prevChild.append(...nextChild.children);
       }
     } else if (
       prevChild.tagName === "style" &&
       nextChild.getAttribute("data-reuse") !== "1"
     ) {
       console.log("replace extra style");
-      prevChild.replaceChildren(...nextChild.children);
+      // todo: gc
+      prevChild.append(...nextChild.children);
     }
   }
 

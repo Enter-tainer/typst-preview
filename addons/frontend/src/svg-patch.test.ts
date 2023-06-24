@@ -106,6 +106,7 @@ describe("interpretView", () => {
     expect(toSnapshot(result)).toMatchInlineSnapshot(`
       [
         "reuse,0",
+        "o0->t0",
       ]
     `);
   });
@@ -120,6 +121,7 @@ describe("interpretView", () => {
       [
         "reuse,0",
         "append,t1",
+        "o0->t0",
       ]
     `);
   });
@@ -160,7 +162,7 @@ describe("interpretView", () => {
         "reuse,4",
         "remove,0",
         "remove,3",
-        "o2->t0,o4->t2",
+        "o2->t0,o1->t1,o4->t2",
       ]
     `);
   });
