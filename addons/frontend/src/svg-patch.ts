@@ -14,20 +14,80 @@ function equal(prev: SVGGElement, next: SVGGElement) {
   return false;
 }
 
-function replaceChildrenFineGranuality(prev: SVGGElement, next: SVGGElement) {
-  for (let i = 0; i < prev.children.length; i++) {
-    const prevChild = prev.children[i];
-    const nextChild = next.children[i];
-    console.log("replacing", prevChild, nextChild);
+function replaceChildren(prev: SVGGElement, next: SVGGElement) {
+  const [targetView, toPatch] = interpretTargetView<SVGGElement>(
+    prev.children as unknown as SVGGElement[],
+    next.children as unknown as SVGGElement[],
+    isSVGGElement
+  );
+
+  for (let [prevChild, nextChild] of toPatch) {
+    patchAndSucceed(prevChild, nextChild);
   }
 
-  return false;
+  // console.log("interpreted target view", targetView);
+
+  const originView = changeViewPerspective(
+    prev.children as unknown as SVGGElement[],
+    targetView,
+    isSVGGElement
+  );
+
+  // console.log("interpreted previous view", originView);
+  for (const [op, off, fr] of originView) {
+    switch (op) {
+      case "insert":
+        prev.insertBefore(fr, prev.children[off]);
+        break;
+      case "swap_in":
+        prev.insertBefore(prev.children[fr], prev.children[off]);
+        break;
+      case "remove":
+        prev.children[off].remove();
+        break;
+      default:
+        throw new Error("unknown op " + op);
+    }
+  }
 }
 
-function replaceChildren(prev: SVGGElement, next: SVGGElement) {
-  if (!replaceChildrenFineGranuality(prev, next)) {
-    console.log("hard replace", prev, next);
-    prev.replaceWith(next);
+function replaceAttributes(prev: SVGGElement, next: SVGGElement) {
+  const prevAttrs = prev.attributes;
+  const nextAttrs = next.attributes;
+  
+  const removedAttrs = [];
+
+  for (let i = 0; i < prevAttrs.length; i++) {
+    removedAttrs.push(prevAttrs[i].name);
+  }
+
+  for (const attr of removedAttrs) {
+    prev.removeAttribute(attr);
+  }
+
+  for (let i = 0; i < nextAttrs.length; i++) {
+    prev.setAttribute(nextAttrs[i].name, nextAttrs[i].value);
+  }
+}
+
+function replaceNonSVGElements(prev: Element, next: Element) {
+  const removedIndecies = [];
+  for (let i = 0; i < prev.children.length; i++) {
+    const prevChild = prev.children[i];
+    if (prevChild.tagName !== "g") {
+      removedIndecies.push(i);
+    }
+  }
+
+  for (const index of removedIndecies.reverse()) {
+    prev.children[index].remove();
+  }
+
+  for (let i = 0; i < next.children.length; i++) {
+    const nextChild = next.children[i];
+    if (nextChild.tagName !== "g") {
+      prev.appendChild(nextChild.cloneNode(true));
+    }
   }
 }
 
@@ -37,6 +97,8 @@ function patchAndSucceed(prev: SVGGElement, next: SVGGElement) {
     return true;
   } else {
     next.removeAttribute("data-reuse-from");
+    replaceAttributes(prev, next);
+    replaceNonSVGElements(prev, next);
     replaceChildren(prev, next);
     return false;
   }
@@ -45,6 +107,7 @@ function patchAndSucceed(prev: SVGGElement, next: SVGGElement) {
 export interface ElementChildren {
   tagName: string;
   getAttribute(name: string): string | null;
+  cloneNode(deep: boolean): unknown;
 }
 
 export type TargetViewInstruction<T> =
@@ -109,7 +172,7 @@ export function interpretTargetView<T extends ElementChildren, U extends T = T>(
     if (prevIdx === undefined) {
       /// clean one is reused directly
       if (nextDataTid === reuseTargetTid) {
-        throw new Error("todo: identity clone " + reuseTargetTid);
+        targetView.push(["append", rsrc[0].cloneNode(true) as U]);
       } else {
         targetView.push(["append", nextChild]);
       }
