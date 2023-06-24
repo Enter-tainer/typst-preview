@@ -189,9 +189,14 @@ export function activate(context: vscode.ExtensionContext) {
 			});
 
 			// 将已经准备好的 HTML 设置为 Webview 内容
-			let html = await loadHTMLFile(context, './frontend/index.html');
-			html = html.replace(`="/assets`, `="${panel.webview.asWebviewUri(vscode.Uri.file(path.resolve(__dirname, 'frontend'))).toString()}/assets`);
-			// panel.webview.html = html.replace("ws://127.0.0.1:23625", `ws://127.0.0.1:${port}`);
+			let html = await loadHTMLFile(context, "./frontend/index.html");
+			html = html.replace(
+			  /\/typst-webview-assets/g,
+			  `${panel.webview
+				.asWebviewUri(vscode.Uri.file(path.resolve(__dirname, "frontend")))
+				.toString()}/typst-webview-assets`
+			);
+			panel.webview.html = html.replace("ws://127.0.0.1:23625", `ws://127.0.0.1:${port}`);
 		} else {
 			vscode.window.showWarningMessage('No active editor');
 		}
