@@ -72,6 +72,15 @@ export function codeGetTypstWsFontArgs(): string[] {
 	  'typst-preview.font-paths'));
 }
 
+function getProjectRoot(): string | null {
+	const paths = vscode.workspace.workspaceFolders?.map(folder => folder.uri.path);
+	if (!paths || paths.length !== 1) {
+		return null;
+	} else {
+		return paths[0];
+	}
+}
+
 const serverProcesses: Array<any> = [];
 const shadowFilePaths: Array<string> = [];
 
@@ -160,8 +169,11 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 			const serverPath = await getTypstWsPath();
 			console.log(`Watching ${filePathToWatch} for changes`);
+			const projectRoot = getProjectRoot();
+			const rootArgs = projectRoot ? ["--root", projectRoot] : [];
 			const [port, serverProcess] = await runServer(serverPath, [
 				"--host", "127.0.0.1:23625",
+				...rootArgs,
 				...codeGetTypstWsFontArgs(),
 				"watch", filePathToWatch,
 			], outputChannel);

@@ -151,6 +151,7 @@ async fn main() {
         .filter_level(log::LevelFilter::Info)
         .try_init();
     let arguments = CliArguments::parse();
+    info!("Arguments: {:#?}", arguments);
     let publisher: Publisher<Document> = PublisherImpl::new().into();
     {
         let arguments = arguments.clone();
