@@ -26,6 +26,8 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Duration;
 use termcolor::{ColorChoice, StandardStream, WriteColor};
 use tokio::net::{TcpListener, TcpStream};
 use typst::doc::Document;
@@ -174,7 +176,8 @@ async fn main() {
     let try_socket = TcpListener::bind(&addr).await;
     let listener = try_socket.expect("Failed to bind");
     info!("Listening on: {}", listener.local_addr().unwrap());
-
+    
+    let active_client_count = Arc::new(AtomicUsize::new(0));
     while let Ok((stream, _)) = listener.accept().await {
         let conn = accept_connection(stream).await;
         {
@@ -184,31 +187,47 @@ async fn main() {
                 publisher: publisher.clone(),
                 renderer: Arc::new(Mutex::new(IncrementalSvgExporter::default())),
             };
+            let active_client_count = active_client_count.clone();
             tokio::spawn(async move {
+                active_client_count.fetch_add(1, Ordering::SeqCst);
                 loop {
                     tokio::select! {
-                        Some(msg) = Client::poll_ws_events(client.conn.clone()) => {
-                            if msg == "current" {
-                                let mut renderer = client.renderer.lock().await;
-                                if let Some(res) = renderer.render_current() {
-                                    client.conn.lock().await.send(Message::Text(res)).await.unwrap();
-                                } else {
-                                    let latest_doc = publisher.latest().await;
-                                    if latest_doc.is_some() {
-                                        let render_result = renderer.render(latest_doc.unwrap());
-                                        client.conn.lock().await.send(Message::Text(render_result)).await.unwrap();
+                        msg = Client::poll_ws_events(client.conn.clone()) => {
+                            if let Some(msg) = msg {
+                                if msg == "current" {
+                                    let mut renderer = client.renderer.lock().await;
+                                    if let Some(res) = renderer.render_current() {
+                                        client.conn.lock().await.send(Message::Text(res)).await.unwrap();
                                     } else {
-                                        client.conn.lock().await.send(Message::Text("current not avalible".into())).await.unwrap();
+                                        let latest_doc = publisher.latest().await;
+                                        if latest_doc.is_some() {
+                                            let render_result = renderer.render(latest_doc.unwrap());
+                                            client.conn.lock().await.send(Message::Text(render_result)).await.unwrap();
+                                        } else {
+                                            client.conn.lock().await.send(Message::Text("current not avalible".into())).await.unwrap();
+                                        }
                                     }
+                                } else {
+                                    client.conn.lock().await.send(Message::Text(format!("unknown command {msg}"))).await.unwrap();
                                 }
                             } else {
-                                client.conn.lock().await.send(Message::Text(format!("unknown command {msg}"))).await.unwrap();
+                                break;
                             }
                         },
                         doc = Client::poll_watch_events(client.publisher.clone()) => {
                             let svg = client.renderer.lock().await.render(doc);
                             client.conn.lock().await.send(Message::Text(svg)).await.unwrap();
                         },
+                    }
+                }
+                info!("Peer closed WebSocket connection.");
+                let prev = active_client_count.fetch_sub(1, Ordering::SeqCst);
+                if prev == 1 {
+                    // There is no clients left. Wait 30s and shutdown if no new clients connect.
+                    tokio::time::sleep(Duration::from_secs(30)).await;
+                    if active_client_count.load(Ordering::SeqCst) == 0 {
+                        info!("No active clients. Shutting down.");
+                        std::process::exit(0);
                     }
                 }
             });
