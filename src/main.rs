@@ -7,7 +7,7 @@ use codespan_reporting::diagnostic::{Diagnostic, Label};
 use codespan_reporting::term::{self, termcolor};
 use comemo::Prehashed;
 use elsa::FrozenVec;
-use futures::stream::{SplitSink, SplitStream};
+
 use futures::{SinkExt, StreamExt};
 use log::{error, info};
 use memmap2::Mmap;
@@ -15,36 +15,35 @@ use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use once_cell::unsync::OnceCell;
 use publisher::Publisher;
 use same_file::Handle;
-use serde::{Deserialize, Serialize};
+
 use siphasher::sip128::{Hasher128, SipHasher};
 use std::cell::{Cell, RefCell, RefMut};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::hash::Hash;
 use std::io::{self, Write};
-use std::ops::Range;
+
 use std::path::{Path, PathBuf};
-use std::process::exit;
-use std::str::FromStr;
+
 use std::sync::Arc;
 use termcolor::{ColorChoice, StandardStream, WriteColor};
 use tokio::net::{TcpListener, TcpStream};
-use typst::doc::{Document, Frame};
+use typst::doc::Document;
 use typst_ts_svg_exporter::IncrementalSvgExporter;
 
 use crate::args::{CliArguments, Command, CompileCommand};
 use crate::publisher::PublisherImpl;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::Mutex;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 use typst::diag::{FileError, FileResult, SourceError, StrResult};
 use typst::eval::{Datetime, Library};
 use typst::font::{Font, FontBook, FontInfo, FontVariant};
-use typst::geom::RgbaColor;
+
 use typst::syntax::{Source, SourceId};
 use typst::util::{Buffer, PathExt};
 use typst::World;
-use typst_ts_core::Exporter;
+
 use walkdir::WalkDir;
 
 type CodespanResult<T> = Result<T, CodespanError>;
@@ -125,7 +124,7 @@ impl FontsSettings {
 }
 struct Client {
     conn: Arc<Mutex<WebSocketStream<TcpStream>>>,
-    publisher: Publisher<Option<Document>>,
+    publisher: Publisher<Document>,
     renderer: Arc<Mutex<IncrementalSvgExporter>>,
 }
 
@@ -138,15 +137,8 @@ impl Client {
         }
     }
 
-    pub async fn poll_watch_events(
-        publisher: Publisher<Option<Document>>,
-    ) -> Option<Arc<Document>> {
-        publisher
-            .wait()
-            .await
-            .as_ref()
-            .as_ref()
-            .map(|doc| Arc::new(doc.clone()))
+    pub async fn poll_watch_events(publisher: Publisher<Document>) -> Arc<Document> {
+        publisher.wait().await
     }
 }
 
@@ -157,7 +149,7 @@ async fn main() {
         .filter_level(log::LevelFilter::Info)
         .try_init();
     let arguments = CliArguments::parse();
-    let publisher: Publisher<_> = PublisherImpl::new(None).into();
+    let publisher: Publisher<Document> = PublisherImpl::new().into();
     {
         let arguments = arguments.clone();
         let publisher = publisher.clone();
@@ -203,7 +195,7 @@ async fn main() {
                                 } else {
                                     let latest_doc = publisher.latest().await;
                                     if latest_doc.is_some() {
-                                        let render_result = renderer.render(Arc::new(latest_doc.as_ref().clone().unwrap()));
+                                        let render_result = renderer.render(latest_doc.unwrap());
                                         client.conn.lock().await.send(Message::Text(render_result)).await.unwrap();
                                     } else {
                                         client.conn.lock().await.send(Message::Text("current not avalible".into())).await.unwrap();
@@ -213,7 +205,7 @@ async fn main() {
                                 client.conn.lock().await.send(Message::Text(format!("unknown command {msg}"))).await.unwrap();
                             }
                         },
-                        Some(doc) = Client::poll_watch_events(client.publisher.clone()) => {
+                        doc = Client::poll_watch_events(client.publisher.clone()) => {
                             let svg = client.renderer.lock().await.render(doc);
                             client.conn.lock().await.send(Message::Text(svg)).await.unwrap();
                         },
@@ -251,7 +243,7 @@ fn print_error(msg: &str) -> io::Result<()> {
 }
 
 /// Execute a compilation command.
-async fn watch(command: CompileSettings, publisher: Publisher<Option<Document>>) -> StrResult<()> {
+async fn watch(command: CompileSettings, publisher: Publisher<Document>) -> StrResult<()> {
     let root = if let Some(root) = &command.root {
         root.clone()
     } else if let Some(dir) = command
@@ -268,7 +260,7 @@ async fn watch(command: CompileSettings, publisher: Publisher<Option<Document>>)
     // Create the world that serves sources, fonts and files.
     let mut world = SystemWorld::new(root, &command.font_paths);
     if let Some(doc) = compile_once(&mut world, &command)? {
-        publisher.publish(Arc::new(Some(doc))).await;
+        publisher.publish(Arc::new(doc)).await;
     }
     // Setup file watching.
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
@@ -303,7 +295,7 @@ async fn watch(command: CompileSettings, publisher: Publisher<Option<Document>>)
         }
         if recompile {
             if let Some(doc) = compile_once(&mut world, &command)? {
-                publisher.publish(Arc::new(Some(doc))).await;
+                publisher.publish(Arc::new(doc)).await;
                 comemo::evict(30);
             }
         }
@@ -350,6 +342,7 @@ fn status(command: &CompileSettings, status: Status) -> io::Result<()> {
 }
 
 /// The status in which the watcher can be.
+#[allow(dead_code)]
 enum Status {
     Compiling,
     Success,
