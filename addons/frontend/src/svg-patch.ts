@@ -54,6 +54,23 @@ function replaceChildren(prev: SVGGElement, next: SVGGElement) {
 function replaceAttributes(prev: SVGGElement, next: SVGGElement) {
   const prevAttrs = prev.attributes;
   const nextAttrs = next.attributes;
+  if (prevAttrs.length === nextAttrs.length) {
+    let same = true;
+    for (let i = 0; i < prevAttrs.length; i++) {
+      const prevAttr = prevAttrs[i];
+      const nextAttr = nextAttrs.getNamedItem(prevAttr.name);
+      if (nextAttr === null || prevAttr.value !== nextAttr.value) {
+        same = false;
+        break;
+      }
+    }
+
+    if (same) {
+      console.log("same attributes, skip");
+      return;
+    }
+  }
+  console.log("different attributes, replace");
   
   const removedAttrs = [];
 
