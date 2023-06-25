@@ -16,7 +16,7 @@ export async function getTypstWsPath(): Promise<string> {
 	const state = getTypstWsPath as unknown as any;
 	(!state.BINARY_NAME) && (state.BINARY_NAME = "typst-ws");
 	(!state.getConfig) && (state.getConfig = (
-	  () => vscode.workspace.getConfiguration().get<string>('typst-preview.executable')));
+		() => vscode.workspace.getConfiguration().get<string>('typst-preview.executable')));
 
 	const bundledPath = path.resolve(__dirname, state.BINARY_NAME);
 	const configPath = state.getConfig();
@@ -48,13 +48,13 @@ export async function getTypstWsPath(): Promise<string> {
 		if (configPath?.length) {
 			return configPath;
 		}
-	
+
 		if (await executableExists(bundledPath)) {
 			return bundledPath;
 		}
-	
+
 		vscode.window.showWarningMessage(
-			`Failed to find ${state.BINARY_NAME} executable at ${bundledPath},`+
+			`Failed to find ${state.BINARY_NAME} executable at ${bundledPath},` +
 			`maybe we didn't ship it for your platform? Using ${state.BINARY_NAME} from PATH`);
 		return state.BINARY_NAME;
 	};
@@ -64,17 +64,21 @@ export async function getTypstWsPath(): Promise<string> {
 
 export function getTypstWsFontArgs(fontPaths?: string[]): string[] {
 	return (!fontPaths) ? [] : fontPaths.map(
-	  (fontPath) => ["--font-path", fontPath]).flat();
+		(fontPath) => ["--font-path", fontPath]).flat();
 }
 
 export function codeGetTypstWsFontArgs(): string[] {
 	return getTypstWsFontArgs(vscode.workspace.getConfiguration().get<string[]>(
-	  'typst-preview.font-paths'));
+		'typst-preview.font-paths'));
 }
 
-function getProjectRoot(): string | null {
-	const paths = vscode.workspace.workspaceFolders?.map(folder => folder.uri.path);
-	if (!paths || paths.length !== 1) {
+function getProjectRoot(currentPath: string): string | null {
+	const checkIfPathContains = (base: string, target: string) => {
+		const relativePath = path.relative(base, target);
+		return !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
+	};
+	const paths = vscode.workspace.workspaceFolders?.map(folder => folder.uri.fsPath).filter(folder => checkIfPathContains(folder, currentPath));
+	if (!paths || paths.length === 0) {
 		return null;
 	} else {
 		return paths[0];
@@ -169,7 +173,7 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 			const serverPath = await getTypstWsPath();
 			console.log(`Watching ${filePathToWatch} for changes`);
-			const projectRoot = getProjectRoot();
+			const projectRoot = getProjectRoot(filePath);
 			const rootArgs = projectRoot ? ["--root", projectRoot] : [];
 			const [port, serverProcess] = await runServer(serverPath, [
 				"--host", "127.0.0.1:23625",
@@ -203,10 +207,10 @@ export function activate(context: vscode.ExtensionContext) {
 			// 将已经准备好的 HTML 设置为 Webview 内容
 			let html = await loadHTMLFile(context, "./frontend/index.html");
 			html = html.replace(
-			  /\/typst-webview-assets/g,
-			  `${panel.webview
-				.asWebviewUri(vscode.Uri.file(path.resolve(__dirname, "frontend")))
-				.toString()}/typst-webview-assets`
+				/\/typst-webview-assets/g,
+				`${panel.webview
+					.asWebviewUri(vscode.Uri.file(path.resolve(__dirname, "frontend")))
+					.toString()}/typst-webview-assets`
 			);
 			panel.webview.html = html.replace("ws://127.0.0.1:23625", `ws://127.0.0.1:${port}`);
 		} else {
