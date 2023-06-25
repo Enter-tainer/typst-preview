@@ -192,7 +192,9 @@ export function interpretTargetView<T extends ElementChildren, U extends T = T>(
     if (prevIdx === undefined) {
       /// clean one is reused directly
       if (nextDataTid === reuseTargetTid) {
-        targetView.push(["append", rsrc[0].cloneNode(true) as U]);
+        const clonedNode = rsrc[0].cloneNode(true) as U;
+        toPatch.push([clonedNode, nextChild]);
+        targetView.push(["append", clonedNode]);
       } else {
         targetView.push(["append", nextChild]);
       }
