@@ -111,7 +111,7 @@ async function processJumpInfo(activeEditor: vscode.TextEditor, jump: JumpInfo) 
 	const endPosition = new vscode.Position(jump.end[0], jump.end[1]);
 	const range = new vscode.Range(startPosition, endPosition);
 	editor.selection = new vscode.Selection(range.start, range.end);
-	editor.revealRange(range);
+	editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
 }
 
 function runServer(command: string, args: string[], outputChannel: vscode.OutputChannel): Promise<[string, ChildProcessWithoutNullStreams]> {
