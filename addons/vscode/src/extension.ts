@@ -95,7 +95,7 @@ interface JumpInfo {
 	end: [number, number] | null,
 }
 
-async function processJumpInfo(jump: JumpInfo) {
+async function processJumpInfo(activeEditor: vscode.TextEditor, jump: JumpInfo) {
 	if (jump.start === null || jump.end === null) {
 		return;
 	}
@@ -106,7 +106,7 @@ async function processJumpInfo(jump: JumpInfo) {
 	}
 	// open this file and show in editor
 	const doc = await vscode.workspace.openTextDocument(jump.filepath);
-	const editor = await vscode.window.showTextDocument(doc);
+	const editor = await vscode.window.showTextDocument(doc, activeEditor.viewColumn);
 	const startPosition = new vscode.Position(jump.start[0], jump.start[1]);
 	const endPosition = new vscode.Position(jump.end[0], jump.end[1]);
 	const range = new vscode.Range(startPosition, endPosition);
@@ -243,7 +243,7 @@ export function activate(context: vscode.ExtensionContext) {
 			jumpInfoWebsocket.addEventListener('message', async (message) => {
 				const data = JSON.parse(message.data as string);
 				console.log("recv jump data", data);
-				await processJumpInfo(data);
+				await processJumpInfo(activeEditor, data);
 			});
 		} else {
 			vscode.window.showWarningMessage('No active editor');
