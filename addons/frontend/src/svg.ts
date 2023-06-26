@@ -118,20 +118,36 @@ var linkleave = function (event: MouseEvent) {
   }
 };
 
-type SourceMappingNode = ['p', number[]] | ['g', number[]] | ['u', number[]] | ['t', [string]];
+type SourceMappingNode =
+  | ["p", number[]]
+  | ["g", number[]]
+  | ["u", number[]]
+  | ["t", [string]]
+  | ["i", [string]]
+  | ["s", [string]];
 
 function findAncestor(el: Element, cls: string) {
   while ((el = el.parentElement!) && !el.classList.contains(cls));
   return el;
 }
 
+type SourceMappingLocTypes = "t" | "i" | "s";
+function isSourceMappingLocNode(ty: string): ty is SourceMappingLocTypes {
+  return ["t", "i", "s"].includes(ty);
+};
+
+type SourceMappingRefTypes = "p" | "g" | "u";
+function isSourceMappingRefNode(ty: string): ty is SourceMappingRefTypes {
+  return ["p", "g", "u"].includes(ty);
+};
+
 function parseSourceMappingNode(node: string): SourceMappingNode {
   const elements = node.split(",");
   const ty = elements[0];
-  if (ty === "t") {
+  if (isSourceMappingLocNode(ty)) {
     return [ty, [elements[1]]];
   }
-  if (ty !== "g" && ty !== "p") {
+  if (!isSourceMappingRefNode(ty)) {
     throw new Error(`unknown type ${ty}`);
   }
   const result = elements.slice(1).map((x) => Number.parseInt(x, 16));
@@ -148,7 +164,7 @@ function castToSourceMappingElement(
   if (elem.classList.length === 0) {
     return undefined;
   }
-  for (const cls of ["typst-text", "typst-group", "typst-page"]) {
+  for (const cls of ["typst-text", "typst-group", "typst-image", "typst-shape", "typst-page"]) {
     if (elem.classList.contains(cls)) {
       return [cls, elem];
     }
@@ -209,7 +225,7 @@ window.initTypstSvg = function (
       .getAttribute("data-source-mapping")!
       .split("|")
       .map(parseSourceMappingNode);
-      srcMapping.remove();
+    srcMapping.remove();
     setTimeout(() => {
       initSourceMapping(docRoot, dataPages, dataSourceMapping);
     }, 0);
@@ -257,8 +273,11 @@ const layoutText = (svg: SVGElement) => {
   console.log(`layoutText used time ${performance.now() - layoutBegin} ms`);
 };
 
-function initSourceMapping(docRoot: SVGElement, dataPages: SourceMappingNode[], dataSourceMapping: SourceMappingNode[]) {
-
+function initSourceMapping(
+  docRoot: SVGElement,
+  dataPages: SourceMappingNode[],
+  dataSourceMapping: SourceMappingNode[]
+) {
   console.log(dataPages, dataSourceMapping);
 
   const findSourceLocation = (elem: Element) => {
@@ -326,6 +345,20 @@ function initSourceMapping(docRoot: SVGElement, dataPages: SourceMappingNode[], 
         case "typst-text":
           if (locInfoItem[0] !== "t") {
             console.log("type mismatch", locInfo, ty, elem);
+            return;
+          }
+
+          return locInfoItem;
+        case "typst-image":
+          if (locInfoItem[0] !== "i") {
+            console.log("type mismatch", locInfo, ty, elem);
+            return;
+          }
+
+          return locInfoItem;
+        case "typst-shape":
+          if (locInfoItem[0] !== "s") {
+            console.log("type mismatch", locInfo, locInfoItem, ty, elem);
             return;
           }
 
