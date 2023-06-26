@@ -106,6 +106,72 @@ window.onload = function () {
       setTimeout(setupSocket, 1000);
     });
 
+    const patchQueue = [];
+
+    const processQueue = (svgUpdateEvent) => {
+      let t0 = performance.now();
+      let t1 = undefined;
+      let t2 = undefined;
+      let t3 = undefined;
+      switch (svgUpdateEvent[0]) {
+        case "new":
+          imageContainer.innerHTML = svgUpdateEvent[1];
+          t1 = t2 = performance.now();
+
+          postprocessSvg();
+          t3 = performance.now();
+          break;
+        case "diff-v0":
+          const elem = document.createElement("div");
+          elem.innerHTML = svgUpdateEvent[1];
+          const svgElement = elem.firstElementChild;
+          t1 = performance.now();
+          patchRoot(imageContainer.firstElementChild, svgElement);
+          t2 = performance.now();
+
+          postprocessSvg();
+          t3 = performance.now();
+          break;
+        default:
+          console.log("data", data);
+          t0 = t1 = t2 = t3 = performance.now();
+          break;
+      }
+
+      console.log(
+        `parse ${(t1 - t0).toFixed(2)} ms, replace ${(t2 - t1).toFixed(
+          2
+        )} ms, postprocess ${(t3 - t2).toFixed(2)} ms, total ${(
+          t3 - t0
+        ).toFixed(2)} ms`
+      );
+    };
+
+    let svgUpdating = false;
+    const triggerSvgUpdate = () => {
+      if (svgUpdating) {
+        return;
+      }
+
+      svgUpdating = true;
+      const doSvgUpdate = () => {
+        if (patchQueue.length === 0) {
+          svgUpdating = false;
+          return;
+        }
+        try {
+          while (patchQueue.length > 0) {
+            processQueue(patchQueue.shift());
+          }
+          requestAnimationFrame(doSvgUpdate);
+        } catch (e) {
+          console.error(e);
+          svgUpdating = false;
+        }
+      };
+      requestAnimationFrame(doSvgUpdate);
+    };
+
     // 当收到WebSocket数据时
     socket.addEventListener("message", (event) => {
       const data = event.data;
@@ -113,50 +179,11 @@ window.onload = function () {
       const message = [data.slice(0, message_idx), data.slice(message_idx + 1)];
       console.log(message);
 
-      let t0 = performance.now();
-      let t1 = undefined;
-      let t2 = undefined;
-      switch (message[0]) {
-        case "new":
-          imageContainer.innerHTML = message[1];
-          t1 = t2 = performance.now();
-
-          postprocessSvg();
-          const t3 = performance.now();
-
-          console.log(
-            `parse ${(t1 - t0).toFixed(2)} ms, replace ${(t2 - t1).toFixed(
-              2
-            )} ms, postprocess ${(t3 - t2).toFixed(2)} ms, total ${(
-              t3 - t0
-            ).toFixed(2)} ms`
-          );
-          break;
-        case "diff-v0":
-          const elem = document.createElement("div");
-          elem.innerHTML = message[1];
-          const svgElement = elem.firstElementChild;
-          t1 = performance.now();
-          requestAnimationFrame(() => {
-            patchRoot(imageContainer.firstElementChild, svgElement);
-            t2 = performance.now();
-
-            postprocessSvg();
-            const t3 = performance.now();
-
-            console.log(
-              `parse ${(t1 - t0).toFixed(2)} ms, replace ${(t2 - t1).toFixed(
-                2
-              )} ms, postprocess ${(t3 - t2).toFixed(2)} ms, total ${(
-                t3 - t0
-              ).toFixed(2)} ms`
-            );
-          });
-          break;
-        default:
-          console.log("data", data);
-          break;
+      if (message[0] === "new") {
+        patchQueue.splice(0, patchQueue.length);
       }
+      patchQueue.push(message);
+      triggerSvgUpdate();
     });
 
     // 当WebSocket连接关闭时
