@@ -47,7 +47,7 @@ var searchIntersections = function (root: Element) {
   let parent = undefined,
     current = root;
   while (current) {
-    if (current.classList.contains("group")) {
+    if (current.classList.contains("typst-group")) {
       parent = current;
       break;
     }
@@ -123,7 +123,61 @@ function findAncestor(el: Element, cls: string) {
   return el;
 }
 
-window.initTypstSvg = function (docRoot: SVGElement) {
+function parseSourceMappingNode(node: string): [string, number[]] {
+  const elements = node.split(",");
+  const ty = elements[0];
+  const result = elements.slice(1).map((x) => Number.parseInt(x, 16));
+  return [ty, result];
+}
+
+// one-of following classes must be present:
+// - typst-page
+// - typst-group
+// - typst-text
+function castToSourceMappingElement(
+  elem: Element
+): [string, Element] | undefined {
+  if (elem.classList.length === 0) {
+    return undefined;
+  }
+  for (const cls of ["typst-text", "typst-group", "typst-page"]) {
+    if (elem.classList.contains(cls)) {
+      return [cls, elem];
+    }
+  }
+  return undefined;
+}
+
+function castToNestSourceMappingElement(
+  elem: Element
+): [string, Element] | undefined {
+  while (elem) {
+    const result = castToSourceMappingElement(elem);
+    if (result) {
+      return result;
+    }
+    let chs = elem.children;
+    if (chs.length !== 1) {
+      return undefined;
+    }
+    elem = chs[0];
+  }
+
+  return undefined;
+}
+
+function castChildrenToSourceMappingElement(
+  elem: Element
+): [string, Element][] {
+  return Array.from(elem.children)
+    .map(castToNestSourceMappingElement)
+    .filter((x) => x) as [string, Element][];
+}
+
+window.initTypstSvg = function (
+  docRoot: SVGElement,
+  srcMapping?: HTMLDivElement
+) {
   var elements = docRoot.getElementsByClassName("pseudo-link");
 
   for (var i = 0; i < elements.length; i++) {
@@ -138,32 +192,11 @@ window.initTypstSvg = function (docRoot: SVGElement) {
     }, 0);
   }
 
-  docRoot.addEventListener("click", (event) => {
-    let elem = event.target! as HTMLElement;
-    while (elem) {
-      const span = elem.getAttribute("data-span");
-      if (span) {
-        console.log("source-span of this svg element", span);
-
-        const docRoot = document.body || document.firstElementChild;
-        const basePos = docRoot.getBoundingClientRect();
-
-        const vw = window.innerWidth || 0;
-        const left = event.clientX - basePos.left + 0.015 * vw;
-        const top = event.clientY - basePos.top + 0.015 * vw;
-
-        triggerRipple(
-          docRoot,
-          left,
-          top,
-          "typst-debug-react-ripple",
-          "typst-debug-react-ripple-effect .4s linear"
-        );
-        return;
-      }
-      elem = elem.parentElement!;
-    }
-  });
+  if (srcMapping) {
+    setTimeout(() => {
+      initSourceMapping(docRoot, srcMapping);
+    }, 0);
+  }
 };
 
 const layoutText = (svg: SVGElement) => {
@@ -206,6 +239,141 @@ const layoutText = (svg: SVGElement) => {
 
   console.log(`layoutText used time ${performance.now() - layoutBegin} ms`);
 };
+
+function initSourceMapping(docRoot: SVGElement, srcMapping: HTMLDivElement) {
+  const dataPages = srcMapping
+    .getAttribute("data-pages")!
+    .split("|")
+    .map(parseSourceMappingNode);
+  const dataSourceMapping = srcMapping
+    .getAttribute("data-source-mapping")!
+    .split("|")
+    .map(parseSourceMappingNode);
+
+  console.log(dataPages, dataSourceMapping);
+
+  const findSourceLocation = (elem: Element) => {
+    const visitChain: [string, Element][] = [];
+    while (elem) {
+      let srcElem = castToSourceMappingElement(elem);
+      if (srcElem) {
+        visitChain.push(srcElem);
+      }
+      if (elem === docRoot) {
+        visitChain.push(["typst-root", elem]);
+        break;
+      }
+      elem = elem.parentElement!;
+    }
+
+    console.log(visitChain);
+
+    if (elem !== docRoot) {
+      return;
+    }
+
+    let parentElements: [string, Element][] = [];
+    const root = visitChain.pop()!;
+    if (root[0] !== "typst-root") {
+      return;
+    }
+    parentElements = castChildrenToSourceMappingElement(elem);
+    if (!parentElements) {
+      return;
+    }
+
+    let locInfo: [string, number[]][] = dataPages;
+
+    visitChain.reverse();
+    for (const [ty, elem] of visitChain) {
+      const childrenElements = castChildrenToSourceMappingElement(elem);
+
+      if (locInfo.length !== parentElements.length) {
+        console.log("length mismatch", locInfo, parentElements);
+        break;
+      }
+
+      const idx = parentElements.findIndex((x) => x[0] === ty && x[1] === elem);
+      if (idx === -1) {
+        console.log("not found", ty, elem, " in ", locInfo);
+        break;
+      }
+
+      switch (ty) {
+        case "typst-page":
+          if (locInfo[idx][0] !== "p") {
+            console.log("type mismatch", locInfo, ty, elem);
+            break;
+          }
+          break;
+        case "typst-group":
+          if (locInfo[idx][0] !== "g") {
+            console.log("type mismatch", locInfo, ty, elem);
+            break;
+          }
+          break;
+        case "typst-text":
+          if (locInfo[idx][0] !== "t") {
+            console.log("type mismatch", locInfo, ty, elem);
+            return;
+          }
+
+          return locInfo[idx];
+        default:
+          console.log("unknown type", ty, elem);
+          break;
+      }
+
+      parentElements = childrenElements;
+      locInfo = locInfo[idx][1].map((x) => {
+        if (x >= dataSourceMapping.length) {
+          console.log("invalid index", x, dataSourceMapping);
+          return ["u", []];
+        }
+        return dataSourceMapping[x];
+      });
+
+      // console.log(
+      //   ty,
+      //   locInfo,
+      //   parentElements
+      // );
+    }
+  };
+
+  const prevSourceMappingHandler = (docRoot as any).sourceMappingHandler;
+  if (prevSourceMappingHandler) {
+    srcMapping.removeEventListener("click", prevSourceMappingHandler);
+  }
+  const sourceMappingHandler = ((docRoot as any).sourceMappingHandler = (
+    event: MouseEvent
+  ) => {
+    let elem = event.target! as Element;
+
+    const sourceLoc = findSourceLocation(elem);
+    if (!sourceLoc) {
+      return;
+    }
+    console.log("source location", sourceLoc);
+
+    const basePos = docRoot.getBoundingClientRect();
+
+    const vw = window.innerWidth || 0;
+    const left = event.clientX - basePos.left + 0.015 * vw;
+    const top = event.clientY - basePos.top + 0.015 * vw;
+
+    triggerRipple(
+      docRoot,
+      left,
+      top,
+      "typst-debug-react-ripple",
+      "typst-debug-react-ripple-effect .4s linear"
+    );
+    return;
+  });
+
+  docRoot.addEventListener("click", sourceMappingHandler);
+}
 
 window.handleTypstLocation = function (
   elem: Element,

@@ -114,7 +114,14 @@ window.onload = function () {
       );
       const docRoot = imageContainer.firstElementChild;
       if (docRoot) {
-        window.initTypstSvg(docRoot);
+        let srcElement = imageContainer.lastElementChild;
+        if (
+          !srcElement ||
+          !srcElement.classList.contains("typst-source-mapping")
+        ) {
+          srcElement = undefined;
+        }
+        window.initTypstSvg(docRoot, srcElement);
       }
     });
 

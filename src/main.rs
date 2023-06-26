@@ -25,8 +25,8 @@ use std::io::{self, Write};
 
 use std::path::{Path, PathBuf};
 
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use termcolor::{ColorChoice, StandardStream, WriteColor};
 use tokio::net::{TcpListener, TcpStream};
@@ -177,16 +177,18 @@ async fn main() {
     let try_socket = TcpListener::bind(&addr).await;
     let listener = try_socket.expect("Failed to bind");
     info!("Listening on: {}", listener.local_addr().unwrap());
-    
+
     let active_client_count = Arc::new(AtomicUsize::new(0));
     while let Ok((stream, _)) = listener.accept().await {
         let conn = accept_connection(stream).await;
         {
             let publisher = publisher.clone();
+            let mut r = IncrementalSvgExporter::default();
+            r.set_should_attach_debug_info(true);
             let client = Client {
                 conn: Arc::new(Mutex::new(conn)),
                 publisher: publisher.clone(),
-                renderer: Arc::new(Mutex::new(IncrementalSvgExporter::default())),
+                renderer: Arc::new(Mutex::new(r)),
             };
             let active_client_count = active_client_count.clone();
             tokio::spawn(async move {
