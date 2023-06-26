@@ -118,7 +118,6 @@ window.onload = function () {
           imageContainer.innerHTML = svgUpdateEvent[1];
           t1 = t2 = performance.now();
 
-          postprocessSvg();
           t3 = performance.now();
           break;
         case "diff-v0":
@@ -129,11 +128,10 @@ window.onload = function () {
           patchRoot(imageContainer.firstElementChild, svgElement);
           t2 = performance.now();
 
-          postprocessSvg();
           t3 = performance.now();
           break;
         default:
-          console.log("data", data);
+          console.log("svgUpdateEvent", svgUpdateEvent);
           t0 = t1 = t2 = t3 = performance.now();
           break;
       }
@@ -157,6 +155,7 @@ window.onload = function () {
       const doSvgUpdate = () => {
         if (patchQueue.length === 0) {
           svgUpdating = false;
+          postprocessSvg();
           return;
         }
         try {
@@ -167,6 +166,7 @@ window.onload = function () {
         } catch (e) {
           console.error(e);
           svgUpdating = false;
+          postprocessSvg();
         }
       };
       requestAnimationFrame(doSvgUpdate);
@@ -175,6 +175,10 @@ window.onload = function () {
     // 当收到WebSocket数据时
     socket.addEventListener("message", (event) => {
       const data = event.data;
+      if ("current not avalible" === data) {
+        return;
+      }
+
       const message_idx = data.indexOf(",");
       const message = [data.slice(0, message_idx), data.slice(message_idx + 1)];
       console.log(message);
