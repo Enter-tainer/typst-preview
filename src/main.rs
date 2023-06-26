@@ -261,6 +261,9 @@ async fn main() {
                                         // get the high 16bits and the low 48bits
                                         let (src_id, span_number) = (id >> 48, id & 0x0000FFFFFFFFFFFF);
                                         let src_id = SourceId::from_u16(src_id as u16);
+                                        if src_id == SourceId::detached() || span_number <= 1 {
+                                            return;
+                                        }
                                         let span = typst::syntax::Span::new(src_id, span_number);
                                         let world = world.lock().await;
                                         let source = world.source(src_id);
@@ -313,7 +316,9 @@ async fn main() {
         let mut conn = accept_connection(stream).await;
         while let Some(jump) = jump_rx.recv().await {
             info!("sending jump info to editor: {:?}", &jump);
-            let res = conn.send(Message::Text(serde_json::to_string(&jump).unwrap())).await;
+            let res = conn
+                .send(Message::Text(serde_json::to_string(&jump).unwrap()))
+                .await;
             if res.is_err() {
                 break;
             }
