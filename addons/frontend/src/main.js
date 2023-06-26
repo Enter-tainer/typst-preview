@@ -89,19 +89,18 @@ window.onload = function () {
   let isFirstScale = true;
   let processStart;
 
-  let socket;
   let socketOpen = false;
 
   function setupSocket() {
-    socket = new WebSocket("ws://127.0.0.1:23625");
+    window.typstWebsocket = new WebSocket("ws://127.0.0.1:23625");
     // socket.binaryType = "arraybuffer";
-    socket.addEventListener("open", () => {
+    window.typstWebsocket.addEventListener("open", () => {
       socketOpen = true;
       console.log("WebSocket connection opened");
-      socket.send("current");
+      window.typstWebsocket.send("current");
     });
 
-    socket.addEventListener("close", () => {
+    window.typstWebsocket.addEventListener("close", () => {
       socketOpen = false;
       setTimeout(setupSocket, 1000);
     });
@@ -173,7 +172,7 @@ window.onload = function () {
     };
 
     // 当收到WebSocket数据时
-    socket.addEventListener("message", (event) => {
+    window.typstWebsocket.addEventListener("message", (event) => {
       const data = event.data;
       if ("current not avalible" === data) {
         return;
@@ -191,12 +190,12 @@ window.onload = function () {
     });
 
     // 当WebSocket连接关闭时
-    socket.addEventListener("close", () => {
+    window.typstWebsocket.addEventListener("close", () => {
       console.log("WebSocket connection closed");
     });
 
     // 当发生错误时
-    socket.addEventListener("error", (error) => {
+    window.typstWebsocket.addEventListener("error", (error) => {
       console.error("WebSocket Error: ", error);
     });
   }
