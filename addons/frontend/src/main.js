@@ -24,6 +24,22 @@ window.onload = function () {
     scaleSvg();
   };
 
+  const postprocessSvg = () => {
+    const docRoot = imageContainer.firstElementChild;
+    if (docRoot) {
+      let srcElement = imageContainer.lastElementChild;
+      if (
+        !srcElement ||
+        !srcElement.classList.contains("typst-source-mapping")
+      ) {
+        srcElement = undefined;
+      }
+      window.initTypstSvg(docRoot, srcElement);
+
+      initSvgScale();
+    }
+  };
+
   // drag (panal resizing) -> rescaling
   window.onresize = scaleSvg;
 
@@ -104,37 +120,42 @@ window.onload = function () {
         case "new":
           imageContainer.innerHTML = message[1];
           t1 = t2 = performance.now();
+
+          postprocessSvg();
+          const t3 = performance.now();
+
+          console.log(
+            `parse ${(t1 - t0).toFixed(2)} ms, replace ${(t2 - t1).toFixed(
+              2
+            )} ms, postprocess ${(t3 - t2).toFixed(2)} ms, total ${(
+              t3 - t0
+            ).toFixed(2)} ms`
+          );
           break;
         case "diff-v0":
           const elem = document.createElement("div");
           elem.innerHTML = message[1];
           const svgElement = elem.firstElementChild;
           t1 = performance.now();
-          patchRoot(imageContainer.firstElementChild, svgElement);
-          t2 = performance.now();
+          requestAnimationFrame(() => {
+            patchRoot(imageContainer.firstElementChild, svgElement);
+            t2 = performance.now();
+
+            postprocessSvg();
+            const t3 = performance.now();
+
+            console.log(
+              `parse ${(t1 - t0).toFixed(2)} ms, replace ${(t2 - t1).toFixed(
+                2
+              )} ms, postprocess ${(t3 - t2).toFixed(2)} ms, total ${(
+                t3 - t0
+              ).toFixed(2)} ms`
+            );
+          });
           break;
         default:
           console.log("data", data);
           break;
-      }
-
-      console.log(
-        `parse ${(t1 - t0).toFixed(2)} ms, replace ${(t2 - t1).toFixed(
-          2
-        )} ms, total ${(t2 - t0).toFixed(2)} ms`
-      );
-      const docRoot = imageContainer.firstElementChild;
-      if (docRoot) {
-        let srcElement = imageContainer.lastElementChild;
-        if (
-          !srcElement ||
-          !srcElement.classList.contains("typst-source-mapping")
-        ) {
-          srcElement = undefined;
-        }
-        window.initTypstSvg(docRoot, srcElement);
-
-        initSvgScale();
       }
     });
 
