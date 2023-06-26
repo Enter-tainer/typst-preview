@@ -8,7 +8,7 @@ body {
   background-color: #fff;
 }
 
-.typst-txt {
+.typst-text {
   pointer-events: bounding-box;
 }
 
@@ -54,11 +54,11 @@ svg {
   fill: var(--glyph_fill);
 }
 
-.hover .typst-txt {
+.hover .typst-text {
   --glyph_fill: #66bab7;
 }
 
-.typst-txt:hover {
+.typst-text:hover {
   --glyph_fill: #f75c2f;
 }
 
