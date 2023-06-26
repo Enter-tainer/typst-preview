@@ -12,7 +12,7 @@ use futures::{SinkExt, StreamExt};
 use log::{error, info};
 use memmap2::Mmap;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
-use once_cell::unsync::OnceCell;
+use once_cell::sync::OnceCell;
 use publisher::Publisher;
 use same_file::Handle;
 
@@ -23,6 +23,7 @@ use std::fs::{self, File};
 use std::hash::Hash;
 use std::io::{self, Write};
 
+use std::ops::DerefMut;
 use std::path::{Path, PathBuf};
 
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -51,6 +52,7 @@ use walkdir::WalkDir;
 type CodespanResult<T> = Result<T, CodespanError>;
 type CodespanError = codespan_reporting::files::Error;
 
+#[allow(dead_code)]
 /// A summary of the input arguments relevant to compilation.
 struct CompileSettings {
     /// The path to the input file.
@@ -153,14 +155,29 @@ async fn main() {
     let arguments = CliArguments::parse();
     info!("Arguments: {:#?}", arguments);
     let publisher: Publisher<Document> = PublisherImpl::new().into();
+    let command = CompileSettings::with_arguments(arguments.clone());
+    let root = if let Some(root) = &command.root {
+        root.clone()
+    } else if let Some(dir) = command
+        .input
+        .canonicalize()
+        .ok()
+        .as_ref()
+        .and_then(|path| path.parent())
+    {
+        dir.into()
+    } else {
+        PathBuf::new()
+    };
+    // Create the world that serves sources, fonts and files.
+    let world = Arc::new(Mutex::new(SystemWorld::new(root, &arguments.font_paths)));
     {
         let arguments = arguments.clone();
         let publisher = publisher.clone();
-        tokio::spawn(async {
+        let world = world.clone();
+        tokio::spawn(async move {
             let res = match &arguments.command {
-                Command::Watch(_) => {
-                    watch(CompileSettings::with_arguments(arguments), publisher).await
-                }
+                Command::Watch(_) => watch(world, command, publisher).await,
                 Command::Fonts(_) => fonts(FontsSettings::with_arguments(arguments)),
             };
 
@@ -182,7 +199,6 @@ async fn main() {
     while let Ok((stream, _)) = listener.accept().await {
         let conn = accept_connection(stream).await;
         {
-            let publisher = publisher.clone();
             let mut r = IncrementalSvgExporter::default();
             r.set_should_attach_debug_info(true);
             let client = Client {
@@ -191,6 +207,8 @@ async fn main() {
                 renderer: Arc::new(Mutex::new(r)),
             };
             let active_client_count = active_client_count.clone();
+            let publisher = publisher.clone();
+            let world = world.clone();
             tokio::spawn(async move {
                 active_client_count.fetch_add(1, Ordering::SeqCst);
                 loop {
@@ -210,6 +228,18 @@ async fn main() {
                                             client.conn.lock().await.send(Message::Text("current not avalible".into())).await.unwrap();
                                         }
                                     }
+                                } else if msg.starts_with("srclocation") {
+                                    let location = msg.split(' ').nth(1).unwrap();
+                                    let id = u64::from_str_radix(location, 16).unwrap();
+                                    // get the high 16bits and the low 48bits
+                                    let (src_id, span_number) = (id >> 48, id & 0x0000FFFFFFFFFFFF);
+                                    let src_id = SourceId::from_u16(src_id as u16);
+                                    let span = typst::syntax::Span::new(src_id, span_number);
+                                    let world = world.lock().await;
+                                    let source = world.source(src_id);
+                                    let range = source.range(span);
+                                    info!("source: {}:{:?}:{:?}, byte_range: {:?}", source.path().to_str().unwrap(), source.byte_to_line(range.start), source.byte_to_column(range.end), range);
+
                                 } else {
                                     client.conn.lock().await.send(Message::Text(format!("unknown command {msg}"))).await.unwrap();
                                 }
@@ -265,23 +295,12 @@ fn print_error(msg: &str) -> io::Result<()> {
 }
 
 /// Execute a compilation command.
-async fn watch(command: CompileSettings, publisher: Publisher<Document>) -> StrResult<()> {
-    let root = if let Some(root) = &command.root {
-        root.clone()
-    } else if let Some(dir) = command
-        .input
-        .canonicalize()
-        .ok()
-        .as_ref()
-        .and_then(|path| path.parent())
-    {
-        dir.into()
-    } else {
-        PathBuf::new()
-    };
-    // Create the world that serves sources, fonts and files.
-    let mut world = SystemWorld::new(root, &command.font_paths);
-    if let Some(doc) = compile_once(&mut world, &command)? {
+async fn watch(
+    world: Arc<Mutex<SystemWorld>>,
+    command: CompileSettings,
+    publisher: Publisher<Document>,
+) -> StrResult<()> {
+    if let Some(doc) = compile_once(world.lock().await.deref_mut(), &command)? {
         publisher.publish(Arc::new(doc)).await;
     }
     // Setup file watching.
@@ -299,24 +318,28 @@ async fn watch(command: CompileSettings, publisher: Publisher<Document>) -> StrR
     // Add a path to be watched. All files and directories at that path and
     // below will be monitored for changes.
     watcher
-        .watch(&world.root, RecursiveMode::Recursive)
+        .watch(&world.lock().await.root, RecursiveMode::Recursive)
         .unwrap();
 
     // Handle events.
     info!("start watching files...");
     loop {
         let mut recompile = false;
-        let mut events = vec![];
+        let mut events: Vec<Option<notify::Event>> = vec![];
         while let Ok(e) =
             tokio::time::timeout(tokio::time::Duration::from_millis(100), rx.recv()).await
         {
             events.push(e);
         }
-        for event in events.into_iter().flatten() {
-            recompile |= world.relevant(&event);
+        {
+            let world = world.lock().await;
+            for event in events.into_iter().flatten() {
+                recompile |= world.relevant(&event);
+            }
+            drop(world);
         }
         if recompile {
-            if let Some(doc) = compile_once(&mut world, &command)? {
+            if let Some(doc) = compile_once(world.lock().await.deref_mut(), &command)? {
                 publisher.publish(Arc::new(doc)).await;
                 comemo::evict(30);
             }

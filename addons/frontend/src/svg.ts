@@ -399,6 +399,7 @@ function initSourceMapping(
       return;
     }
     console.log("source location", sourceLoc);
+    window.typstWebsocket.send(`srclocation ${sourceLoc[1][0]}`)
 
     const basePos = docRoot.getBoundingClientRect();
 
