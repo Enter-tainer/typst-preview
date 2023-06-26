@@ -71,7 +71,7 @@ function replaceAttributes(prev: SVGGElement, next: SVGGElement) {
     }
   }
   console.log("different attributes, replace");
-  
+
   const removedAttrs = [];
 
   for (let i = 0; i < prevAttrs.length; i++) {
