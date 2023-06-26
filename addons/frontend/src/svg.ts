@@ -118,16 +118,24 @@ var linkleave = function (event: MouseEvent) {
   }
 };
 
+type SourceMappingNode = ['p', number[]] | ['g', number[]] | ['u', number[]] | ['t', [string]];
+
 function findAncestor(el: Element, cls: string) {
   while ((el = el.parentElement!) && !el.classList.contains(cls));
   return el;
 }
 
-function parseSourceMappingNode(node: string): [string, number[]] {
+function parseSourceMappingNode(node: string): SourceMappingNode {
   const elements = node.split(",");
   const ty = elements[0];
+  if (ty === "t") {
+    return [ty, [elements[1]]];
+  }
+  if (ty !== "g" && ty !== "p") {
+    throw new Error(`unknown type ${ty}`);
+  }
   const result = elements.slice(1).map((x) => Number.parseInt(x, 16));
-  return [ty, result];
+  return [ty, result] as SourceMappingNode;
 }
 
 // one-of following classes must be present:
@@ -193,8 +201,17 @@ window.initTypstSvg = function (
   }
 
   if (srcMapping) {
+    const dataPages = srcMapping
+      .getAttribute("data-pages")!
+      .split("|")
+      .map(parseSourceMappingNode);
+    const dataSourceMapping = srcMapping
+      .getAttribute("data-source-mapping")!
+      .split("|")
+      .map(parseSourceMappingNode);
+      srcMapping.remove();
     setTimeout(() => {
-      initSourceMapping(docRoot, srcMapping);
+      initSourceMapping(docRoot, dataPages, dataSourceMapping);
     }, 0);
   }
 };
@@ -240,15 +257,7 @@ const layoutText = (svg: SVGElement) => {
   console.log(`layoutText used time ${performance.now() - layoutBegin} ms`);
 };
 
-function initSourceMapping(docRoot: SVGElement, srcMapping: HTMLDivElement) {
-  const dataPages = srcMapping
-    .getAttribute("data-pages")!
-    .split("|")
-    .map(parseSourceMappingNode);
-  const dataSourceMapping = srcMapping
-    .getAttribute("data-source-mapping")!
-    .split("|")
-    .map(parseSourceMappingNode);
+function initSourceMapping(docRoot: SVGElement, dataPages: SourceMappingNode[], dataSourceMapping: SourceMappingNode[]) {
 
   console.log(dataPages, dataSourceMapping);
 
@@ -282,7 +291,7 @@ function initSourceMapping(docRoot: SVGElement, srcMapping: HTMLDivElement) {
       return;
     }
 
-    let locInfo: [string, number[]][] = dataPages;
+    let locInfo: SourceMappingNode[] = dataPages;
 
     visitChain.reverse();
     for (const [ty, elem] of visitChain) {
@@ -299,33 +308,35 @@ function initSourceMapping(docRoot: SVGElement, srcMapping: HTMLDivElement) {
         break;
       }
 
+      const locInfoItem = locInfo[idx];
+
       switch (ty) {
         case "typst-page":
-          if (locInfo[idx][0] !== "p") {
+          if (locInfoItem[0] !== "p") {
             console.log("type mismatch", locInfo, ty, elem);
-            break;
+            return;
           }
           break;
         case "typst-group":
-          if (locInfo[idx][0] !== "g") {
+          if (locInfoItem[0] !== "g") {
             console.log("type mismatch", locInfo, ty, elem);
-            break;
+            return;
           }
           break;
         case "typst-text":
-          if (locInfo[idx][0] !== "t") {
+          if (locInfoItem[0] !== "t") {
             console.log("type mismatch", locInfo, ty, elem);
             return;
           }
 
-          return locInfo[idx];
+          return locInfoItem;
         default:
           console.log("unknown type", ty, elem);
-          break;
+          return;
       }
 
       parentElements = childrenElements;
-      locInfo = locInfo[idx][1].map((x) => {
+      locInfo = locInfoItem[1].map((x) => {
         if (x >= dataSourceMapping.length) {
           console.log("invalid index", x, dataSourceMapping);
           return ["u", []];
@@ -343,7 +354,7 @@ function initSourceMapping(docRoot: SVGElement, srcMapping: HTMLDivElement) {
 
   const prevSourceMappingHandler = (docRoot as any).sourceMappingHandler;
   if (prevSourceMappingHandler) {
-    srcMapping.removeEventListener("click", prevSourceMappingHandler);
+    docRoot.removeEventListener("click", prevSourceMappingHandler);
   }
   const sourceMappingHandler = ((docRoot as any).sourceMappingHandler = (
     event: MouseEvent
