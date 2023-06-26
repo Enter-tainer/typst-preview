@@ -6,15 +6,26 @@ window.onload = function () {
   let currentScale = 1; // variable for storing scaling factor
   let imageContainerWidth = imageContainer.offsetWidth;
 
-  // drag (panal resizing) -> rescaling
-  window.onresize = () => {
+  const scaleSvg = () => {
     const newImageContainerWidth = imageContainer.offsetWidth;
     currentScale =
       currentScale * (newImageContainerWidth / imageContainerWidth);
     imageContainerWidth = newImageContainerWidth;
+
     imageContainer.style.transformOrigin = "0px 0px";
-    imageContainer.style.transform = `scale(${currentScale * 2})`;
+    imageContainer.style.transform = `scale(${currentScale})`;
   };
+
+  const initSvgScale = () => {
+    imageContainerWidth = imageContainer.offsetWidth;
+    const svgWidth = imageContainer.firstElementChild.getAttribute("width");
+    currentScale = imageContainerWidth / svgWidth;
+
+    scaleSvg();
+  };
+
+  // drag (panal resizing) -> rescaling
+  window.onresize = scaleSvg;
 
   // Ctrl+scroll rescaling
   // will disable auto resizing
@@ -55,7 +66,7 @@ window.onload = function () {
 
       // Apply new scale
       imageContainer.style.transformOrigin = "0 0";
-      imageContainer.style.transform = `scale(${currentScale * 2})`;
+      imageContainer.style.transform = `scale(${currentScale})`;
     }
   });
 
@@ -122,6 +133,8 @@ window.onload = function () {
           srcElement = undefined;
         }
         window.initTypstSvg(docRoot, srcElement);
+
+        initSvgScale();
       }
     });
 
