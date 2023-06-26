@@ -5,6 +5,7 @@ import { ChildProcessWithoutNullStreams } from 'child_process';
 import { spawn, sync as spawnSync } from 'cross-spawn';
 import { readFile } from 'fs/promises';
 import * as path from 'path';
+import { WebSocket } from 'ws';
 
 async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: string) {
 	const filePath = path.resolve(__dirname, relativePath);
@@ -86,7 +87,32 @@ function getProjectRoot(currentPath: string): string | null {
 }
 
 const serverProcesses: Array<any> = [];
-const shadowFilePaths: Array<string> = [];
+const shadowFilePathMapping: Map<string, string> = new Map;
+
+interface JumpInfo {
+	filepath: string,
+	start: [number, number] | null,
+	end: [number, number] | null,
+}
+
+async function processJumpInfo(jump: JumpInfo) {
+	if (jump.start === null || jump.end === null) {
+		return;
+	}
+	// check if shadowFilesPaths contains filepath
+	const actualPath = shadowFilePathMapping.get(jump.filepath);
+	if (actualPath !== undefined) {
+		jump.filepath = actualPath;
+	}
+	// open this file and show in editor
+	const doc = await vscode.workspace.openTextDocument(jump.filepath);
+	const editor = await vscode.window.showTextDocument(doc);
+	const startPosition = new vscode.Position(jump.start[0], jump.start[1]);
+	const endPosition = new vscode.Position(jump.end[0], jump.end[1]);
+	const range = new vscode.Range(startPosition, endPosition);
+	editor.selection = new vscode.Selection(range.start, range.end);
+	editor.revealRange(range);
+}
 
 function runServer(command: string, args: string[], outputChannel: vscode.OutputChannel): Promise<[string, ChildProcessWithoutNullStreams]> {
 	const serverProcess = spawn(command, args, {
@@ -116,7 +142,7 @@ function runServer(command: string, args: string[], outputChannel: vscode.Output
 	serverProcesses.push(serverProcesses);
 	return new Promise((resolve, reject) => {
 		serverProcess.stderr.on('data', (data: Buffer) => {
-			if (data.toString().includes("Listening on")) {
+			if (data.toString().includes("listening on")) {
 				// port is 127.0.0.1:{port}, use regex
 				const port = data.toString().match(/127\.0\.0\.1:(\d+)/)?.[1];
 				if (port === undefined) {
@@ -169,14 +195,14 @@ export function activate(context: vscode.ExtensionContext) {
 						await update();
 					}
 				});
-				shadowFilePaths.push(shadowFilePath);
+				shadowFilePathMapping.set(shadowFilePath, filePath);
 			}
 			const serverPath = await getTypstWsPath();
 			console.log(`Watching ${filePathToWatch} for changes`);
 			const projectRoot = getProjectRoot(filePath);
 			const rootArgs = projectRoot ? ["--root", projectRoot] : [];
 			const [port, serverProcess] = await runServer(serverPath, [
-				"--host", "127.0.0.1:23625",
+				"--data-plane-host", "127.0.0.1:23625",
 				...rootArgs,
 				...codeGetTypstWsFontArgs(),
 				"watch", filePathToWatch,
@@ -213,6 +239,12 @@ export function activate(context: vscode.ExtensionContext) {
 					.toString()}/typst-webview-assets`
 			);
 			panel.webview.html = html.replace("ws://127.0.0.1:23625", `ws://127.0.0.1:${port}`);
+			const jumpInfoWebsocket = new WebSocket("ws://127.0.0.1:23626");
+			jumpInfoWebsocket.addEventListener('message', async (message) => {
+				const data = JSON.parse(message.data as string);
+				console.log("recv jump data", data);
+				await processJumpInfo(data);
+			});
 		} else {
 			vscode.window.showWarningMessage('No active editor');
 		}
@@ -228,8 +260,8 @@ export function activate(context: vscode.ExtensionContext) {
 
 // This method is called when your extension is deactivated
 export async function deactivate() {
-	console.log(shadowFilePaths);
-	for (const shadowFilePath of shadowFilePaths) {
+	console.log(shadowFilePathMapping);
+	for (const [shadowFilePath, _] of shadowFilePathMapping) {
 		try {
 			await vscode.workspace.fs.delete(vscode.Uri.file(shadowFilePath));
 		} catch (e) {
