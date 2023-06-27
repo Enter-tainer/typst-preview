@@ -1,3 +1,6 @@
+import { triggerRipple } from "./svg-animation";
+import { parseSourceMappingNode, initSourceMapping } from "./svg-debug-info.ts";
+
 // debounce https://stackoverflow.com/questions/23181243/throttling-a-mousemove-event-to-fire-no-more-than-5-times-a-second
 // ignore fast events, good for capturing double click
 // @param (callback): function to be run when done
@@ -35,11 +38,11 @@ var overLapping = function (a: Element, b: Element) {
     ) &&
     /// determine overlapping by area
     (Math.abs(aRect.left - bRect.left) + Math.abs(aRect.right - bRect.right)) /
-    Math.max(aRect.width, bRect.width) <
-    0.5 &&
+      Math.max(aRect.width, bRect.width) <
+      0.5 &&
     (Math.abs(aRect.bottom - bRect.bottom) + Math.abs(aRect.top - bRect.top)) /
-    Math.max(aRect.height, bRect.height) <
-    0.5
+      Math.max(aRect.height, bRect.height) <
+      0.5
   );
 };
 
@@ -84,138 +87,31 @@ var getRelatedElements = function (event: any) {
   return relatedElements;
 };
 
-var linkmove = function (event: MouseEvent) {
-  ignoredEvent(
-    function () {
-      const elements = getRelatedElements(event);
-      if (elements === undefined || elements === null) {
-        return;
-      }
-      for (var i = 0; i < elements.length; i++) {
-        var elem = elements[i];
-        if (elem.classList.contains("hover")) {
-          continue;
-        }
-        elem.classList.add("hover");
-      }
-    },
-    200,
-    "mouse-move"
-  );
-};
-
-var linkleave = function (event: MouseEvent) {
-  const elements = getRelatedElements(event);
-  if (elements === undefined || elements === null) {
-    return;
-  }
-  for (var i = 0; i < elements.length; i++) {
-    var elem = elements[i];
-    if (!elem.classList.contains("hover")) {
-      continue;
-    }
-    elem.classList.remove("hover");
-  }
-};
-
-type SourceMappingNode =
-  | ["p", number[]]
-  | ["g", number[]]
-  | ["u", number[]]
-  | ["t", [string]]
-  | ["i", [string]]
-  | ["s", [string]];
-
 function findAncestor(el: Element, cls: string) {
   while ((el = el.parentElement!) && !el.classList.contains(cls));
   return el;
-}
-
-type SourceMappingLocTypes = "t" | "i" | "s";
-function isSourceMappingLocNode(ty: string): ty is SourceMappingLocTypes {
-  return ["t", "i", "s"].includes(ty);
-};
-
-type SourceMappingRefTypes = "p" | "g" | "u";
-function isSourceMappingRefNode(ty: string): ty is SourceMappingRefTypes {
-  return ["p", "g", "u"].includes(ty);
-};
-
-function parseSourceMappingNode(node: string): SourceMappingNode {
-  const elements = node.split(",");
-  const ty = elements[0];
-  if (isSourceMappingLocNode(ty)) {
-    return [ty, [elements[1]]];
-  }
-  if (!isSourceMappingRefNode(ty)) {
-    throw new Error(`unknown type ${ty}`);
-  }
-  const result = elements.slice(1).map((x) => Number.parseInt(x, 16));
-  return [ty, result] as SourceMappingNode;
-}
-
-// one-of following classes must be present:
-// - typst-page
-// - typst-group
-// - typst-text
-function castToSourceMappingElement(
-  elem: Element
-): [string, Element] | undefined {
-  if (elem.classList.length === 0) {
-    return undefined;
-  }
-  for (const cls of ["typst-text", "typst-group", "typst-image", "typst-shape", "typst-page"]) {
-    if (elem.classList.contains(cls)) {
-      return [cls, elem];
-    }
-  }
-  return undefined;
-}
-
-function castToNestSourceMappingElement(
-  elem: Element
-): [string, Element] | undefined {
-  while (elem) {
-    const result = castToSourceMappingElement(elem);
-    if (result) {
-      return result;
-    }
-    let chs = elem.children;
-    if (chs.length !== 1) {
-      return undefined;
-    }
-    elem = chs[0];
-  }
-
-  return undefined;
-}
-
-function castChildrenToSourceMappingElement(
-  elem: Element
-): [string, Element][] {
-  return Array.from(elem.children)
-    .map(castToNestSourceMappingElement)
-    .filter((x) => x) as [string, Element][];
 }
 
 window.initTypstSvg = function (
   docRoot: SVGElement,
   srcMapping?: HTMLDivElement
 ) {
+  /// initialize pseudo links
   var elements = docRoot.getElementsByClassName("pseudo-link");
-
   for (var i = 0; i < elements.length; i++) {
     let elem = elements[i] as SVGAElement;
-    elem.addEventListener("mousemove", linkmove);
-    elem.addEventListener("mouseleave", linkleave);
+    elem.addEventListener("mousemove", mouseMoveToLink);
+    elem.addEventListener("mouseleave", mouseLeaveFromLink);
   }
 
+  /// initialize text layout at client side
   if (false) {
     setTimeout(() => {
       layoutText(docRoot);
     }, 0);
   }
 
+  /// initialize debug info (source mapping)
   if (srcMapping) {
     const dataPages = srcMapping
       .getAttribute("data-pages")!
@@ -230,9 +126,45 @@ window.initTypstSvg = function (
       initSourceMapping(docRoot, dataPages, dataSourceMapping);
     }, 0);
   }
+
+  return;
+
+  function mouseMoveToLink(event: MouseEvent) {
+    ignoredEvent(
+      function () {
+        const elements = getRelatedElements(event);
+        if (elements === undefined || elements === null) {
+          return;
+        }
+        for (var i = 0; i < elements.length; i++) {
+          var elem = elements[i];
+          if (elem.classList.contains("hover")) {
+            continue;
+          }
+          elem.classList.add("hover");
+        }
+      },
+      200,
+      "mouse-move"
+    );
+  }
+
+  function mouseLeaveFromLink(event: MouseEvent) {
+    const elements = getRelatedElements(event);
+    if (elements === undefined || elements === null) {
+      return;
+    }
+    for (var i = 0; i < elements.length; i++) {
+      var elem = elements[i];
+      if (!elem.classList.contains("hover")) {
+        continue;
+      }
+      elem.classList.remove("hover");
+    }
+  }
 };
 
-const layoutText = (svg: SVGElement) => {
+function layoutText (svg: SVGElement) {
   const divs = svg.querySelectorAll<HTMLDivElement>(".tsel");
   const canvas = document.createElementNS(
     "http://www.w3.org/1999/xhtml",
@@ -273,153 +205,6 @@ const layoutText = (svg: SVGElement) => {
   console.log(`layoutText used time ${performance.now() - layoutBegin} ms`);
 };
 
-function initSourceMapping(
-  docRoot: SVGElement,
-  dataPages: SourceMappingNode[],
-  dataSourceMapping: SourceMappingNode[]
-) {
-  console.log(dataPages, dataSourceMapping);
-
-  const findSourceLocation = (elem: Element) => {
-    const visitChain: [string, Element][] = [];
-    while (elem) {
-      let srcElem = castToSourceMappingElement(elem);
-      if (srcElem) {
-        visitChain.push(srcElem);
-      }
-      if (elem === docRoot) {
-        visitChain.push(["typst-root", elem]);
-        break;
-      }
-      elem = elem.parentElement!;
-    }
-
-    console.log(visitChain);
-
-    if (elem !== docRoot) {
-      return;
-    }
-
-    let parentElements: [string, Element][] = [];
-    const root = visitChain.pop()!;
-    if (root[0] !== "typst-root") {
-      return;
-    }
-    parentElements = castChildrenToSourceMappingElement(elem);
-    if (!parentElements) {
-      return;
-    }
-
-    let locInfo: SourceMappingNode[] = dataPages;
-
-    visitChain.reverse();
-    for (const [ty, elem] of visitChain) {
-      const childrenElements = castChildrenToSourceMappingElement(elem);
-
-      if (locInfo.length !== parentElements.length) {
-        console.log("length mismatch", locInfo, parentElements);
-        break;
-      }
-
-      const idx = parentElements.findIndex((x) => x[0] === ty && x[1] === elem);
-      if (idx === -1) {
-        console.log("not found", ty, elem, " in ", locInfo);
-        break;
-      }
-
-      const locInfoItem = locInfo[idx];
-
-      switch (ty) {
-        case "typst-page":
-          if (locInfoItem[0] !== "p") {
-            console.log("type mismatch", locInfo, ty, elem);
-            return;
-          }
-          break;
-        case "typst-group":
-          if (locInfoItem[0] !== "g") {
-            console.log("type mismatch", locInfo, ty, elem);
-            return;
-          }
-          break;
-        case "typst-text":
-          if (locInfoItem[0] !== "t") {
-            console.log("type mismatch", locInfo, ty, elem);
-            return;
-          }
-
-          return locInfoItem;
-        case "typst-image":
-          if (locInfoItem[0] !== "i") {
-            console.log("type mismatch", locInfo, ty, elem);
-            return;
-          }
-
-          return locInfoItem;
-        case "typst-shape":
-          if (locInfoItem[0] !== "s") {
-            console.log("type mismatch", locInfo, locInfoItem, ty, elem);
-            return;
-          }
-
-          return locInfoItem;
-        default:
-          console.log("unknown type", ty, elem);
-          return;
-      }
-
-      parentElements = childrenElements;
-      locInfo = locInfoItem[1].map((x) => {
-        if (x >= dataSourceMapping.length) {
-          console.log("invalid index", x, dataSourceMapping);
-          return ["u", []];
-        }
-        return dataSourceMapping[x];
-      });
-
-      // console.log(
-      //   ty,
-      //   locInfo,
-      //   parentElements
-      // );
-    }
-  };
-
-  const prevSourceMappingHandler = (docRoot as any).sourceMappingHandler;
-  if (prevSourceMappingHandler) {
-    docRoot.removeEventListener("click", prevSourceMappingHandler);
-  }
-  const sourceMappingHandler = ((docRoot as any).sourceMappingHandler = (
-    event: MouseEvent
-  ) => {
-    let elem = event.target! as Element;
-
-    const sourceLoc = findSourceLocation(elem);
-    if (!sourceLoc) {
-      return;
-    }
-    console.log("source location", sourceLoc);
-    window.typstWebsocket.send(`srclocation ${sourceLoc[1][0]}`)
-
-    const basePos = docRoot.getBoundingClientRect();
-
-    const vw = window.innerWidth || 0;
-    const left = event.clientX - basePos.left + 0.015 * vw;
-    const top = event.clientY - basePos.top + 0.015 * vw;
-
-    triggerRipple(
-      docRoot,
-      left,
-      top,
-      "typst-debug-react-ripple",
-      "typst-debug-react-ripple-effect .4s linear"
-    );
-    return;
-  });
-
-  docRoot.addEventListener("click", sourceMappingHandler);
-}
-
 window.handleTypstLocation = function (
   elem: Element,
   page: number,
@@ -453,7 +238,9 @@ window.handleTypstLocation = function (
       const left = xOffset + xOffsetInnerFix;
       const top = yOffset + yOffsetInnerFix;
 
-      window.scrollTo(xOffset, yOffset);
+      // window.scrollTo(xOffset, yOffset);
+      /// this would be better for preview svg
+      window.scrollTo(basePos.left, yOffset);
 
       triggerRipple(
         docRoot,
@@ -466,24 +253,3 @@ window.handleTypstLocation = function (
     }
   }
 };
-
-function triggerRipple(
-  docRoot: Element,
-  left: number,
-  top: number,
-  className: string,
-  animation: string
-) {
-  const ripple = document.createElement("div");
-
-  ripple.className = className;
-  ripple.style.left = left.toString() + "px";
-  ripple.style.top = top.toString() + "px";
-
-  docRoot.appendChild(ripple);
-
-  ripple.style.animation = animation;
-  ripple.onanimationend = () => {
-    docRoot.removeChild(ripple);
-  };
-}
