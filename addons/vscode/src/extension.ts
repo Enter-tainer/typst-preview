@@ -6,6 +6,8 @@ import { spawn, sync as spawnSync } from 'cross-spawn';
 import { readFile } from 'fs/promises';
 import * as path from 'path';
 import { WebSocket } from 'ws';
+import express = require("express");
+import { open } from 'openurl';
 
 async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: string) {
 	const filePath = path.resolve(__dirname, relativePath);
@@ -88,6 +90,7 @@ function getProjectRoot(currentPath: string): string | null {
 
 const serverProcesses: Array<any> = [];
 const shadowFilePathMapping: Map<string, string> = new Map;
+const expressServers: Array<any> = [];
 
 interface JumpInfo {
 	filepath: string,
@@ -165,49 +168,62 @@ export function activate(context: vscode.ExtensionContext) {
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
 	const outputChannel = vscode.window.createOutputChannel('typst-preview');
-	let disposable = vscode.commands.registerCommand('typst-preview.preview', async () => {
+	const launchTypstWs = async (activeEditor: vscode.TextEditor, refreshStyle: string) => {
+		const filePath = activeEditor.document.uri.fsPath;
+		console.log('File path:', filePath);
+		// get file dir using path
+		const rootDir = path.dirname(filePath);
+		const filename = path.basename(filePath);
+		const shadowFilePath = path.join(rootDir, '.typst-preview.' + filename);
+		const filePathToWatch = refreshStyle === "onSave" ? filePath : shadowFilePath;
+		if (refreshStyle === "onType") {
+			console.log('shadow file path:', shadowFilePath);
+			// copy file content to shadow file
+			const fileContent = activeEditor.document.getText();
+			await vscode.workspace.fs.writeFile(vscode.Uri.file(shadowFilePath), Buffer.from(fileContent));
+			const update = async () => {
+				// save file content to shadow file
+				if (activeEditor?.document) {
+					const fileContent = activeEditor?.document.getText();
+					await vscode.workspace.fs.writeFile(vscode.Uri.file(shadowFilePath), Buffer.from(fileContent));
+				}
+			};
+			vscode.workspace.onDidChangeTextDocument(async (e) => {
+				if (e.document === activeEditor?.document) {
+					await update();
+				}
+			});
+			shadowFilePathMapping.set(shadowFilePath, filePath);
+		}
+		const serverPath = await getTypstWsPath();
+		console.log(`Watching ${filePathToWatch} for changes`);
+		const projectRoot = getProjectRoot(filePath);
+		const rootArgs = projectRoot ? ["--root", projectRoot] : [];
+		const [port, serverProcess] = await runServer(serverPath, [
+			"--data-plane-host", "127.0.0.1:23625",
+			...rootArgs,
+			...codeGetTypstWsFontArgs(),
+			"watch", filePathToWatch,
+		], outputChannel);
+		console.log('Launched server, port:', port);
+		const jumpInfoWebsocket = new WebSocket("ws://127.0.0.1:23626");
+		jumpInfoWebsocket.addEventListener('message', async (message) => {
+			const data = JSON.parse(message.data as string);
+			console.log("recv jump data", data);
+			await processJumpInfo(activeEditor, data);
+		});
+		return {
+			shadowFilePath, serverProcess, port
+		};
+	};
+	let webviewDisposable = vscode.commands.registerCommand('typst-preview.preview', async () => {
 		// The code you place here will be executed every time your command is executed
 		// Display a message box to the user
 		const activeEditor = vscode.window.activeTextEditor;
 		const refreshStyle = vscode.workspace.getConfiguration().get<string>('typst-preview.refresh') || "onSave";
 		if (activeEditor) {
-			const filePath = activeEditor.document.uri.fsPath;
-			console.log('File path:', filePath);
-			// get file dir using path
-			const rootDir = path.dirname(filePath);
-			const filename = path.basename(filePath);
-			const shadowFilePath = path.join(rootDir, '.typst-preview.' + filename);
-			const filePathToWatch = refreshStyle === "onSave" ? filePath : shadowFilePath;
-			if (refreshStyle === "onType") {
-				console.log('shadow file path:', shadowFilePath);
-				// copy file content to shadow file
-				const fileContent = activeEditor.document.getText();
-				await vscode.workspace.fs.writeFile(vscode.Uri.file(shadowFilePath), Buffer.from(fileContent));
-				const update = async () => {
-					// save file content to shadow file
-					if (activeEditor?.document) {
-						const fileContent = activeEditor?.document.getText();
-						await vscode.workspace.fs.writeFile(vscode.Uri.file(shadowFilePath), Buffer.from(fileContent));
-					}
-				};
-				vscode.workspace.onDidChangeTextDocument(async (e) => {
-					if (e.document === activeEditor?.document) {
-						await update();
-					}
-				});
-				shadowFilePathMapping.set(shadowFilePath, filePath);
-			}
-			const serverPath = await getTypstWsPath();
-			console.log(`Watching ${filePathToWatch} for changes`);
-			const projectRoot = getProjectRoot(filePath);
-			const rootArgs = projectRoot ? ["--root", projectRoot] : [];
-			const [port, serverProcess] = await runServer(serverPath, [
-				"--data-plane-host", "127.0.0.1:23625",
-				...rootArgs,
-				...codeGetTypstWsFontArgs(),
-				"watch", filePathToWatch,
-			], outputChannel);
-			console.log('Launched server, port:', port);
+
+			const { shadowFilePath, serverProcess, port } = await launchTypstWs(activeEditor, refreshStyle);
 
 			// Create and show a new WebView
 			const panel = vscode.window.createWebviewPanel(
@@ -239,18 +255,29 @@ export function activate(context: vscode.ExtensionContext) {
 					.toString()}/typst-webview-assets`
 			);
 			panel.webview.html = html.replace("ws://127.0.0.1:23625", `ws://127.0.0.1:${port}`);
-			const jumpInfoWebsocket = new WebSocket("ws://127.0.0.1:23626");
-			jumpInfoWebsocket.addEventListener('message', async (message) => {
-				const data = JSON.parse(message.data as string);
-				console.log("recv jump data", data);
-				await processJumpInfo(activeEditor, data);
-			});
 		} else {
 			vscode.window.showWarningMessage('No active editor');
 		}
 	});
 
-	context.subscriptions.push(disposable);
+	let browserDisposable = vscode.commands.registerCommand('typst-preview.browser', async () => {
+		const activeEditor = vscode.window.activeTextEditor;
+		const refreshStyle = vscode.workspace.getConfiguration().get<string>('typst-preview.refresh') || "onSave";
+		if (activeEditor) {
+			const { shadowFilePath, serverProcess, port } = await launchTypstWs(activeEditor, refreshStyle);
+			const app = express();
+			const frontendPath = path.resolve(__dirname, "frontend");
+			app.use(express.static(frontendPath));
+			const server = app.listen(23267);
+			// serve local frontend
+			expressServers.push(server);
+			open(`http://localhost:23267/index.html`);
+		} else {
+			vscode.window.showWarningMessage('No active editor');
+		}
+	});
+
+	context.subscriptions.push(webviewDisposable, browserDisposable);
 	process.on('SIGINT', () => {
 		for (const serverProcess of serverProcesses) {
 			serverProcess.kill();
@@ -272,5 +299,8 @@ export async function deactivate() {
 	console.log('killing preview services');
 	for (const serverProcess of serverProcesses) {
 		serverProcess.kill();
+	}
+	for (const server of expressServers) {
+		server.close();
 	}
 }
