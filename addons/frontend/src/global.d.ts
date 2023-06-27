@@ -1,4 +1,3 @@
-/// window.initTypstSvg = function (docRoot: SVGElement) {
 
 interface Window {
   initTypstSvg(docRoot: SVGElement, srcMapping?: HTMLDivElement): void;

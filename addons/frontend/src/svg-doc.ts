@@ -151,6 +151,10 @@ export class SvgDocument {
         while (this.patchQueue.length > 0) {
           this.processQueue(this.patchQueue.shift()!);
         }
+
+        // to hide the rescale behavior at the first time
+        this.initScale();
+
         requestAnimationFrame(doSvgUpdate);
       } catch (e) {
         console.error(e);
