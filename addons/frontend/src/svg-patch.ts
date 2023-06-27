@@ -302,6 +302,7 @@ function runOriginViewInstructions(
 /// End of View Interpretation
 /// Begin of Recursive Svg Patch
 
+/// Patch the `prev <svg>` in the DOM according to `next <svg>` from the backend.
 export function patchRoot(prev: SVGElement, next: SVGElement) {
   /// Patch attributes
   patchAttributes(prev, next);
@@ -339,6 +340,44 @@ export function patchRoot(prev: SVGElement, next: SVGElement) {
   }
 }
 
+/// apply attribute patches to the `prev <svg or g>` element
+function patchAttributes(prev: Element, next: Element) {
+  const prevAttrs = prev.attributes;
+  const nextAttrs = next.attributes;
+  if (prevAttrs.length === nextAttrs.length) {
+    let same = true;
+    for (let i = 0; i < prevAttrs.length; i++) {
+      const prevAttr = prevAttrs[i];
+      const nextAttr = nextAttrs.getNamedItem(prevAttr.name);
+      if (nextAttr === null || prevAttr.value !== nextAttr.value) {
+        same = false;
+        break;
+      }
+    }
+
+    if (same) {
+      // console.log("same attributes, skip");
+      return;
+    }
+  }
+  // console.log("different attributes, replace");
+
+  const removedAttrs = [];
+
+  for (let i = 0; i < prevAttrs.length; i++) {
+    removedAttrs.push(prevAttrs[i].name);
+  }
+
+  for (const attr of removedAttrs) {
+    prev.removeAttribute(attr);
+  }
+
+  for (let i = 0; i < nextAttrs.length; i++) {
+    prev.setAttribute(nextAttrs[i].name, nextAttrs[i].value);
+  }
+}
+
+/// apply patches to the children sequence of `prev <svg or g>` in the DOM
 function patchChildren(prev: Element, next: Element) {
   const [targetView, toPatch] = interpretTargetView<SVGGElement>(
     prev.children as unknown as SVGGElement[],
@@ -357,7 +396,6 @@ function patchChildren(prev: Element, next: Element) {
     targetView,
     isGElem
   );
-
 
   runOriginViewInstructions(prev, originView);
 }
@@ -401,42 +439,6 @@ function reuseOrPatchElem(prev: SVGGElement, next: SVGGElement) {
         prev.appendChild(nextChild.cloneNode(true));
       }
     }
-  }
-}
-
-function patchAttributes(prev: Element, next: Element) {
-  const prevAttrs = prev.attributes;
-  const nextAttrs = next.attributes;
-  if (prevAttrs.length === nextAttrs.length) {
-    let same = true;
-    for (let i = 0; i < prevAttrs.length; i++) {
-      const prevAttr = prevAttrs[i];
-      const nextAttr = nextAttrs.getNamedItem(prevAttr.name);
-      if (nextAttr === null || prevAttr.value !== nextAttr.value) {
-        same = false;
-        break;
-      }
-    }
-
-    if (same) {
-      // console.log("same attributes, skip");
-      return;
-    }
-  }
-  // console.log("different attributes, replace");
-
-  const removedAttrs = [];
-
-  for (let i = 0; i < prevAttrs.length; i++) {
-    removedAttrs.push(prevAttrs[i].name);
-  }
-
-  for (const attr of removedAttrs) {
-    prev.removeAttribute(attr);
-  }
-
-  for (let i = 0; i < nextAttrs.length; i++) {
-    prev.setAttribute(nextAttrs[i].name, nextAttrs[i].value);
   }
 }
 
