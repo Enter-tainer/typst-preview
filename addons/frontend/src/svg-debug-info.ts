@@ -209,21 +209,23 @@ export function initSourceMapping(
       return;
     }
     console.log("source location", sourceLoc);
-    window.typstWebsocket.send(`srclocation ${sourceLoc[1][0]}`);
 
-    const basePos = docRoot.getBoundingClientRect();
+    const triggerWindow = document.body || document.firstElementChild;
+    const basePos = triggerWindow.getBoundingClientRect();
 
-    const vw = window.innerWidth || 0;
-    const left = event.clientX - basePos.left + 0.015 * vw;
-    const top = event.clientY - basePos.top + 0.015 * vw;
+    // const vw = window.innerWidth || 0;
+    const left = event.clientX - basePos.left;
+    const top = event.clientY - basePos.top;
 
     triggerRipple(
-      docRoot,
+      triggerWindow,
       left,
       top,
       "typst-debug-react-ripple",
       "typst-debug-react-ripple-effect .4s linear"
     );
+
+    window.typstWebsocket.send(`srclocation ${sourceLoc[1][0]}`);
     return;
   });
 
