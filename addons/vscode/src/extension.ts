@@ -6,8 +6,6 @@ import { spawn, sync as spawnSync } from 'cross-spawn';
 import { readFile } from 'fs/promises';
 import * as path from 'path';
 import { WebSocket } from 'ws';
-import express = require("express");
-import { open } from 'openurl';
 
 async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: string) {
 	const filePath = path.resolve(__dirname, relativePath);
@@ -90,7 +88,6 @@ function getProjectRoot(currentPath: string): string | null {
 
 const serverProcesses: Array<any> = [];
 const shadowFilePathMapping: Map<string, string> = new Map;
-const expressServers: Array<any> = [];
 
 interface JumpInfo {
 	filepath: string,
@@ -168,7 +165,7 @@ export function activate(context: vscode.ExtensionContext) {
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
 	const outputChannel = vscode.window.createOutputChannel('typst-preview');
-	const launchTypstWs = async (activeEditor: vscode.TextEditor, refreshStyle: string) => {
+	const launchTypstWs = async (activeEditor: vscode.TextEditor, refreshStyle: string, frontendPath: null | string) => {
 		const filePath = activeEditor.document.uri.fsPath;
 		console.log('File path:', filePath);
 		// get file dir using path
@@ -199,9 +196,11 @@ export function activate(context: vscode.ExtensionContext) {
 		console.log(`Watching ${filePathToWatch} for changes`);
 		const projectRoot = getProjectRoot(filePath);
 		const rootArgs = projectRoot ? ["--root", projectRoot] : [];
+		const staticFileArgs = frontendPath ? ["--static-file-path", frontendPath] : [];
 		const [port, serverProcess] = await runServer(serverPath, [
 			"--data-plane-host", "127.0.0.1:23625",
 			...rootArgs,
+			...staticFileArgs,
 			...codeGetTypstWsFontArgs(),
 			"watch", filePathToWatch,
 		], outputChannel);
@@ -223,7 +222,7 @@ export function activate(context: vscode.ExtensionContext) {
 		const refreshStyle = vscode.workspace.getConfiguration().get<string>('typst-preview.refresh') || "onSave";
 		if (activeEditor) {
 
-			const { shadowFilePath, serverProcess, port } = await launchTypstWs(activeEditor, refreshStyle);
+			const { shadowFilePath, serverProcess, port } = await launchTypstWs(activeEditor, refreshStyle, null);
 
 			// Create and show a new WebView
 			const panel = vscode.window.createWebviewPanel(
@@ -264,14 +263,8 @@ export function activate(context: vscode.ExtensionContext) {
 		const activeEditor = vscode.window.activeTextEditor;
 		const refreshStyle = vscode.workspace.getConfiguration().get<string>('typst-preview.refresh') || "onSave";
 		if (activeEditor) {
-			const { shadowFilePath, serverProcess, port } = await launchTypstWs(activeEditor, refreshStyle);
-			const app = express();
 			const frontendPath = path.resolve(__dirname, "frontend");
-			app.use(express.static(frontendPath));
-			const server = app.listen(23267);
-			// serve local frontend
-			expressServers.push(server);
-			open(`http://localhost:23267/index.html`);
+			const { shadowFilePath, serverProcess, port } = await launchTypstWs(activeEditor, refreshStyle, frontendPath);
 		} else {
 			vscode.window.showWarningMessage('No active editor');
 		}
@@ -299,8 +292,5 @@ export async function deactivate() {
 	console.log('killing preview services');
 	for (const serverProcess of serverProcesses) {
 		serverProcess.kill();
-	}
-	for (const server of expressServers) {
-		server.close();
 	}
 }
