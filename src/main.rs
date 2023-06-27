@@ -1,6 +1,7 @@
 mod args;
 mod publisher;
 
+use actix_web::HttpServer;
 use chrono::Datelike;
 use clap::Parser;
 use codespan_reporting::diagnostic::{Diagnostic, Label};
@@ -23,6 +24,7 @@ use std::collections::HashMap;
 use std::fs::{self, File};
 use std::hash::Hash;
 use std::io::{self, Write};
+use tokio::signal::ctrl_c;
 
 use std::ops::DerefMut;
 use std::path::{Path, PathBuf};
@@ -172,7 +174,7 @@ impl JumpInfo {
 #[tokio::main]
 async fn main() {
     let _ = env_logger::builder()
-        .filter_level(log::LevelFilter::Info)
+        .filter_module("typst_ws", log::LevelFilter::Info)
         .try_init();
     let arguments = CliArguments::parse();
     info!("Arguments: {:#?}", arguments);
@@ -208,6 +210,13 @@ async fn main() {
             }
         });
     }
+
+    tokio::spawn(async move {
+        let _ = ctrl_c().await;
+        info!("Ctrl-C received, exiting");
+        std::process::exit(0);
+    });
+
     let data_plane_addr = arguments
         .data_plane_host
         .unwrap_or_else(|| "127.0.0.1:23625".to_string());
@@ -290,8 +299,8 @@ async fn main() {
                     info!("Peer closed WebSocket connection.");
                     let prev = active_client_count.fetch_sub(1, Ordering::SeqCst);
                     if prev == 1 {
-                        // There is no clients left. Wait 30s and shutdown if no new clients connect.
-                        tokio::time::sleep(Duration::from_secs(30)).await;
+                        // There is no clients left. Wait 5s and shutdown if no new clients connect.
+                        tokio::time::sleep(Duration::from_secs(5)).await;
                         if active_client_count.load(Ordering::SeqCst) == 0 {
                             info!("No active clients. Shutting down.");
                             std::process::exit(0);
@@ -324,6 +333,26 @@ async fn main() {
             }
         }
     });
+
+    let static_file_addr = arguments
+        .static_file_host
+        .unwrap_or_else(|| "127.0.0.1:23267".to_string());
+    if let Some(path) = arguments.static_file_path {
+        let server = HttpServer::new(move || {
+            actix_web::App::new()
+                .service(actix_files::Files::new("/", &path).index_file("index.html"))
+            // Enable the logger.
+            // .wrap(actix_web::middleware::Logger::default())
+        });
+        open::that_detached(format!("http://{}", static_file_addr)).unwrap();
+        server
+            .bind(&static_file_addr)
+            .unwrap()
+            .workers(1)
+            .run()
+            .await
+            .unwrap();
+    }
     let _ = tokio::join!(data_plane_handle, control_plane_handle);
 }
 
