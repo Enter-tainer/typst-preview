@@ -303,10 +303,13 @@ function runOriginViewInstructions(
 /// Begin of Recursive Svg Patch
 
 export function patchRoot(prev: SVGElement, next: SVGElement) {
+  /// Patch attributes
+  patchAttributes(prev, next);
+  /// Patch global svg resources
   patchSvgHeader(prev, next);
 
   /// Patch `<g>` children, call `reuseOrPatchElem` to patch.
-  replaceChildren(prev, next);
+  patchChildren(prev, next);
   return;
 
   function patchSvgHeader(prev: SVGElement, next: SVGElement) {
@@ -336,6 +339,29 @@ export function patchRoot(prev: SVGElement, next: SVGElement) {
   }
 }
 
+function patchChildren(prev: Element, next: Element) {
+  const [targetView, toPatch] = interpretTargetView<SVGGElement>(
+    prev.children as unknown as SVGGElement[],
+    next.children as unknown as SVGGElement[],
+    isGElem
+  );
+
+  for (let [prevChild, nextChild] of toPatch) {
+    reuseOrPatchElem(prevChild, nextChild);
+  }
+
+  // console.log("interpreted target view", targetView);
+
+  const originView = changeViewPerspective(
+    prev.children as unknown as SVGGElement[],
+    targetView,
+    isGElem
+  );
+
+
+  runOriginViewInstructions(prev, originView);
+}
+
 /// Replace the `prev` element with `next` element.
 /// Return true if the `prev` element is reused.
 /// Return false if the `prev` element is replaced.
@@ -344,7 +370,7 @@ function reuseOrPatchElem(prev: SVGGElement, next: SVGGElement) {
 
   /// Even if the element is reused, we still need to replace its attributes.
   next.removeAttribute(TypstSvgAttrs.ReuseFrom);
-  replaceAttributes(prev, next);
+  patchAttributes(prev, next);
 
   if (canReuse) {
     return true /* reused */;
@@ -353,44 +379,8 @@ function reuseOrPatchElem(prev: SVGGElement, next: SVGGElement) {
   /// Hard replace elements that is not a `<g>` element.
   replaceNonSVGElements(prev, next);
   /// Patch `<g>` children, will call `reuseOrPatchElem` again.
-  replaceChildren(prev, next);
+  patchChildren(prev, next);
   return false /* reused */;
-
-  function replaceAttributes(prev: SVGGElement, next: SVGGElement) {
-    const prevAttrs = prev.attributes;
-    const nextAttrs = next.attributes;
-    if (prevAttrs.length === nextAttrs.length) {
-      let same = true;
-      for (let i = 0; i < prevAttrs.length; i++) {
-        const prevAttr = prevAttrs[i];
-        const nextAttr = nextAttrs.getNamedItem(prevAttr.name);
-        if (nextAttr === null || prevAttr.value !== nextAttr.value) {
-          same = false;
-          break;
-        }
-      }
-
-      if (same) {
-        // console.log("same attributes, skip");
-        return;
-      }
-    }
-    // console.log("different attributes, replace");
-
-    const removedAttrs = [];
-
-    for (let i = 0; i < prevAttrs.length; i++) {
-      removedAttrs.push(prevAttrs[i].name);
-    }
-
-    for (const attr of removedAttrs) {
-      prev.removeAttribute(attr);
-    }
-
-    for (let i = 0; i < nextAttrs.length; i++) {
-      prev.setAttribute(nextAttrs[i].name, nextAttrs[i].value);
-    }
-  }
 
   function replaceNonSVGElements(prev: Element, next: Element) {
     const removedIndecies = [];
@@ -414,27 +404,40 @@ function reuseOrPatchElem(prev: SVGGElement, next: SVGGElement) {
   }
 }
 
-function replaceChildren(prev: Element, next: Element) {
-  const [targetView, toPatch] = interpretTargetView<SVGGElement>(
-    prev.children as unknown as SVGGElement[],
-    next.children as unknown as SVGGElement[],
-    isGElem
-  );
+function patchAttributes(prev: Element, next: Element) {
+  const prevAttrs = prev.attributes;
+  const nextAttrs = next.attributes;
+  if (prevAttrs.length === nextAttrs.length) {
+    let same = true;
+    for (let i = 0; i < prevAttrs.length; i++) {
+      const prevAttr = prevAttrs[i];
+      const nextAttr = nextAttrs.getNamedItem(prevAttr.name);
+      if (nextAttr === null || prevAttr.value !== nextAttr.value) {
+        same = false;
+        break;
+      }
+    }
 
-  for (let [prevChild, nextChild] of toPatch) {
-    reuseOrPatchElem(prevChild, nextChild);
+    if (same) {
+      // console.log("same attributes, skip");
+      return;
+    }
+  }
+  // console.log("different attributes, replace");
+
+  const removedAttrs = [];
+
+  for (let i = 0; i < prevAttrs.length; i++) {
+    removedAttrs.push(prevAttrs[i].name);
   }
 
-  // console.log("interpreted target view", targetView);
+  for (const attr of removedAttrs) {
+    prev.removeAttribute(attr);
+  }
 
-  const originView = changeViewPerspective(
-    prev.children as unknown as SVGGElement[],
-    targetView,
-    isGElem
-  );
-
-
-  runOriginViewInstructions(prev, originView);
+  for (let i = 0; i < nextAttrs.length; i++) {
+    prev.setAttribute(nextAttrs[i].name, nextAttrs[i].value);
+  }
 }
 
 /// End of Recursive Svg Patch
