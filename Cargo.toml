@@ -17,6 +17,7 @@ typst = "0.5.0"
 typst-library = "0.5.0"
 typst-ts-svg-exporter = "0.2"
 typst-ts-core = "0.2"
+typst-ts-compiler = "0.2"
 
 chrono = { version = "0.4", default-features = false, features = [
   "clock",
@@ -48,8 +49,9 @@ actix-files = { version = "0.6.2", features = [] }
 [patch.crates-io]
 typst = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.ts" }
 typst-library = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.ts" }
-typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "545e185f8f2f0b43a856f5f1fca93465f3bfda34", package = "typst-ts-svg-exporter" }
-typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "545e185f8f2f0b43a856f5f1fca93465f3bfda34", package = "typst-ts-core" }
+typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "e47df2107b16d52e6afac824034adf859bd609cf", package = "typst-ts-svg-exporter" }
+typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "e47df2107b16d52e6afac824034adf859bd609cf", package = "typst-ts-core" }
+typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "e47df2107b16d52e6afac824034adf859bd609cf", package = "typst-ts-compiler" }
 
 # typst-ts-svg-exporter = { path = "../typst.ts/exporter/svg" }
 # typst-ts-core = { path = "../typst.ts/core" }

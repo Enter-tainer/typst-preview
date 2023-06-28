@@ -223,11 +223,11 @@ export function activate(context: vscode.ExtensionContext) {
 		if (activeEditor) {
 
 			const { shadowFilePath, serverProcess, port } = await launchTypstWs(activeEditor, refreshStyle, null);
-
+			const basename = path.basename(activeEditor.document.fileName);
 			// Create and show a new WebView
 			const panel = vscode.window.createWebviewPanel(
 				'typst-ws-preview', // 标识符
-				'Preview', // 面板标题
+				`${basename}(Preview)`, // 面板标题
 				vscode.ViewColumn.Beside, // 显示在编辑器的哪一侧
 				{
 					enableScripts: true, // 启用 JS
