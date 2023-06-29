@@ -120,6 +120,17 @@ export class SvgDocument {
 
         t3 = performance.now();
         break;
+      case "jump":
+        t1 = performance.now();
+        const [page, x, y] = svgUpdateEvent[1].split(" ").map(Number);
+        const rootElem = document.getElementById("imageContainer")?.firstElementChild;
+        if (rootElem) {
+          window.handleTypstLocation(rootElem, page, x, y)
+        }
+        t2 = performance.now();
+
+        t3 = performance.now();
+        break;
       default:
         console.log("svgUpdateEvent", svgUpdateEvent);
         t0 = t1 = t2 = t3 = performance.now();

@@ -180,9 +180,6 @@ interface TaskControlBlock {
 }
 
 const panelScrollTo = async (task: LaunchInBrowserTask | LaunchInWebViewTask) => {
-	if (task.kind === 'browser') {
-		return;
-	}
 	const {
 		bindDocument,
 		activeEditor,
@@ -356,6 +353,18 @@ export function activate(context: vscode.ExtensionContext) {
 				vscode.window.showWarningMessage('No active editor');
 				return;
 			}
+			vscode.window.onDidChangeTextEditorSelection((e) => {
+				if (e.textEditor === activeEditor) {
+					console.log('selection changed, sending src2doc jump request');
+					panelScrollTo({
+						kind,
+						context,
+						outputChannel,
+						activeEditor,
+						bindDocument: activeEditor.document,
+					});
+				}
+			});
 			const bindDocument = activeEditor.document;
 			if (activingTask.has(bindDocument)) {
 				panelScrollTo({
