@@ -152,7 +152,8 @@ async fn main() {
             font_paths: arguments.font_paths.clone(),
             with_embedded_fonts: EMBEDDED_FONT.to_owned(),
             ..CompileOpts::default()
-        });
+        })
+        .expect("incorrect options");
 
         CompileDriver::new(world).with_entry_file(command.input.clone())
     };
