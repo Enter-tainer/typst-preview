@@ -11,8 +11,9 @@ use publisher::Publisher;
 
 use serde::{Deserialize, Serialize};
 use std::io::{self, Write};
-use typst::ide::jump_from_cursor;
+use typst::geom::Point;
 
+use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -20,7 +21,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use termcolor::{ColorChoice, StandardStream, WriteColor};
 use tokio::net::{TcpListener, TcpStream};
-use typst::doc::Document;
+use typst::doc::{Document, Frame, FrameItem, Position};
 use typst_ts_svg_exporter::IncrementalSvgExporter;
 
 use crate::args::{CliArguments, Command, CompileCommand};
@@ -30,7 +31,7 @@ use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 use typst::diag::StrResult;
 
-use typst::syntax::SourceId;
+use typst::syntax::{LinkedNode, Source, SourceId, Span, SyntaxKind};
 use typst::World;
 use typst_ts_compiler::service::CompileDriver;
 use typst_ts_compiler::TypstSystemWorld;
@@ -501,3 +502,69 @@ pub static EMBEDDED_FONT: &[Cow<'_, [u8]>] = &[
     #[cfg(feature = "embedded-emoji-fonts")]
     Cow::Borrowed(include_bytes!("../assets/fonts/NotoColorEmoji.ttf").as_slice()),
 ];
+
+/// Find the output location in the document for a cursor position.
+pub fn jump_from_cursor(frames: &[Frame], source: &Source, cursor: usize) -> Option<Position> {
+    let node = LinkedNode::new(source.root()).leaf_at(cursor)?;
+    if node.kind() != SyntaxKind::Text {
+        return None;
+    }
+
+    info!("jump_from_cursor: {:?} {:?}", node, node.span());
+
+    let mut min_dis = u64::MAX;
+    let mut p = Point::default();
+    let mut ppage = 0usize;
+
+    let span = node.span();
+    for (i, frame) in frames.iter().enumerate() {
+        let t_dis = min_dis;
+        if let Some(pos) = find_in_frame(frame, span, &mut min_dis, &mut p) {
+            return Some(Position {
+                page: NonZeroUsize::new(i + 1).unwrap(),
+                point: pos,
+            });
+        }
+        if t_dis != min_dis {
+            ppage = i;
+        }
+        info!("min_dis: {} {:?} {:?}", min_dis, ppage, p);
+    }
+
+    if min_dis == u64::MAX {
+        return None;
+    }
+
+    Some(Position {
+        page: NonZeroUsize::new(ppage + 1).unwrap(),
+        point: p,
+    })
+}
+
+/// Find the position of a span in a frame.
+fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) -> Option<Point> {
+    for (mut pos, item) in frame.items() {
+        if let FrameItem::Group(group) = item {
+            // TODO: Handle transformation.
+            if let Some(point) = find_in_frame(&group.frame, span, min_dis, p) {
+                return Some(point + pos);
+            }
+        }
+
+        if let FrameItem::Text(text) = item {
+            for glyph in &text.glyphs {
+                if glyph.span.0 == span {
+                    return Some(pos);
+                }
+                let dis = glyph.span.0.number().abs_diff(span.number());
+                if dis < *min_dis {
+                    *min_dis = dis;
+                    *p = pos;
+                }
+                pos.x += glyph.x_advance.at(text.size);
+            }
+        }
+    }
+
+    None
+}
