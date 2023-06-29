@@ -35,6 +35,16 @@ window.onload = function () {
       const message = [data.slice(0, message_idx), data.slice(message_idx + 1)];
       console.log(message);
 
+      if (message[0] === "jump") {
+        const [page, x, y] = message[1].split(" ").map(Number);
+        const rootElem =
+          document.getElementById("imageContainer")?.firstElementChild;
+        if (rootElem) {
+          window.handleTypstLocation(rootElem, page, x, y);
+        }
+        return;
+      }
+
       svgDoc.addChangement(message);
     });
 
