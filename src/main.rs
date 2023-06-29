@@ -5,14 +5,15 @@ use clap::Parser;
 use codespan_reporting::term::{self, termcolor};
 
 use futures::{SinkExt, StreamExt};
-use log::{error, info};
+use log::{error, info, warn};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use publisher::Publisher;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::io::{self, Write};
+use typst::ide::jump_from_cursor;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -102,13 +103,13 @@ impl Client {
 }
 
 #[derive(Debug, Serialize)]
-struct JumpInfo {
+struct DocToSrcJumpRequest {
     filepath: String,
     start: Option<(usize, usize)>, // row, column
     end: Option<(usize, usize)>,
 }
 
-impl JumpInfo {
+impl DocToSrcJumpRequest {
     pub fn from_option(
         filepath: String,
         start: (Option<usize>, Option<usize>),
@@ -122,6 +123,28 @@ impl JumpInfo {
     }
 }
 
+// JSON.stringify({
+// 		'event': 'panelScrollTo',
+// 		'filepath': bindDocument.uri.fsPath,
+// 		'line': activeEditor.selection.active.line,
+// 		'character': activeEditor.selection.active.character,
+// 	})
+#[derive(Debug, Deserialize)]
+struct SrcToDocJumpRequest {
+    event: String,
+    filepath: String,
+    line: usize,
+    /// fixme: character is 0-based, UTF-16 code unit.
+    /// We treat it as UTF-8 now.
+    character: usize,
+}
+
+impl SrcToDocJumpRequest {
+    pub fn to_byte_offset(&self, src: &typst::syntax::Source) -> Option<usize> {
+        src.line_column_to_byte(self.line, self.character)
+    }
+}
+
 /// Entry point.
 #[tokio::main]
 async fn main() {
@@ -130,7 +153,7 @@ async fn main() {
         .try_init();
     let arguments = CliArguments::parse();
     info!("Arguments: {:#?}", arguments);
-    let publisher: Publisher<Document> = PublisherImpl::new().into();
+    let doc_publisher: Publisher<Document> = PublisherImpl::new().into();
     let command = CompileSettings::with_arguments(arguments.clone());
     let root = if let Some(root) = &command.root {
         root.clone()
@@ -162,7 +185,7 @@ async fn main() {
     let world = Arc::new(Mutex::new(compile_driver));
     {
         let arguments = arguments.clone();
-        let publisher = publisher.clone();
+        let publisher = doc_publisher.clone();
         let world = world.clone();
         tokio::spawn(async move {
             let res = match &arguments.command {
@@ -185,96 +208,109 @@ async fn main() {
     let data_plane_addr = arguments
         .data_plane_host
         .unwrap_or_else(|| "127.0.0.1:23625".to_string());
-    let (jump_tx, mut jump_rx) = tokio::sync::mpsc::channel(8);
-    let data_plane_handle = tokio::spawn(async move {
-        // Create the event loop and TCP listener we'll accept connections on.
-        let try_socket = TcpListener::bind(&data_plane_addr).await;
-        let listener = try_socket.expect("Failed to bind");
-        info!(
-            "Data plane server listening on: {}",
-            listener.local_addr().unwrap()
-        );
+    let (doc_to_src_jump_tx, mut doc_to_src_jump_rx) = tokio::sync::mpsc::channel(8);
+    let src_to_doc_jump_publisher: Publisher<typst::doc::Position> = PublisherImpl::new().into();
+    let data_plane_handle = {
+        let world = world.clone();
+        let doc_publisher = doc_publisher.clone();
+        let src_to_doc_jump_publisher = src_to_doc_jump_publisher.clone();
+        tokio::spawn(async move {
+            // Create the event loop and TCP listener we'll accept connections on.
+            let try_socket = TcpListener::bind(&data_plane_addr).await;
+            let listener = try_socket.expect("Failed to bind");
+            info!(
+                "Data plane server listening on: {}",
+                listener.local_addr().unwrap()
+            );
 
-        let active_client_count = Arc::new(AtomicUsize::new(0));
-        while let Ok((stream, _)) = listener.accept().await {
-            let conn = accept_connection(stream).await;
-            {
-                let mut r = IncrementalSvgExporter::default();
-                r.set_should_attach_debug_info(true);
-                let client = Client {
-                    conn: Arc::new(Mutex::new(conn)),
-                    publisher: publisher.clone(),
-                    renderer: Arc::new(Mutex::new(r)),
-                };
-                let active_client_count = active_client_count.clone();
-                let publisher = publisher.clone();
-                let world = world.clone();
-                let jump_tx = jump_tx.clone();
-                tokio::spawn(async move {
-                    active_client_count.fetch_add(1, Ordering::SeqCst);
-                    loop {
-                        tokio::select! {
-                            msg = Client::poll_ws_events(client.conn.clone()) => {
-                                if let Some(msg) = msg {
-                                    if msg == "current" {
-                                        let mut renderer = client.renderer.lock().await;
-                                        if let Some(res) = renderer.render_current() {
-                                            client.conn.lock().await.send(Message::Text(res)).await.unwrap();
-                                        } else {
-                                            let latest_doc = publisher.latest().await;
-                                            if latest_doc.is_some() {
-                                                let render_result = renderer.render(latest_doc.unwrap());
-                                                client.conn.lock().await.send(Message::Text(render_result)).await.unwrap();
+            let active_client_count = Arc::new(AtomicUsize::new(0));
+            while let Ok((stream, _)) = listener.accept().await {
+                let conn = accept_connection(stream).await;
+                {
+                    let mut r = IncrementalSvgExporter::default();
+                    r.set_should_attach_debug_info(true);
+                    let client = Client {
+                        conn: Arc::new(Mutex::new(conn)),
+                        publisher: doc_publisher.clone(),
+                        renderer: Arc::new(Mutex::new(r)),
+                    };
+                    let active_client_count = active_client_count.clone();
+                    let doc_publisher = doc_publisher.clone();
+                    let world = world.clone();
+                    let jump_tx = doc_to_src_jump_tx.clone();
+                    let src_to_doc_jump_publisher = src_to_doc_jump_publisher.clone();
+                    tokio::spawn(async move {
+                        active_client_count.fetch_add(1, Ordering::SeqCst);
+                        loop {
+                            tokio::select! {
+                                msg = Client::poll_ws_events(client.conn.clone()) => {
+                                    if let Some(msg) = msg {
+                                        if msg == "current" {
+                                            let mut renderer = client.renderer.lock().await;
+                                            if let Some(res) = renderer.render_current() {
+                                                client.conn.lock().await.send(Message::Text(res)).await.unwrap();
                                             } else {
-                                                client.conn.lock().await.send(Message::Text("current not avalible".into())).await.unwrap();
+                                                let latest_doc = doc_publisher.latest().await;
+                                                if latest_doc.is_some() {
+                                                    let render_result = renderer.render(latest_doc.unwrap());
+                                                    client.conn.lock().await.send(Message::Text(render_result)).await.unwrap();
+                                                } else {
+                                                    client.conn.lock().await.send(Message::Text("current not avalible".into())).await.unwrap();
+                                                }
                                             }
+                                        } else if msg.starts_with("srclocation") {
+                                            let location = msg.split(' ').nth(1).unwrap();
+                                            let id = u64::from_str_radix(location, 16).unwrap();
+                                            // get the high 16bits and the low 48bits
+                                            let (src_id, span_number) = (id >> 48, id & 0x0000FFFFFFFFFFFF);
+                                            let src_id = SourceId::from_u16(src_id as u16);
+                                            if src_id == SourceId::detached() || span_number <= 1 {
+                                                continue;
+                                            }
+                                            let span = typst::syntax::Span::new(src_id, span_number);
+                                            let world = world.lock().await;
+                                            let source = world.world.source(src_id);
+                                            let range = source.range(span);
+                                            let jump = DocToSrcJumpRequest::from_option (
+                                                source.path().to_string_lossy().to_string(),
+                                                (source.byte_to_line(range.start), source.byte_to_column(range.start)),
+                                                (source.byte_to_line(range.end), source.byte_to_column(range.end))
+                                            );
+                                            let _ = jump_tx.send(jump).await;
+                                        } else {
+                                            client.conn.lock().await.send(Message::Text(format!("unknown command {msg}"))).await.unwrap();
                                         }
-                                    } else if msg.starts_with("srclocation") {
-                                        let location = msg.split(' ').nth(1).unwrap();
-                                        let id = u64::from_str_radix(location, 16).unwrap();
-                                        // get the high 16bits and the low 48bits
-                                        let (src_id, span_number) = (id >> 48, id & 0x0000FFFFFFFFFFFF);
-                                        let src_id = SourceId::from_u16(src_id as u16);
-                                        if src_id == SourceId::detached() || span_number <= 1 {
-                                            continue;
-                                        }
-                                        let span = typst::syntax::Span::new(src_id, span_number);
-                                        let world = world.lock().await;
-                                        let source = world.world.source(src_id);
-                                        let range = source.range(span);
-                                        let jump = JumpInfo::from_option (
-                                            source.path().to_string_lossy().to_string(),
-                                            (source.byte_to_line(range.start), source.byte_to_column(range.start)),
-                                            (source.byte_to_line(range.end), source.byte_to_column(range.end))
-                                        );
-                                        let _ = jump_tx.send(jump).await;
                                     } else {
-                                        client.conn.lock().await.send(Message::Text(format!("unknown command {msg}"))).await.unwrap();
+                                        break;
                                     }
-                                } else {
-                                    break;
+                                },
+                                doc = Client::poll_watch_events(client.publisher.clone()) => {
+                                    let svg = client.renderer.lock().await.render(doc);
+                                    client.conn.lock().await.send(Message::Text(svg)).await.unwrap();
+                                },
+                                pos = src_to_doc_jump_publisher.wait() => {
+                                    let mut conn = client.conn.lock().await;
+                                    let jump_info = format!("jump,{} {} {}", pos.page, pos.point.x.to_pt(), pos.point.y.to_pt());
+                                    info!("sending src2doc jump info {}", jump_info);
+                                    conn.send(Message::Text(jump_info)).await.unwrap();
                                 }
-                            },
-                            doc = Client::poll_watch_events(client.publisher.clone()) => {
-                                let svg = client.renderer.lock().await.render(doc);
-                                client.conn.lock().await.send(Message::Text(svg)).await.unwrap();
-                            },
+                            }
                         }
-                    }
-                    info!("Peer closed WebSocket connection.");
-                    let prev = active_client_count.fetch_sub(1, Ordering::SeqCst);
-                    if prev == 1 {
-                        // There is no clients left. Wait 30s and shutdown if no new clients connect.
-                        tokio::time::sleep(Duration::from_secs(30)).await;
-                        if active_client_count.load(Ordering::SeqCst) == 0 {
-                            info!("No active clients. Shutting down.");
-                            std::process::exit(0);
+                        info!("Peer closed WebSocket connection.");
+                        let prev = active_client_count.fetch_sub(1, Ordering::SeqCst);
+                        if prev == 1 {
+                            // There is no clients left. Wait 30s and shutdown if no new clients connect.
+                            tokio::time::sleep(Duration::from_secs(30)).await;
+                            if active_client_count.load(Ordering::SeqCst) == 0 {
+                                info!("No active clients. Shutting down.");
+                                std::process::exit(0);
+                            }
                         }
-                    }
-                });
+                    });
+                }
             }
-        }
-    });
+        })
+    };
 
     let control_plane_addr = arguments
         .control_plane_host
@@ -288,13 +324,42 @@ async fn main() {
         );
         let (stream, _) = listener.accept().await.unwrap();
         let mut conn = accept_connection(stream).await;
-        while let Some(jump) = jump_rx.recv().await {
-            info!("sending jump info to editor: {:?}", &jump);
-            let res = conn
-                .send(Message::Text(serde_json::to_string(&jump).unwrap()))
-                .await;
-            if res.is_err() {
-                break;
+        loop {
+            tokio::select! {
+                Some(jump) = doc_to_src_jump_rx.recv() => {
+                    let res = conn
+                        .send(Message::Text(serde_json::to_string(&jump).unwrap()))
+                        .await;
+                    info!("sent doc2src jump info to editor: {:?}", &jump);
+                    if res.is_err() {
+                        break;
+                    }
+                }
+                Some(Ok(Message::Text(msg))) = conn.next() => {
+                    let Ok(msg) = serde_json::from_str::<SrcToDocJumpRequest>(&msg) else {
+                        warn!("failed to parse jump request: {:?}", msg);
+                        continue;
+                    };
+                    let world = world.lock().await;
+                    let Ok(source_id) = world.world.resolve(Path::new(&msg.filepath)) else {
+                        warn!("failed to resolve source: {:?}", msg);
+                        continue;
+                    };
+                    let source = world.world.source(source_id);
+                    let Some(cursor) = msg.to_byte_offset(source) else {
+                        warn!("failed to resolve cursor: {:?}", msg);
+                        continue;
+                    };
+                    let Some(doc) = doc_publisher.latest().await else {
+                        warn!("latest doc is empty");
+                        continue;
+                    };
+                    if let Some(pos) = jump_from_cursor(&doc.pages, source, cursor) {
+                        src_to_doc_jump_publisher.publish(pos.into()).await;
+                    } else {
+                        warn!("failed to jump from cursor: {:?}, {:?}, {:?}", msg, source, cursor);
+                    }
+                }
             }
         }
     });
