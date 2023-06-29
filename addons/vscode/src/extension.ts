@@ -191,7 +191,7 @@ const panelScrollTo = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 	if (tcb === undefined) {
 		return;
 	}
-	const {addonΠserver} = tcb;
+	const { addonΠserver } = tcb;
 	addonΠserver.send(JSON.stringify({
 		'event': 'panelScrollTo',
 		'filepath': bindDocument.uri.fsPath,
@@ -226,13 +226,13 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 	serverProcess.on('exit', (code: any) => {
 		addonΠserver.close();
 		if (activeTask.has(bindDocument)) {
-	   	    activeTask.delete(bindDocument);
+			activeTask.delete(bindDocument);
 		}
 	});
 
 	switch (task.kind) {
-	case 'browser': return launchPreviewInBrowser();
-	case 'webview': return launchPreviewInWebView();
+		case 'browser': return launchPreviewInBrowser();
+		case 'webview': return launchPreviewInWebView();
 	}
 
 	async function launchPreviewInBrowser() {
@@ -306,7 +306,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		return { shadowFilePath };
 	};
 
-	async function launchTypstWs (frontendPath: null | string) {
+	async function launchTypstWs(frontendPath: null | string) {
 		const filePathToWatch = refreshStyle === "onSave" ? filePath : shadowFilePath;
 		const serverPath = await getTypstWsPath();
 		console.log(`Watching ${filePathToWatch} for changes`);
@@ -369,7 +369,7 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 
 			activingTask.add(bindDocument);
-	
+
 			try {
 				launchPreview({
 					kind,
