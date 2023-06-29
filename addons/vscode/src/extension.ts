@@ -88,7 +88,8 @@ function getProjectRoot(currentPath: string): string | null {
 
 const serverProcesses: Array<any> = [];
 const shadowFilePathMapping: Map<string, string> = new Map;
-const activePanels = new Map<vscode.TextDocument, vscode.WebviewPanel>();
+const activingTask = new Set<vscode.TextDocument>();
+const activeTask = new Map<vscode.TextDocument, TaskControlBlock>();
 
 interface JumpInfo {
 	filepath: string,
@@ -160,6 +161,7 @@ interface LaunchTask {
 	context: vscode.ExtensionContext,
 	outputChannel: vscode.OutputChannel,
 	activeEditor: vscode.TextEditor,
+	bindDocument: vscode.TextDocument,
 }
 
 interface LaunchInBrowserTask extends LaunchTask {
@@ -170,21 +172,74 @@ interface LaunchInWebViewTask extends LaunchTask {
 	kind: 'webview',
 }
 
+interface TaskControlBlock {
+	/// related panel
+	panel?: vscode.WebviewPanel;
+	/// channel to communicate with typst-ws
+	addonΠserver: WebSocket;
+}
+
+const panelScrollTo = async (task: LaunchInBrowserTask | LaunchInWebViewTask) => {
+	if (task.kind === 'browser') {
+		return;
+	}
+	const {
+		bindDocument,
+		activeEditor,
+	} = task;
+	const tcb = activeTask.get(bindDocument);
+	if (tcb === undefined) {
+		return;
+	}
+	const {addonΠserver} = tcb;
+	addonΠserver.send(JSON.stringify({
+		'event': 'panelScrollTo',
+		'filepath': bindDocument.uri.fsPath,
+		'line': activeEditor.selection.active.line,
+		'character': activeEditor.selection.active.character,
+	}));
+};
+
 const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) => {
 	const {
 		context,
 		outputChannel,
 		activeEditor,
+		bindDocument,
 	} = task;
-	const bindDocument = activeEditor.document;
+	const filePath = bindDocument.uri.fsPath;
+	// get file dir using path
+	const rootDir = path.dirname(filePath);
+	const filename = path.basename(filePath);
 
 	const refreshStyle = vscode.workspace.getConfiguration().get<string>('typst-preview.refresh') || "onSave";
 	const fontendPath = path.resolve(__dirname, "frontend");
-	const { shadowFilePath, serverProcess, port } = await launchTypstWs(task.kind === 'browser' ? fontendPath : null);
+	const { shadowFilePath } = await watchEditorFiles();
+	const { serverProcess, port } = await launchTypstWs(task.kind === 'browser' ? fontendPath : null);
+
+	const addonΠserver = new WebSocket("ws://127.0.0.1:23626");
+	addonΠserver.addEventListener('message', async (message) => {
+		const data = JSON.parse(message.data as string);
+		console.log("recv jump data", data);
+		await processJumpInfo(activeEditor, data);
+	});
+	serverProcess.on('exit', (code: any) => {
+		addonΠserver.close();
+		if (activeTask.has(bindDocument)) {
+	   	    activeTask.delete(bindDocument);
+		}
+	});
 
 	switch (task.kind) {
-	case 'browser': return /* launchPreviewInBrowser() */;
+	case 'browser': return launchPreviewInBrowser();
 	case 'webview': return launchPreviewInWebView();
+	}
+
+	async function launchPreviewInBrowser() {
+		// todo: may override the same file
+		activeTask.set(bindDocument, {
+			addonΠserver,
+		});
 	}
 
 	async function launchPreviewInWebView() {
@@ -201,7 +256,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 
 		panel.onDidDispose(async () => {
 			// todo: bindDocument.onDidDispose, but we did not find a similar way.
-			activePanels.delete(bindDocument);
+			activeTask.delete(bindDocument);
 			// remove shadow file
 			if (refreshStyle === "onType") {
 				await vscode.workspace.fs.delete(vscode.Uri.file(shadowFilePath));
@@ -221,16 +276,14 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 				.toString()}/typst-webview-assets`
 		);
 		panel.webview.html = html.replace("ws://127.0.0.1:23625", `ws://127.0.0.1:${port}`);
+		activeTask.set(bindDocument, {
+			panel,
+			addonΠserver,
+		});
 	};
 
-	async function launchTypstWs (frontendPath: null | string) {
-		const filePath = activeEditor.document.uri.fsPath;
-		console.log('File path:', filePath);
-		// get file dir using path
-		const rootDir = path.dirname(filePath);
-		const filename = path.basename(filePath);
+	async function watchEditorFiles() {
 		const shadowFilePath = path.join(rootDir, '.typst-preview.' + filename);
-		const filePathToWatch = refreshStyle === "onSave" ? filePath : shadowFilePath;
 		if (refreshStyle === "onType") {
 			console.log('shadow file path:', shadowFilePath);
 			// copy file content to shadow file
@@ -250,6 +303,11 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 			});
 			shadowFilePathMapping.set(shadowFilePath, filePath);
 		}
+		return { shadowFilePath };
+	};
+
+	async function launchTypstWs (frontendPath: null | string) {
+		const filePathToWatch = refreshStyle === "onSave" ? filePath : shadowFilePath;
 		const serverPath = await getTypstWsPath();
 		console.log(`Watching ${filePathToWatch} for changes`);
 		const projectRoot = getProjectRoot(filePath);
@@ -263,14 +321,9 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 			"watch", filePathToWatch,
 		], outputChannel);
 		console.log('Launched server, port:', port);
-		const jumpInfoWebsocket = new WebSocket("ws://127.0.0.1:23626");
-		jumpInfoWebsocket.addEventListener('message', async (message) => {
-			const data = JSON.parse(message.data as string);
-			console.log("recv jump data", data);
-			await processJumpInfo(activeEditor, data);
-		});
+		// window.typstWebsocket.send("current");
 		return {
-			shadowFilePath, serverProcess, port
+			serverProcess, port
 		};
 	};
 };
@@ -303,13 +356,31 @@ export function activate(context: vscode.ExtensionContext) {
 				vscode.window.showWarningMessage('No active editor');
 				return;
 			}
+			const bindDocument = activeEditor.document;
+			if (activingTask.has(bindDocument)) {
+				panelScrollTo({
+					kind,
+					context,
+					outputChannel,
+					activeEditor,
+					bindDocument,
+				});
+				return;
+			}
+
+			activingTask.add(bindDocument);
 	
-			launchPreview({
-				kind,
-				context,
-				outputChannel,
-				activeEditor,
-			});
+			try {
+				launchPreview({
+					kind,
+					context,
+					outputChannel,
+					activeEditor,
+					bindDocument,
+				});
+			} finally {
+				activingTask.delete(bindDocument);
+			}
 		};
 	};
 }
