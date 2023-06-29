@@ -88,6 +88,7 @@ function getProjectRoot(currentPath: string): string | null {
 
 const serverProcesses: Array<any> = [];
 const shadowFilePathMapping: Map<string, string> = new Map;
+const activePanels = new Map<vscode.TextDocument, vscode.WebviewPanel>();
 
 interface JumpInfo {
 	filepath: string,
@@ -155,17 +156,74 @@ function runServer(command: string, args: string[], outputChannel: vscode.Output
 	});
 }
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
-export function activate(context: vscode.ExtensionContext) {
+interface LaunchTask {
+	context: vscode.ExtensionContext,
+	outputChannel: vscode.OutputChannel,
+	activeEditor: vscode.TextEditor,
+}
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	const outputChannel = vscode.window.createOutputChannel('typst-preview');
-	const launchTypstWs = async (activeEditor: vscode.TextEditor, refreshStyle: string, frontendPath: null | string) => {
+interface LaunchInBrowserTask extends LaunchTask {
+	kind: 'browser',
+}
+
+interface LaunchInWebViewTask extends LaunchTask {
+	kind: 'webview',
+}
+
+const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) => {
+	const {
+		context,
+		outputChannel,
+		activeEditor,
+	} = task;
+	const bindDocument = activeEditor.document;
+
+	const refreshStyle = vscode.workspace.getConfiguration().get<string>('typst-preview.refresh') || "onSave";
+	const fontendPath = path.resolve(__dirname, "frontend");
+	const { shadowFilePath, serverProcess, port } = await launchTypstWs(task.kind === 'browser' ? fontendPath : null);
+
+	switch (task.kind) {
+	case 'browser': return /* launchPreviewInBrowser() */;
+	case 'webview': return launchPreviewInWebView();
+	}
+
+	async function launchPreviewInWebView() {
+		const basename = path.basename(activeEditor.document.fileName);
+		// Create and show a new WebView
+		const panel = vscode.window.createWebviewPanel(
+			'typst-ws-preview', // 标识符
+			`${basename}(Preview)`, // 面板标题
+			vscode.ViewColumn.Beside, // 显示在编辑器的哪一侧
+			{
+				enableScripts: true, // 启用 JS
+			}
+		);
+
+		panel.onDidDispose(async () => {
+			// todo: bindDocument.onDidDispose, but we did not find a similar way.
+			activePanels.delete(bindDocument);
+			// remove shadow file
+			if (refreshStyle === "onType") {
+				await vscode.workspace.fs.delete(vscode.Uri.file(shadowFilePath));
+				console.log('removed shadow file');
+			}
+			serverProcess.kill();
+			console.log('killed preview services');
+			panel.dispose();
+		});
+
+		// 将已经准备好的 HTML 设置为 Webview 内容
+		let html = await loadHTMLFile(context, "./frontend/index.html");
+		html = html.replace(
+			/\/typst-webview-assets/g,
+			`${panel.webview
+				.asWebviewUri(vscode.Uri.file(fontendPath))
+				.toString()}/typst-webview-assets`
+		);
+		panel.webview.html = html.replace("ws://127.0.0.1:23625", `ws://127.0.0.1:${port}`);
+	};
+
+	async function launchTypstWs (frontendPath: null | string) {
 		const filePath = activeEditor.document.uri.fsPath;
 		console.log('File path:', filePath);
 		// get file dir using path
@@ -215,60 +273,21 @@ export function activate(context: vscode.ExtensionContext) {
 			shadowFilePath, serverProcess, port
 		};
 	};
-	let webviewDisposable = vscode.commands.registerCommand('typst-preview.preview', async () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		const activeEditor = vscode.window.activeTextEditor;
-		const refreshStyle = vscode.workspace.getConfiguration().get<string>('typst-preview.refresh') || "onSave";
-		if (activeEditor) {
+};
 
-			const { shadowFilePath, serverProcess, port } = await launchTypstWs(activeEditor, refreshStyle, null);
-			const basename = path.basename(activeEditor.document.fileName);
-			// Create and show a new WebView
-			const panel = vscode.window.createWebviewPanel(
-				'typst-ws-preview', // 标识符
-				`${basename}(Preview)`, // 面板标题
-				vscode.ViewColumn.Beside, // 显示在编辑器的哪一侧
-				{
-					enableScripts: true, // 启用 JS
-				}
-			);
 
-			panel.onDidDispose(async () => {
-				// remove shadow file
-				if (refreshStyle === "onType") {
-					await vscode.workspace.fs.delete(vscode.Uri.file(shadowFilePath));
-					console.log('removed shadow file');
-				}
-				serverProcess.kill();
-				console.log('killed preview services');
-				panel.dispose();
-			});
+// This method is called when your extension is activated
+// Your extension is activated the very first time the command is executed
+export function activate(context: vscode.ExtensionContext) {
+	// Use the console to output diagnostic information (console.log) and errors (console.error)
+	// This line of code will only be executed once when your extension is activated
+	// The command has been defined in the package.json file
+	// Now provide the implementation of the command with registerCommand
+	// The commandId parameter must match the command field in package.json
+	const outputChannel = vscode.window.createOutputChannel('typst-preview');
 
-			// 将已经准备好的 HTML 设置为 Webview 内容
-			let html = await loadHTMLFile(context, "./frontend/index.html");
-			html = html.replace(
-				/\/typst-webview-assets/g,
-				`${panel.webview
-					.asWebviewUri(vscode.Uri.file(path.resolve(__dirname, "frontend")))
-					.toString()}/typst-webview-assets`
-			);
-			panel.webview.html = html.replace("ws://127.0.0.1:23625", `ws://127.0.0.1:${port}`);
-		} else {
-			vscode.window.showWarningMessage('No active editor');
-		}
-	});
-
-	let browserDisposable = vscode.commands.registerCommand('typst-preview.browser', async () => {
-		const activeEditor = vscode.window.activeTextEditor;
-		const refreshStyle = vscode.workspace.getConfiguration().get<string>('typst-preview.refresh') || "onSave";
-		if (activeEditor) {
-			const frontendPath = path.resolve(__dirname, "frontend");
-			const { shadowFilePath, serverProcess, port } = await launchTypstWs(activeEditor, refreshStyle, frontendPath);
-		} else {
-			vscode.window.showWarningMessage('No active editor');
-		}
-	});
+	let webviewDisposable = vscode.commands.registerCommand('typst-preview.preview', launchPrologue('webview'));
+	let browserDisposable = vscode.commands.registerCommand('typst-preview.browser', launchPrologue('browser'));
 
 	context.subscriptions.push(webviewDisposable, browserDisposable);
 	process.on('SIGINT', () => {
@@ -276,6 +295,23 @@ export function activate(context: vscode.ExtensionContext) {
 			serverProcess.kill();
 		}
 	});
+
+	function launchPrologue(kind: 'browser' | 'webview') {
+		return async () => {
+			const activeEditor = vscode.window.activeTextEditor;
+			if (!activeEditor) {
+				vscode.window.showWarningMessage('No active editor');
+				return;
+			}
+	
+			launchPreview({
+				kind,
+				context,
+				outputChannel,
+				activeEditor,
+			});
+		};
+	};
 }
 
 // This method is called when your extension is deactivated
