@@ -88,7 +88,7 @@ var getRelatedElements = function (event: any) {
 };
 
 function findAncestor(el: Element, cls: string) {
-  while ((el = el.parentElement!) && !el.classList.contains(cls));
+  while (!el.classList.contains(cls) && (el = el.parentElement!));
   return el;
 }
 
@@ -212,6 +212,10 @@ window.handleTypstLocation = function (
   y: number
 ) {
   const docRoot = findAncestor(elem, "typst-doc");
+  if (!docRoot) {
+    console.warn("no typst-doc found", elem);
+    return;
+  }
   const children = docRoot.children;
   let nthPage = 0;
   for (let i = 0; i < children.length; i++) {
