@@ -88,7 +88,6 @@ function getProjectRoot(currentPath: string): string | null {
 
 const serverProcesses: Array<any> = [];
 const shadowFilePathMapping: Map<string, string> = new Map;
-const activingTask = new Set<vscode.TextDocument>();
 const activeTask = new Map<vscode.TextDocument, TaskControlBlock>();
 
 interface JumpInfo {
@@ -179,11 +178,7 @@ interface TaskControlBlock {
 	addonΠserver: WebSocket;
 }
 
-const panelScrollTo = async (task: LaunchInBrowserTask | LaunchInWebViewTask) => {
-	const {
-		bindDocument,
-		activeEditor,
-	} = task;
+const panelScrollTo = async (bindDocument: vscode.TextDocument, activeEditor: vscode.TextEditor) => {
 	const tcb = activeTask.get(bindDocument);
 	if (tcb === undefined) {
 		return;
@@ -338,8 +333,14 @@ export function activate(context: vscode.ExtensionContext) {
 
 	let webviewDisposable = vscode.commands.registerCommand('typst-preview.preview', launchPrologue('webview'));
 	let browserDisposable = vscode.commands.registerCommand('typst-preview.browser', launchPrologue('browser'));
+	let syncDisposable = vscode.commands.registerCommand('typst-preview.sync', async () => {
+		const activeEditor = vscode.window.activeTextEditor;
+		if (activeEditor !== undefined) {
+			panelScrollTo(activeEditor.document, activeEditor);
+		}
+	});
 
-	context.subscriptions.push(webviewDisposable, browserDisposable);
+	context.subscriptions.push(webviewDisposable, browserDisposable, syncDisposable);
 	process.on('SIGINT', () => {
 		for (const serverProcess of serverProcesses) {
 			serverProcess.kill();
@@ -353,43 +354,14 @@ export function activate(context: vscode.ExtensionContext) {
 				vscode.window.showWarningMessage('No active editor');
 				return;
 			}
-			vscode.window.onDidChangeTextEditorSelection((e) => {
-				if (e.textEditor === activeEditor) {
-					console.log('selection changed, sending src2doc jump request');
-					panelScrollTo({
-						kind,
-						context,
-						outputChannel,
-						activeEditor,
-						bindDocument: activeEditor.document,
-					});
-				}
-			});
 			const bindDocument = activeEditor.document;
-			if (activingTask.has(bindDocument)) {
-				panelScrollTo({
-					kind,
-					context,
-					outputChannel,
-					activeEditor,
-					bindDocument,
-				});
-				return;
-			}
-
-			activingTask.add(bindDocument);
-
-			try {
-				launchPreview({
-					kind,
-					context,
-					outputChannel,
-					activeEditor,
-					bindDocument,
-				});
-			} finally {
-				activingTask.delete(bindDocument);
-			}
+			launchPreview({
+				kind,
+				context,
+				outputChannel,
+				activeEditor,
+				bindDocument,
+			});
 		};
 	};
 }

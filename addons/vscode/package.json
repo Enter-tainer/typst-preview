@@ -38,6 +38,11 @@
         "title": "Typst Preview: Preview current file in browser",
         "description": "Launch typst-ws server and open the preview in your browser",
         "icon": "$(open-preview)"
+      },
+      {
+        "command": "typst-preview.sync",
+        "title": "Typst Preview: Sync preview with current cursor",
+        "icon": "$(sync)"
       }
     ],
     "menus": {
