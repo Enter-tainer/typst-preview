@@ -232,9 +232,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 			activeTask.delete(bindDocument);
 		}
 		src2docHandlerDispose.dispose();
-		if (shadowDispose !== undefined) {
-			shadowDispose.dispose();
-		}
+		shadowDispose?.dispose();
 	});
 
 	switch (task.kind) {
@@ -350,9 +348,12 @@ export function activate(context: vscode.ExtensionContext) {
 	let browserDisposable = vscode.commands.registerCommand('typst-preview.browser', launchPrologue('browser'));
 	let syncDisposable = vscode.commands.registerCommand('typst-preview.sync', async () => {
 		const activeEditor = vscode.window.activeTextEditor;
-		if (activeEditor !== undefined) {
-			panelScrollTo(activeEditor.document, activeEditor);
+		if (!activeEditor) {
+			vscode.window.showWarningMessage('No active editor');
+			return;
 		}
+
+		panelScrollTo(activeEditor.document, activeEditor);
 	});
 
 	context.subscriptions.push(webviewDisposable, browserDisposable, syncDisposable);
@@ -391,6 +392,10 @@ export async function deactivate() {
 			console.error('Failed to remove shadow file: ' + shadowFilePath);
 			console.error(e);
 		}
+	}
+	console.log(activeTask);
+	for (const [_, task] of activeTask) {
+		task.panel?.dispose();
 	}
 	console.log('killing preview services');
 	for (const serverProcess of serverProcesses) {
