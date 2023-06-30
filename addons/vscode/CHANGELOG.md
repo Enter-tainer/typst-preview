@@ -62,3 +62,12 @@ Add preview button
 ## v0.5.0
 
 - Upgrade to typst v0.5.0
+
+## v0.5.1
+
+- Performance improvement(#14): We now use typst.ts. We utilize a  [virtual DOM](https://en.wikipedia.org/wiki/Virtual_DOM) approach to diff and render the document. This is a **significant enhancement** of previewing document in `onType` mode in terms of resource savings and response time for changes.
+- Cross jump between code and preview (#36): We implement SyncTeX-like feature for typst-preview. You can now click on the preview panel to jump to the corresponding code location, and vice versa. This feature is still experimental and may not work well in some cases. Please report any issues you encounter. 
+- Sync preview position with cursor: We now automatically scroll the preview panel to the corresponding position of the cursor. This feature is controlled by `typst-preview.scrollSync`
+- Open preview in separate window(#39): You can type `typst-preview.browser` in command palette to open the preview page in a separate browser.
+- Links in preview panel: You can now click on links in the preview panel to open them in browser. The cross reference links are also clickable.
+- Text selection in preview panel: You can now select text in the preview panel.

@@ -15,8 +15,18 @@ pub struct CliArguments {
     pub root: Option<PathBuf>,
 
     /// Configure the websocket path
-    #[clap(long = "host")]
-    pub host: Option<String>,
+    #[clap(long = "data-plane-host")]
+    pub data_plane_host: Option<String>,
+
+    /// Configure the websocket path
+    #[clap(long = "control-plane-host")]
+    pub control_plane_host: Option<String>,
+
+    #[clap(long = "static-file-host")]
+    pub static_file_host: Option<String>,
+
+    #[clap(long = "static-file-path")]
+    pub static_file_path: Option<String>,
 
     /// The typst command to run
     #[command(subcommand)]

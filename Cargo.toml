@@ -1,6 +1,6 @@
 [package]
 name = "typst-ws"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["The Typst Project Developers"]
 edition = "2021"
 
@@ -13,8 +13,12 @@ bench = false
 doc = false
 
 [dependencies]
-typst = { git = "https://github.com/typst/typst.git", tag = "v0.5.0"}
-typst-library = { git = "https://github.com/typst/typst.git", tag = "v0.5.0" }
+typst = "0.5.0"
+typst-library = "0.5.0"
+typst-ts-svg-exporter = "0.2"
+typst-ts-core = "0.2"
+typst-ts-compiler = "0.2"
+
 chrono = { version = "0.4", default-features = false, features = [
   "clock",
   "std",
@@ -30,8 +34,8 @@ same-file = "1"
 siphasher = "0.3"
 walkdir = "2"
 clap = { version = "4.2.1", features = ["derive"] }
-open = "4.0.1"
-tokio = {version = "1.27.0", features = ["full"]}
+open = "5.0.0"
+tokio = { version = "1.27.0", features = ["full"] }
 tokio-tungstenite = "0.19.0"
 tiny-skia = "0.9.0"
 env_logger = "0.10.0"
@@ -39,6 +43,19 @@ log = "0.4.17"
 serde_json = "1.0.95"
 futures = "0.3.28"
 serde = "1.0.159"
+actix-web = { version = "4.3.1", features = [] }
+actix-files = { version = "0.6.2", features = [] }
+
+[patch.crates-io]
+typst = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.ts" }
+typst-library = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.ts" }
+typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts", tag = "v0.2.3", package = "typst-ts-svg-exporter" }
+typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts", tag = "v0.2.3", package = "typst-ts-core" }
+typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts", tag = "v0.2.3", package = "typst-ts-compiler" }
+
+# typst-ts-svg-exporter = { path = "../../rust/typst.ts/exporter/svg" }
+# typst-ts-compiler = { path = "../../rust/typst.ts/compiler" }
+# typst-ts-core = { path = "../../rust/typst.ts/core" }
 
 [build-dependencies]
 clap = { version = "4.2.1", features = ["derive", "string"] }

@@ -8,7 +8,7 @@
     "type": "git",
     "url": "https://github.com/Enter-tainer/typst-preview-vscode"
   },
-  "version": "0.5.0",
+  "version": "0.5.1",
   "engines": {
     "vscode": "^1.77.0"
   },
@@ -32,6 +32,17 @@
         "title": "Typst Preview: Preview current file",
         "description": "Launch typst-ws server",
         "icon": "$(open-preview)"
+      },
+      {
+        "command": "typst-preview.browser",
+        "title": "Typst Preview: Preview current file in browser",
+        "description": "Launch typst-ws server and open the preview in your browser",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "typst-preview.sync",
+        "title": "Typst Preview: Sync preview with current cursor",
+        "icon": "$(sync)"
       }
     ],
     "menus": {
@@ -51,7 +62,7 @@
           "default": "",
           "description": "Path to typst-ws executable. If not set, the extension will use bundled typst-ws. If bundled binary is not found, it will use typst-ws installed in PATH"
         },
-        "typst-preview.font-paths": {
+        "typst-preview.fontPaths": {
           "type": "array",
           "items": {
             "type": "string",
@@ -74,13 +85,26 @@
             "Refresh preview on save",
             "Refresh preview on type"
           ]
+        },
+        "typst-preview.scrollSync": {
+          "description": "Configure scroll sync mode.",
+          "type": "string",
+          "enum": [
+            "never",
+            "onSelectionChange"
+          ],
+          "default": "onSelectionChange",
+          "enumDescriptions": [
+            "Scroll preview to current cursor position when selection changes"
+          ]
         }
       }
     }
   },
   "scripts": {
+    "build:frontend": "cd ../frontend && yarn run build && cd ../vscode && rimraf ./out/frontend/ && cpr ../frontend/dist/ ./out/frontend/",
     "vscode:prepublish": "yarn run compile",
-    "compile": "tsc -p ./",
+    "compile": "tsc -p ./ && yarn run build:frontend",
     "watch": "tsc -watch -p ./",
     "pretest": "yarn run compile && yarn run lint",
     "package": "vsce package",
@@ -93,6 +117,7 @@
     "@types/mocha": "^10.0.1",
     "@types/node": "16.x",
     "@types/vscode": "^1.77.0",
+    "@types/ws": "^8.5.5",
     "@typescript-eslint/eslint-plugin": "^5.56.0",
     "@typescript-eslint/parser": "^5.56.0",
     "@vscode/test-electron": "^2.3.0",
@@ -100,9 +125,12 @@
     "eslint": "^8.36.0",
     "glob": "^8.1.0",
     "mocha": "^10.2.0",
-    "typescript": "^4.9.5"
+    "rimraf": "^5.0.1",
+    "typescript": "^5.0.2"
   },
   "dependencies": {
-    "cross-spawn": "^7.0.3"
+    "cpr": "^3.0.1",
+    "cross-spawn": "^7.0.3",
+    "ws": "^8.13.0"
   }
 }

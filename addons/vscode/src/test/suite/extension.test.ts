@@ -57,7 +57,7 @@ suite('Extension Test Suite', () => {
     /// check that default font paths should be []
     jsonIs(assert.strictEqual)(
       [],
-      vscode.workspace.getConfiguration().get<string[]>("typst-preview.font-paths")
+      vscode.workspace.getConfiguration().get<string[]>("typst-preview.fontPaths")
     );
 
     jsonIs(assert.strictEqual)(
