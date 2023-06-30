@@ -222,6 +222,15 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		}
 	});
 
+	const src2docHandler = (e: vscode.TextEditorSelectionChangeEvent) => {
+		if (e.textEditor === activeEditor) {
+			console.log('selection changed, sending src2doc jump request');
+			panelScrollTo(bindDocument, activeEditor);
+		}
+	};
+	
+	const src2docHandlerDispose = vscode.window.onDidChangeTextEditorSelection(src2docHandler);
+
 	switch (task.kind) {
 		case 'browser': return launchPreviewInBrowser();
 		case 'webview': return launchPreviewInWebView();
@@ -257,6 +266,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 			serverProcess.kill();
 			console.log('killed preview services');
 			panel.dispose();
+			src2docHandlerDispose.dispose();
 		});
 
 		// 将已经准备好的 HTML 设置为 Webview 内容
