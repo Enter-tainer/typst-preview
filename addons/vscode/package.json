@@ -62,7 +62,7 @@
           "default": "",
           "description": "Path to typst-ws executable. If not set, the extension will use bundled typst-ws. If bundled binary is not found, it will use typst-ws installed in PATH"
         },
-        "typst-preview.font-paths": {
+        "typst-preview.fontPaths": {
           "type": "array",
           "items": {
             "type": "string",

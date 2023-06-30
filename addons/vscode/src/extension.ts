@@ -72,7 +72,7 @@ export function getTypstWsFontArgs(fontPaths?: string[]): string[] {
 
 export function codeGetTypstWsFontArgs(): string[] {
 	return getTypstWsFontArgs(vscode.workspace.getConfiguration().get<string[]>(
-		'typst-preview.font-paths'));
+		'typst-preview.fontPaths'));
 }
 
 function getProjectRoot(currentPath: string): string | null {
