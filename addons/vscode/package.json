@@ -85,6 +85,18 @@
             "Refresh preview on save",
             "Refresh preview on type"
           ]
+        },
+        "typst-preview.scrollSync": {
+          "description": "Configure scroll sync mode.",
+          "type": "string",
+          "enum": [
+            "never",
+            "onSelectionChange"
+          ],
+          "default": "onSelectionChange",
+          "enumDescriptions": [
+            "Scroll preview to current cursor position when selection changes"
+          ]
         }
       }
     }
