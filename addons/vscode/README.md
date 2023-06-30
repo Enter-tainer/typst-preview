@@ -1,6 +1,12 @@
 # [Typst Preview VSCode](https://github.com/Enter-tainer/typst-preview-vscode)
 
-Preview your Typst files in vscode instantly
+Preview your Typst files in vscode instantly!
+
+## Features
+
+- Instant preview on type, powered by VDOM based incremental rendering technique.
+- Cross jump between code and preview like SyncTeX.
+- Open preview in separate browser window.
 
 Install this extension from [marketplace](https://marketplace.visualstudio.com/items?itemName=mgt19937.typst-preview), open command palette (Ctrl+Shift+P), and type `>Typst Preview:`.
 
@@ -14,13 +20,7 @@ TODO
 ## Known Issues
 
 - Ctrl+wheel is kind of strange
-- Render output might be kind of blurry
 
-## Acknowledgements
-
-Big thanks to @zzh1996 for graciously granting me access to the GPT-4 API. Thanks to his generosity, I was able to complete this extension in such a short time.
-
-(Yes, the javascript part is mostly done by GPT)
 ## Release Notes
 
 ### 0.1.0
@@ -80,3 +80,12 @@ Add preview button
 ### v0.5.0
 
 - Upgrade to typst v0.5.0
+
+### v0.5.1
+
+- Performance improvement(#14): We now use typst.ts. We utilize a  [virtual DOM](https://en.wikipedia.org/wiki/Virtual_DOM) approach to diff and render the document. This is a **significant enhancement** of previewing document in `onType` mode in terms of resource savings and response time for changes.
+- Cross jump between code and preview (#36): We implement SyncTeX-like feature for typst-preview. You can now click on the preview panel to jump to the corresponding code location, and vice versa. This feature is still experimental and may not work well in some cases. Please report any issues you encounter. 
+- Sync preview position with cursor: We now automatically scroll the preview panel to the corresponding position of the cursor. This feature is controlled by `typst-preview.scrollSync`
+- Open preview in separate window(#39): You can type `typst-preview.browser` in command palette to open the preview page in a separate browser.
+- Links in preview panel: You can now click on links in the preview panel to open them in browser. The cross reference links are also clickable.
+- Text selection in preview panel: You can now select text in the preview panel.
