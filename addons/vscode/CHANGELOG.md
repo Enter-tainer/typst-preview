@@ -69,4 +69,5 @@ Add preview button
 - Cross jump between code and preview (#36): We implement SyncTeX-like feature for typst-preview. You can now click on the preview panel to jump to the corresponding code location, and vice versa. This feature is still experimental and may not work well in some cases. Please report any issues you encounter. 
 - Sync preview position with cursor: We now automatically scroll the preview panel to the corresponding position of the cursor. This feature is controlled by `typst-preview.scrollSync`
 - Open preview in separate window(#39): You can type `typst-preview.browser` in command palette to open the preview in a separate window.
-- Text selection in preview panel: You can now select text in the preview panel. The links in the preview panel are now clickable too.
+- Links in preview panel: You can now click on links in the preview panel to open them in browser. The cross reference links are also clickable.
+- Text selection in preview panel: You can now select text in the preview panel.
