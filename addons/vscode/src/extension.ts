@@ -66,8 +66,7 @@ export async function getTypstWsPath(): Promise<string> {
 }
 
 export function getTypstWsFontArgs(fontPaths?: string[]): string[] {
-	return (!fontPaths) ? [] : fontPaths.map(
-		(fontPath) => ["--font-path", fontPath]).flat();
+	return (fontPaths ?? []).flatMap((fontPath) => ["--font-path", fontPath]);
 }
 
 export function codeGetTypstWsFontArgs(): string[] {
