@@ -72,7 +72,7 @@ svg {
 }
 
 .typst-jump-ripple {
-  border: 1px solid #66bab7;
+  border: 2px solid #66bab7;
 }
 
 .typst-debug-react-ripple {
@@ -92,7 +92,7 @@ svg {
   to {
     width: 3vw;
     height: 3vw;
-    opacity: 0.01;
+    opacity: 0.1;
     margin: -1.5vw;
   }
 }
