@@ -7,6 +7,8 @@ import { readFile } from 'fs/promises';
 import * as path from 'path';
 import { WebSocket } from 'ws';
 
+type ScrollSyncMode = "never" | "onSelectionChange";
+
 async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: string) {
 	const filePath = path.resolve(__dirname, relativePath);
 	const fileContents = await readFile(filePath, 'utf8');
@@ -206,6 +208,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 	const filename = path.basename(filePath);
 
 	const refreshStyle = vscode.workspace.getConfiguration().get<string>('typst-preview.refresh') || "onSave";
+	const scrollSyncMode = vscode.workspace.getConfiguration().get<ScrollSyncMode>('typst-preview.scrollSync') || "never";
 	const fontendPath = path.resolve(__dirname, "frontend");
 	const { shadowFilePath } = await watchEditorFiles();
 	const { serverProcess, port } = await launchTypstWs(task.kind === 'browser' ? fontendPath : null);
@@ -224,14 +227,17 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		}
 	};
 	
-	const src2docHandlerDispose = vscode.window.onDidChangeTextEditorSelection(src2docHandler);
+	const src2docHandlerDispose =
+    scrollSyncMode === "onSelectionChange"
+      ? vscode.window.onDidChangeTextEditorSelection(src2docHandler)
+      : undefined;
 
 	serverProcess.on('exit', (code: any) => {
 		addonΠserver.close();
 		if (activeTask.has(bindDocument)) {
 			activeTask.delete(bindDocument);
 		}
-		src2docHandlerDispose.dispose();
+		src2docHandlerDispose?.dispose();
 		shadowDispose?.dispose();
 	});
 
