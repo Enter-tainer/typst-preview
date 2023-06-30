@@ -201,6 +201,23 @@ const panelScrollTo = async (bindDocument: vscode.TextDocument, activeEditor: vs
 	addonΠserver.send(JSON.stringify(scrollRequest));
 };
 
+const debounce = <T extends (...args: any[]) => any>(func: T, wait: number) => {
+	let timeout: NodeJS.Timeout;
+	return (...args: Parameters<T>): Promise<ReturnType<T>> => {
+		return new Promise((resolve, reject) => {
+			clearTimeout(timeout);
+			timeout = setTimeout(() => {
+				try {
+					resolve(func(...args));
+				} catch (e) {
+					reject(e);
+				}
+			}, wait);
+		});
+	};
+};
+
+
 const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) => {
 	let shadowDispose: vscode.Disposable | undefined = undefined;
 	const {
@@ -236,7 +253,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 	
 	const src2docHandlerDispose =
     scrollSyncMode === "onSelectionChange"
-      ? vscode.window.onDidChangeTextEditorSelection(src2docHandler)
+			? vscode.window.onDidChangeTextEditorSelection(debounce(src2docHandler, 500))
       : undefined;
 
 	serverProcess.on('exit', (code: any) => {
