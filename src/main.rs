@@ -556,10 +556,12 @@ fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) ->
                 if glyph.span.0 == span {
                     return Some(pos);
                 }
-                let dis = glyph.span.0.number().abs_diff(span.number());
-                if dis < *min_dis {
-                    *min_dis = dis;
-                    *p = pos;
+                if glyph.span.0.source() == span.source() {
+                    let dis = glyph.span.0.number().abs_diff(span.number());
+                    if dis < *min_dis {
+                        *min_dis = dis;
+                        *p = pos;
+                    }
                 }
                 pos.x += glyph.x_advance.at(text.size);
             }
