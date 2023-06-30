@@ -90,6 +90,7 @@ function getProjectRoot(currentPath: string): string | null {
 
 const serverProcesses: Array<any> = [];
 const shadowFilePathMapping: Map<string, string> = new Map;
+const shadowFilePathRevMapping: Map<string, string> = new Map;
 const activeTask = new Map<vscode.TextDocument, TaskControlBlock>();
 
 interface JumpInfo {
@@ -186,12 +187,18 @@ const panelScrollTo = async (bindDocument: vscode.TextDocument, activeEditor: vs
 		return;
 	}
 	const { addonΠserver } = tcb;
-	addonΠserver.send(JSON.stringify({
+	const scrollRequest = {
 		'event': 'panelScrollTo',
 		'filepath': bindDocument.uri.fsPath,
 		'line': activeEditor.selection.active.line,
 		'character': activeEditor.selection.active.character,
-	}));
+	};
+	console.log(Array.from(shadowFilePathRevMapping.keys()), scrollRequest);
+	const actualPath = shadowFilePathRevMapping.get(scrollRequest.filepath);
+	if (actualPath !== undefined) {
+		scrollRequest.filepath = actualPath;
+	}
+	addonΠserver.send(JSON.stringify(scrollRequest));
 };
 
 const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) => {
@@ -313,6 +320,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 				}
 			});
 			shadowFilePathMapping.set(shadowFilePath, filePath);
+			shadowFilePathRevMapping.set(filePath, shadowFilePath);
 		}
 		return { shadowFilePath };
 	};
