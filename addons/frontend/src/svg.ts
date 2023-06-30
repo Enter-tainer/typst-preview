@@ -88,7 +88,9 @@ var getRelatedElements = function (event: any) {
 };
 
 function findAncestor(el: Element, cls: string) {
-  while (!el.classList.contains(cls) && (el = el.parentElement!));
+  while (el && !el.classList.contains(cls)) {
+    el = el.parentElement!;
+  }
   return el;
 }
 
