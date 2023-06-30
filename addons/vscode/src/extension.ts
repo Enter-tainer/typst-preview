@@ -193,6 +193,7 @@ const panelScrollTo = async (bindDocument: vscode.TextDocument, activeEditor: vs
 };
 
 const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) => {
+	let shadowDispose: vscode.Disposable | undefined = undefined;
 	const {
 		context,
 		outputChannel,
@@ -215,12 +216,6 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		console.log("recv jump data", data);
 		await processJumpInfo(activeEditor, data);
 	});
-	serverProcess.on('exit', (code: any) => {
-		addonΠserver.close();
-		if (activeTask.has(bindDocument)) {
-			activeTask.delete(bindDocument);
-		}
-	});
 
 	const src2docHandler = (e: vscode.TextEditorSelectionChangeEvent) => {
 		if (e.textEditor === activeEditor) {
@@ -230,6 +225,17 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 	};
 	
 	const src2docHandlerDispose = vscode.window.onDidChangeTextEditorSelection(src2docHandler);
+
+	serverProcess.on('exit', (code: any) => {
+		addonΠserver.close();
+		if (activeTask.has(bindDocument)) {
+			activeTask.delete(bindDocument);
+		}
+		src2docHandlerDispose.dispose();
+		if (shadowDispose !== undefined) {
+			shadowDispose.dispose();
+		}
+	});
 
 	switch (task.kind) {
 		case 'browser': return launchPreviewInBrowser();
@@ -266,7 +272,6 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 			serverProcess.kill();
 			console.log('killed preview services');
 			panel.dispose();
-			src2docHandlerDispose.dispose();
 		});
 
 		// 将已经准备好的 HTML 设置为 Webview 内容
@@ -298,7 +303,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 					await vscode.workspace.fs.writeFile(vscode.Uri.file(shadowFilePath), Buffer.from(fileContent));
 				}
 			};
-			vscode.workspace.onDidChangeTextDocument(async (e) => {
+			shadowDispose = vscode.workspace.onDidChangeTextDocument(async (e) => {
 				if (e.document === activeEditor?.document) {
 					await update();
 				}
