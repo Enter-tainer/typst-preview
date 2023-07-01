@@ -10,18 +10,18 @@ import { WebSocket } from 'ws';
 type ScrollSyncMode = "never" | "onSelectionChange";
 
 async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: string) {
-	const filePath = path.resolve(__dirname, relativePath);
+	const filePath = path.resolve(context.extensionPath, relativePath);
 	const fileContents = await readFile(filePath, 'utf8');
 	return fileContents;
 }
 
-export async function getTypstWsPath(): Promise<string> {
+export async function getTypstWsPath(context: vscode.ExtensionContext): Promise<string> {
 	const state = getTypstWsPath as unknown as any;
 	(!state.BINARY_NAME) && (state.BINARY_NAME = "typst-ws");
 	(!state.getConfig) && (state.getConfig = (
 		() => vscode.workspace.getConfiguration().get<string>('typst-preview.executable')));
 
-	const bundledPath = path.resolve(__dirname, state.BINARY_NAME);
+	const bundledPath = path.resolve(context.extensionPath, state.BINARY_NAME);
 	const configPath = state.getConfig();
 
 	if (state.bundledPath === bundledPath && state.configPath === configPath) {
@@ -232,7 +232,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 
 	const refreshStyle = vscode.workspace.getConfiguration().get<string>('typst-preview.refresh') || "onSave";
 	const scrollSyncMode = vscode.workspace.getConfiguration().get<ScrollSyncMode>('typst-preview.scrollSync') || "never";
-	const fontendPath = path.resolve(__dirname, "frontend");
+	const fontendPath = path.resolve(context.extensionPath, "frontend");
 	const { shadowFilePath } = await watchEditorFiles();
 	const { serverProcess, port } = await launchTypstWs(task.kind === 'browser' ? fontendPath : null);
 
@@ -343,7 +343,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 
 	async function launchTypstWs(frontendPath: null | string) {
 		const filePathToWatch = refreshStyle === "onSave" ? filePath : shadowFilePath;
-		const serverPath = await getTypstWsPath();
+		const serverPath = await getTypstWsPath(context);
 		console.log(`Watching ${filePathToWatch} for changes`);
 		const projectRoot = getProjectRoot(filePath);
 		const rootArgs = projectRoot ? ["--root", projectRoot] : [];
