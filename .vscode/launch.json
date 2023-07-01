@@ -3,19 +3,17 @@
 // Hover to view descriptions of existing attributes.
 // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
 {
-	"version": "0.2.0",
-	"configurations": [
-		{
-			"name": "Run Extension",
-			"type": "extensionHost",
-			"request": "launch",
-			"args": [
-				"--extensionDevelopmentPath=${workspaceFolder}/addons/vscode"
-			],
-			"outFiles": [
-				"${workspaceFolder}/addons/vscode/out/**/*.js"
-			],
-			"preLaunchTask": "VS Code Extension Prelaunch"
-		}
-	]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/addons/vscode/out"
+      ],
+      "outFiles": ["${workspaceFolder}/addons/vscode/out/**/*.js"],
+      "preLaunchTask": "VS Code Extension Prelaunch"
+    }
+  ]
 }
