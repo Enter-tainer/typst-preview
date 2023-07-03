@@ -83,7 +83,12 @@ jobs:
           mkdir -p addons/vscode/out
           cp "target/${{ matrix.rust-target }}/release/typst-ws$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "addons/vscode/out/"
           cp "target/${{ matrix.rust-target }}/release/typst-ws$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "typst-ws-${{ env.target }}$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )"
-      - shell: pwsh
+      - name: Prepublish
+        shell: pwsh
+        run: yarn run vscode-prepublish
+        working-directory: ./addons/vscode
+      - name: Packing
+        shell: pwsh
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
         working-directory: ./addons/vscode
       - uses: actions/upload-artifact@v2
