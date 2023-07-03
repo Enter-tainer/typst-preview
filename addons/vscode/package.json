@@ -16,7 +16,7 @@
     "Other"
   ],
   "activationEvents": [],
-  "main": "./out/extension.js",
+  "main": "extension.js",
   "languages": [
     {
       "id": "typst",
@@ -104,10 +104,10 @@
   "scripts": {
     "build:frontend": "cd ../frontend && yarn run build && cd ../vscode && rimraf ./out/frontend/ && cpr ../frontend/dist/ ./out/frontend/",
     "vscode:prepublish": "yarn run compile",
-    "compile": "tsc -p ./ && yarn run build:frontend",
+    "compile": "tsc -p ./ && cpr package.json ./out/package.json && yarn run build:frontend",
     "watch": "tsc -watch -p ./",
     "pretest": "yarn run compile && yarn run lint",
-    "package": "vsce package",
+    "package": "cd out && vsce package",
     "lint": "eslint src --ext ts",
     "test": "node ./out/test/runTest.js"
   },
