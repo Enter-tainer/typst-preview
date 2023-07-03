@@ -9,9 +9,7 @@
       "name": "Run Extension",
       "type": "extensionHost",
       "request": "launch",
-      "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}/addons/vscode/out"
-      ],
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}/addons/vscode"],
       "outFiles": ["${workspaceFolder}/addons/vscode/out/**/*.js"],
       "preLaunchTask": "VS Code Extension Prelaunch"
     }

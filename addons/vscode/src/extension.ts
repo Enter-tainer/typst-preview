@@ -21,7 +21,7 @@ export async function getTypstWsPath(extensionPath?: string): Promise<string> {
 	(!state.getConfig) && (state.getConfig = (
 		() => vscode.workspace.getConfiguration().get<string>('typst-preview.executable')));
 
-	const bundledPath = path.resolve(extensionPath || __dirname, state.BINARY_NAME);
+	const bundledPath = path.resolve(extensionPath || path.join(__dirname, ".."), "out", state.BINARY_NAME);
 	const configPath = state.getConfig();
 
 	if (state.bundledPath === bundledPath && state.configPath === configPath) {
@@ -232,7 +232,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 
 	const refreshStyle = vscode.workspace.getConfiguration().get<string>('typst-preview.refresh') || "onSave";
 	const scrollSyncMode = vscode.workspace.getConfiguration().get<ScrollSyncMode>('typst-preview.scrollSync') || "never";
-	const fontendPath = path.resolve(context.extensionPath, "frontend");
+	const fontendPath = path.resolve(context.extensionPath, "out/frontend");
 	const { shadowFilePath } = await watchEditorFiles();
 	const { serverProcess, port } = await launchTypstWs(task.kind === 'browser' ? fontendPath : null);
 
@@ -302,7 +302,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		});
 
 		// 将已经准备好的 HTML 设置为 Webview 内容
-		let html = await loadHTMLFile(context, "./frontend/index.html");
+		let html = await loadHTMLFile(context, "./out/frontend/index.html");
 		html = html.replace(
 			/\/typst-webview-assets/g,
 			`${panel.webview
