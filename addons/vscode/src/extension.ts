@@ -245,8 +245,12 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 
 	const src2docHandler = (e: vscode.TextEditorSelectionChangeEvent) => {
 		if (e.textEditor === activeEditor) {
-			console.log('selection changed, sending src2doc jump request');
-			panelScrollTo(bindDocument, activeEditor);
+			const kind = e.kind;
+			console.log(`selection changed, kind: ${kind && vscode.TextEditorSelectionChangeKind[kind]}`);
+			if (kind === vscode.TextEditorSelectionChangeKind.Mouse || kind === vscode.TextEditorSelectionChangeKind.Keyboard) {
+				console.log(`selection changed, sending src2doc jump request`);
+				panelScrollTo(bindDocument, activeEditor);
+			}
 		}
 	};
 	
