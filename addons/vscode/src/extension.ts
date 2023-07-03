@@ -21,7 +21,7 @@ export async function getTypstWsPath(extensionPath?: string): Promise<string> {
 	(!state.getConfig) && (state.getConfig = (
 		() => vscode.workspace.getConfiguration().get<string>('typst-preview.executable')));
 
-	const bundledPath = path.resolve(extensionPath || __dirname, state.BINARY_NAME);
+	const bundledPath = path.resolve(extensionPath || path.join(__dirname, ".."), "out", state.BINARY_NAME);
 	const configPath = state.getConfig();
 
 	if (state.bundledPath === bundledPath && state.configPath === configPath) {
