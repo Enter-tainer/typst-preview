@@ -30,13 +30,22 @@ class MockElement {
 const injectOffsets = (kind: string, elems: MockElement[]): MockElement[] => {
   for (let i = 0; i < elems.length; i++) {
     elems[i].attrs["data-kind"] = kind;
+    if (elems[i].attrs["data-tid"]) {
+      continue;
+    }
     elems[i].attrs["data-tid"] = i.toString();
   }
 
   return elems;
 };
 
-const repeat = (n: number): MockElement[] => {
+const repeatOrJust = (n: number | number[]): MockElement[] => {
+  if (Array.isArray(n)) {
+    return n.map((i) => new MockElement({
+      "data-tid": i.toString(),
+    }));
+  }
+
   const res: MockElement[] = [];
   for (let i = 0; i < n; i++) {
     res.push(new MockElement({}));
@@ -70,14 +79,14 @@ function toSnapshot([targetView, patchPair]: [
   return [...instructions, ...patches];
 }
 
-const indexTargetView = (init: number, rearrange: (number | null)[]) =>
+const indexTargetView = (init: number | number[], rearrange: (number | null)[]) =>
   interpretTargetView<MockElement>(
-    injectOffsets("o", repeat(init)),
+    injectOffsets("o", repeatOrJust(init)),
     injectOffsets("t", rearrange.map(reuseStub))
   );
-const indexOriginView = (init: number, rearrange: (number | null)[]) =>
+const indexOriginView = (init: number | number[], rearrange: (number | null)[]) =>
   changeViewPerspective<MockElement>(
-    injectOffsets("o", repeat(init)),
+    injectOffsets("o", repeatOrJust(init)),
     indexTargetView(init, rearrange)[0]
   );
 
@@ -212,6 +221,61 @@ describe("interpretView", () => {
         "insert,2,t2",
         "insert,4,t4",
         "insert,6,t6",
+      ]
+    `);
+  });
+
+  it("handleReusePreseveOrder", () => {
+    const result = indexTargetView([0, 1, 2, 1, 2], [1, 2, 1, 2]);
+    expect(toSnapshot(result)).toMatchInlineSnapshot(`
+      [
+        "reuse,3",
+        "reuse,4",
+        "reuse,1",
+        "reuse,2",
+        "remove,0",
+        "o1->t0,o2->t1,o1->t2,o2->t3",
+      ]
+    `);
+  });
+  it("handleReusePreseveOrder_origin", () => {
+    const result = indexOriginView([0, 1, 2, 1, 2], [1, 2, 1, 2]);
+    expect(toSnapshot([result, []])).toMatchInlineSnapshot(`
+      [
+        "remove,0",
+        "swap_in,0,2",
+        "swap_in,1,3",
+      ]
+    `);
+  });
+  it("handleReusePreseveOrder2", () => {
+    const result = indexTargetView([0, 1, 2, 1, 2, 3, 4, 3, 4], [1, 2, 3, 4, 3, 4, 1, 2]);
+    expect(toSnapshot(result)).toMatchInlineSnapshot(`
+      [
+        "reuse,3",
+        "reuse,4",
+        "reuse,7",
+        "reuse,8",
+        "reuse,5",
+        "reuse,6",
+        "reuse,1",
+        "reuse,2",
+        "remove,0",
+        "o1->t0,o2->t1,o3->t2,o4->t3,o3->t4,o4->t5,o1->t6,o2->t7",
+      ]
+    `);
+  });
+  it("handleReusePreseveOrder2_origin", () => {
+    const result = indexOriginView([0, 1, 2, 1, 2, 3, 4, 3, 4], [1, 2, 3, 4, 3, 4, 1, 2]);
+    expect(toSnapshot([result, []])).toMatchInlineSnapshot(`
+      [
+        "remove,0",
+        "swap_in,0,2",
+        "swap_in,1,3",
+        "swap_in,2,6",
+        "swap_in,3,7",
+        "swap_in,4,6",
+        "swap_in,5,7",
       ]
     `);
   });
