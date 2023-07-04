@@ -1,10 +1,12 @@
 import { patchRoot } from "./svg-patch";
+import { removeSourceMappingHandler } from "./svg-debug-info";
 
 export class SvgDocument {
   currentScale: number;
   imageContainerWidth: number;
   patchQueue: [string, string][];
   svgUpdating: boolean;
+  holdingSrcElement: HTMLDivElement | undefined;
 
   constructor(private hookedElem: HTMLElement) {
     this.currentScale = 1;
@@ -80,19 +82,22 @@ export class SvgDocument {
     this.rescale();
   }
 
+  private grabSourceMappingElement(svgElement: HTMLElement) {
+    let srcElement = (svgElement.lastElementChild || undefined) as
+      | HTMLDivElement
+      | undefined;
+    if (!srcElement || !srcElement.classList.contains("typst-source-mapping")) {
+      srcElement = undefined;
+    }
+    this.holdingSrcElement = srcElement;
+  }
+
   private postprocessChanges() {
     const docRoot = this.hookedElem.firstElementChild as SVGElement;
     if (docRoot) {
-      let srcElement = (this.hookedElem.lastElementChild || undefined) as
-        | HTMLDivElement
-        | undefined;
-      if (
-        !srcElement ||
-        !srcElement.classList.contains("typst-source-mapping")
-      ) {
-        srcElement = undefined;
-      }
-      window.initTypstSvg(docRoot, srcElement);
+      console.log("holdingSrcElement", this.holdingSrcElement);
+      window.initTypstSvg(docRoot, this.holdingSrcElement);
+      this.holdingSrcElement = undefined;
 
       this.initScale();
     }
@@ -108,14 +113,24 @@ export class SvgDocument {
         this.hookedElem.innerHTML = svgUpdateEvent[1];
         t1 = t2 = performance.now();
 
+        this.grabSourceMappingElement(this.hookedElem);
+
         t3 = performance.now();
         break;
       case "diff-v0":
+        /// although there is still a race condition, we try to avoid it
+        if (this.hookedElem.firstElementChild) {
+          removeSourceMappingHandler(
+            this.hookedElem.firstElementChild as SVGElement
+          );
+        }
+
         const elem = document.createElement("div");
         elem.innerHTML = svgUpdateEvent[1];
         const svgElement = elem.firstElementChild as SVGElement;
         t1 = performance.now();
         patchRoot(this.hookedElem.firstElementChild as SVGElement, svgElement);
+        this.grabSourceMappingElement(elem);
         t2 = performance.now();
 
         t3 = performance.now();

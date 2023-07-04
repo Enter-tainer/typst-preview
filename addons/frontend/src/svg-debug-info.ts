@@ -83,6 +83,14 @@ function castChildrenToSourceMappingElement(
     .filter((x) => x) as [string, Element][];
 }
 
+export function removeSourceMappingHandler(docRoot: SVGElement) {
+  const prevSourceMappingHandler = (docRoot as any).sourceMappingHandler;
+  if (prevSourceMappingHandler) {
+    docRoot.removeEventListener("click", prevSourceMappingHandler);
+    console.log("remove removeSourceMappingHandler");
+  }
+}
+
 export function initSourceMapping(
   docRoot: SVGElement,
   dataPages: SourceMappingNode[],
@@ -187,18 +195,11 @@ export function initSourceMapping(
         return dataSourceMapping[x];
       });
 
-      // console.log(
-      //   ty,
-      //   locInfo,
-      //   parentElements
-      // );
+      // console.log(ty, locInfo, parentElements);
     }
   };
 
-  const prevSourceMappingHandler = (docRoot as any).sourceMappingHandler;
-  if (prevSourceMappingHandler) {
-    docRoot.removeEventListener("click", prevSourceMappingHandler);
-  }
+  removeSourceMappingHandler(docRoot);
   const sourceMappingHandler = ((docRoot as any).sourceMappingHandler = (
     event: MouseEvent
   ) => {
