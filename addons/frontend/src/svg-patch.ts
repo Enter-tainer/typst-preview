@@ -119,7 +119,7 @@ export function interpretTargetView<T extends ElementChildren, U extends T = T>(
     }
 
     const rsrc = availableOwnedResource.get(reuseTargetTid)!;
-    const prevIdx = rsrc[1].pop();
+    const prevIdx = rsrc[1].shift();
 
     /// no available resource
     if (prevIdx === undefined) {
