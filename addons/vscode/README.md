@@ -89,3 +89,13 @@ Add preview button
 - Open preview in separate window(#39): You can type `typst-preview.browser` in command palette to open the preview page in a separate browser.
 - Links in preview panel: You can now click on links in the preview panel to open them in browser. The cross reference links are also clickable.
 - Text selection in preview panel: You can now select text in the preview panel.
+
+### v0.6.0
+
+- Upgrade to typst v0.6.0
+- Bug fix:
+  - #48: Webview cannot load frontend resources when VSCode is installed by scoop
+  - #46: Preview to source jump not working after inserting new text in the source file
+  - #52: Bug fix about VDOM operation
+- Enhancement
+  - #54: Only scroll the preview panel when the event is triggered by mouse
