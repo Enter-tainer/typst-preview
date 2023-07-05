@@ -220,8 +220,8 @@ export function changeViewPerspective<
   let targetViewCursor = 0;
   /// the append effect
   let appendOffset = 0;
-  /// whether the element has been in correct position
-  const shifted = new Set<number>();
+  /// converted append instructions.
+  const swapIns: number[] = [];
   /// converted append instructions.
   const inserts: ["insert", number, U][] = [];
 
@@ -229,9 +229,6 @@ export function changeViewPerspective<
   const interpretOriginView = (off: number) => {
     // console.log(off, getShift(off));
     off = getShift(off);
-    if (shifted.has(off)) {
-      return;
-    }
     while (targetViewCursor < targetView.length) {
       let done = false;
       const inst = targetView[targetViewCursor];
@@ -242,15 +239,9 @@ export function changeViewPerspective<
           break;
         case "reuse":
           const target_off = getShift(inst[1]);
-          // console.log(off, inst[1], target_off);
-          if (target_off != off) {
-            originView.push(["swap_in", off, target_off]);
-            shifted.add(target_off);
-            appendOffset++;
-          } else if (target_off === off) {
-            done = true;
-            appendOffset++;
-          }
+          console.log("reuse", off, inst[1], target_off);
+          swapIns.push(target_off);
+          appendOffset++;
           break;
         // case "remove":
         default:
@@ -273,6 +264,30 @@ export function changeViewPerspective<
     interpretOriginView(off);
   }
   interpretOriginView(originChildren.length);
+
+  const simulated: number[] = [];
+  for (let i = 0; i < swapIns.length; i++) {
+    simulated.push(i);
+  }
+  for (let i = 0; i < swapIns.length; i++) {
+    const off = swapIns[i];
+    for (let j = 0; j < simulated.length; j++) {
+      if (simulated[j] === off) {
+        // console.log("swap_in", j, i, simulated);
+        simulated.splice(j, 1);
+        if (i <= j) {
+          simulated.splice(i, 0, off);
+        } else {
+          simulated.splice(i + 1, 0, off);
+        }
+        if (j !== i) {
+          originView.push(["swap_in", i, j]);
+          // console.log("swap_in then", j, i, simulated);
+        }
+        break;
+      }
+    }
+  }
 
   return [...originView, ...inserts];
 }
