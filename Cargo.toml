@@ -1,6 +1,6 @@
 [package]
 name = "typst-ws"
-version = "0.5.1"
+version = "0.6.0"
 authors = ["The Typst Project Developers"]
 edition = "2021"
 

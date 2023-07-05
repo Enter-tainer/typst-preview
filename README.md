@@ -10,14 +10,11 @@ This repo contains:
 - the native part of the extension, in rust
 - a vscode extension, in typescript
 
-<!-- ## How it works?
+## How it works?
 
-The extension watches for file changes, and sends the compiled framebuffers to the client. Framebuffers are used here because they are faster than pdf.
+The extension watches for file changes, and incrementally compile your document to svg files. Then we use a websocket to send the rendered svg to the client. The client calculates the diff between the new svg and the old one, and apply the diff to the old one. This is done by a VDOM based incremental rendering technique.
 
-- The server is started, watching file changes, and listening to a websocket port.
-- The webview client connects to the websocket port.
-- The client sends the current visible range whenever the user scrolls/resizes the preview panel.
-- The server sends rendered framebuffers to the client whenever the typst document is updated. -->
+With all these techniques, we can achieve instant preview on type.
 
 ## Acknowledgements
 
