@@ -31,7 +31,8 @@ use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 use typst::diag::StrResult;
 
-use typst::syntax::{LinkedNode, Source, SourceId, Span, SyntaxKind};
+use typst::file::FileId;
+use typst::syntax::{LinkedNode, Source, Span, SyntaxKind};
 use typst::World;
 use typst_ts_compiler::service::CompileDriver;
 use typst_ts_compiler::TypstSystemWorld;
@@ -264,16 +265,17 @@ async fn main() {
                                             let id = u64::from_str_radix(location, 16).unwrap();
                                             // get the high 16bits and the low 48bits
                                             let (src_id, span_number) = (id >> 48, id & 0x0000FFFFFFFFFFFF);
-                                            let src_id = SourceId::from_u16(src_id as u16);
-                                            if src_id == SourceId::detached() || span_number <= 1 {
+                                            let src_id = FileId::from_u16(src_id as u16);
+                                            if src_id == FileId::detached() || span_number <= 1 {
                                                 continue;
                                             }
                                             let span = typst::syntax::Span::new(src_id, span_number);
                                             let world = world.lock().await;
-                                            let source = world.world.source(src_id);
-                                            let range = source.range(span);
+                                            let source = world.world.source(src_id).unwrap();
+                                            let range = source.find(span).unwrap().range();
+                                            let file_path = world.world.path_for_id(src_id).unwrap();
                                             let jump = DocToSrcJumpRequest::from_option (
-                                                source.path().to_string_lossy().to_string(),
+                                                file_path.to_string_lossy().to_string(),
                                                 (source.byte_to_line(range.start), source.byte_to_column(range.start)),
                                                 (source.byte_to_line(range.end), source.byte_to_column(range.end))
                                             );
@@ -342,12 +344,17 @@ async fn main() {
                         continue;
                     };
                     let world = world.lock().await;
-                    let Ok(source_id) = world.world.resolve(Path::new(&msg.filepath)) else {
-                        warn!("failed to resolve source: {:?}", msg);
+                    let Ok(relative_path) = Path::new(&msg.filepath).strip_prefix(&world.world.root) else {
+                        warn!("failed to strip prefix: {:?}, {:?}. currently jump from typst packages is not supported", msg, world.world.root);
                         continue;
                     };
-                    let source = world.world.source(source_id);
-                    let Some(cursor) = msg.to_byte_offset(source) else {
+                    // fixme: in typst v0.6.0, all relative path should start with `/`
+                    let source_id = FileId::new(None, &Path::new("/").join(relative_path));
+                    let Ok(source) = world.world.source(source_id) else {
+                        warn!("filed to resolve source from path: {:?}", msg);
+                        continue;
+                    };
+                    let Some(cursor) = msg.to_byte_offset(&source) else {
                         warn!("failed to resolve cursor: {:?}", msg);
                         continue;
                     };
@@ -355,7 +362,7 @@ async fn main() {
                         warn!("latest doc is empty");
                         continue;
                     };
-                    if let Some(pos) = jump_from_cursor(&doc.pages, source, cursor) {
+                    if let Some(pos) = jump_from_cursor(&doc.pages, &source, cursor) {
                         src_to_doc_jump_publisher.publish(pos.into()).await;
                     } else {
                         warn!("failed to jump from cursor: {:?}, {:?}, {:?}", msg, source, cursor);
@@ -435,7 +442,7 @@ async fn watch(world: Arc<Mutex<CompileDriver>>, publisher: Publisher<Document>)
     // Add a path to be watched. All files and directories at that path and
     // below will be monitored for changes.
     watcher
-        .watch(world.lock().await.world.root(), RecursiveMode::Recursive)
+        .watch(&world.lock().await.world.root, RecursiveMode::Recursive)
         .unwrap();
 
     // Handle events.
@@ -556,7 +563,7 @@ fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) ->
                 if glyph.span.0 == span {
                     return Some(pos);
                 }
-                if glyph.span.0.source() == span.source() {
+                if glyph.span.0.id() == span.id() {
                     let dis = glyph.span.0.number().abs_diff(span.number());
                     if dis < *min_dis {
                         *min_dis = dis;
