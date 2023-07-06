@@ -95,7 +95,6 @@ export class SvgDocument {
   private postprocessChanges() {
     const docRoot = this.hookedElem.firstElementChild as SVGElement;
     if (docRoot) {
-      console.log("holdingSrcElement", this.holdingSrcElement);
       window.initTypstSvg(docRoot, this.holdingSrcElement);
       this.holdingSrcElement = undefined;
 

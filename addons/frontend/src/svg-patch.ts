@@ -239,7 +239,6 @@ export function changeViewPerspective<
           break;
         case "reuse":
           const target_off = getShift(inst[1]);
-          console.log("reuse", off, inst[1], target_off);
           swapIns.push(target_off);
           appendOffset++;
           break;
