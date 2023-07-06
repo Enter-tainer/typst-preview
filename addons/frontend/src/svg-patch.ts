@@ -257,9 +257,18 @@ export function changeViewPerspective<
   /// scanning the origin view
   for (let off = 0; off < originChildren.length; off++) {
     const prevChild = originChildren[off];
-    if (!tIsU(prevChild) || removeShift[off] === undefined) {
+
+    if (removeShift[off] === undefined) {
       continue;
     }
+
+    // keep position of unpredictable elements
+    if (!tIsU(prevChild)) {
+      const target_off = getShift(off);
+      swapIns.push(target_off);
+      continue;
+    }
+
     interpretOriginView(off);
   }
   interpretOriginView(originChildren.length);
