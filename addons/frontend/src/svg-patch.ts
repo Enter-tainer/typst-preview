@@ -346,9 +346,27 @@ export function patchRoot(prev: SVGElement, next: SVGElement) {
         prevChild.tagName === "style" &&
         nextChild.getAttribute("data-reuse") !== "1"
       ) {
-        // console.log("replace extra style");
+        // console.log("replace extra style", prevChild, nextChild);
+
         // todo: gc
-        prevChild.append(...nextChild.children);
+        if (nextChild.textContent) {
+          // todo: looks slow
+          // https://stackoverflow.com/questions/3326494/parsing-css-in-javascript-jquery
+          var doc = document.implementation.createHTMLDocument(""),
+            styleElement = document.createElement("style");
+
+          styleElement.textContent = nextChild.textContent;
+          // the style will only be parsed once it is added to a document
+          doc.body.appendChild(styleElement);
+
+          const currentSvgSheet = (prevChild as HTMLStyleElement).sheet!;
+          const rulesToInsert = styleElement.sheet?.cssRules || [];
+
+          // console.log("rules to insert", currentSvgSheet, rulesToInsert);
+          for (const rule of rulesToInsert) {
+            currentSvgSheet.insertRule(rule.cssText);
+          }
+        }
       }
     }
   }
