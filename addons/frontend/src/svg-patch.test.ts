@@ -229,10 +229,10 @@ describe("interpretView", () => {
     const result = indexTargetView([0, 1, 2, 1, 2], [1, 2, 1, 2]);
     expect(toSnapshot(result)).toMatchInlineSnapshot(`
       [
-        "reuse,3",
-        "reuse,4",
         "reuse,1",
         "reuse,2",
+        "reuse,3",
+        "reuse,4",
         "remove,0",
         "o1->t0,o2->t1,o1->t2,o2->t3",
       ]
@@ -243,8 +243,6 @@ describe("interpretView", () => {
     expect(toSnapshot([result, []])).toMatchInlineSnapshot(`
       [
         "remove,0",
-        "swap_in,0,2",
-        "swap_in,1,3",
       ]
     `);
   });
@@ -252,14 +250,14 @@ describe("interpretView", () => {
     const result = indexTargetView([0, 1, 2, 1, 2, 3, 4, 3, 4], [1, 2, 3, 4, 3, 4, 1, 2]);
     expect(toSnapshot(result)).toMatchInlineSnapshot(`
       [
-        "reuse,3",
-        "reuse,4",
-        "reuse,7",
-        "reuse,8",
-        "reuse,5",
-        "reuse,6",
         "reuse,1",
         "reuse,2",
+        "reuse,5",
+        "reuse,6",
+        "reuse,7",
+        "reuse,8",
+        "reuse,3",
+        "reuse,4",
         "remove,0",
         "o1->t0,o2->t1,o3->t2,o4->t3,o3->t4,o4->t5,o1->t6,o2->t7",
       ]
@@ -270,10 +268,8 @@ describe("interpretView", () => {
     expect(toSnapshot([result, []])).toMatchInlineSnapshot(`
       [
         "remove,0",
-        "swap_in,0,2",
-        "swap_in,1,3",
-        "swap_in,2,6",
-        "swap_in,3,7",
+        "swap_in,2,4",
+        "swap_in,3,5",
         "swap_in,4,6",
         "swap_in,5,7",
       ]
