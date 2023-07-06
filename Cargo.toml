@@ -47,8 +47,8 @@ actix-web = { version = "4.3.1", features = [] }
 actix-files = { version = "0.6.2", features = [] }
 
 [patch.crates-io]
-typst = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.ts" }
-typst-library = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.ts" }
+typst = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "5a2a2a2f24a80a2b8bb211862348c29b92f97736" }
+typst-library = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "5a2a2a2f24a80a2b8bb211862348c29b92f97736" }
 typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "ee2f165460e9d80abd4c471e884040407159a914", package = "typst-ts-svg-exporter" }
 typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "ee2f165460e9d80abd4c471e884040407159a914", package = "typst-ts-core" }
 typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "ee2f165460e9d80abd4c471e884040407159a914", package = "typst-ts-compiler" }
