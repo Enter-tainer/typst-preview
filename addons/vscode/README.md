@@ -4,9 +4,9 @@ Preview your Typst files in vscode instantly!
 
 ## Features
 
-- Instant preview on type, powered by VDOM based incremental rendering technique.
-- Cross jump between code and preview like SyncTeX.
-- Open preview in separate browser window.
+- Low latency preview: preview your document instantly on type. The incremental rendering technique makes the preview latency as low as possible.
+- Open in browser: open the preview in browser, so you put it in another monitor. https://github.com/typst/typst/issues/1344
+- Cross jump between code and preview: We implement SyncTeX-like feature for typst-preview. You can now click on the preview panel to jump to the corresponding code location, and vice versa.
 
 Install this extension from [marketplace](https://marketplace.visualstudio.com/items?itemName=mgt19937.typst-preview), open command palette (Ctrl+Shift+P), and type `>Typst Preview:`.
 
