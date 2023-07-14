@@ -343,10 +343,10 @@ export function patchRoot(prev: SVGElement, next: SVGElement) {
       // console.log("prev", prevChild);
       // console.log("next", nextChild);
       if (prevChild.tagName === "defs") {
-        if (prevChild.getAttribute("id") === "glyph") {
+        if (prevChild.getAttribute("class") === "glyph") {
           // console.log("append glyphs:", nextChild.children, "to", prevChild);
           prevChild.append(...nextChild.children);
-        } else if (prevChild.getAttribute("id") === "clip-path") {
+        } else if (prevChild.getAttribute("class") === "clip-path") {
           // console.log("clip path: replace");
           // todo: gc
           prevChild.append(...nextChild.children);
