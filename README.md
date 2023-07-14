@@ -10,6 +10,12 @@ This repo contains:
 - the native part of the extension, in rust
 - a vscode extension, in typescript
 
+## Features
+
+- Low latency preview: preview your document instantly on type. The incremental rendering technique makes the preview latency as low as possible.
+- Open in browser: open the preview in browser, so you put it in another monitor. https://github.com/typst/typst/issues/1344
+- Cross jump between code and preview: We implement SyncTeX-like feature for typst-preview. You can now click on the preview panel to jump to the corresponding code location, and vice versa.
+
 ## How it works?
 
 The extension watches for file changes, and incrementally compile your document to svg files. Then we use a websocket to send the rendered svg to the client. The client calculates the diff between the new svg and the old one, and apply the diff to the old one. This is done by a VDOM based incremental rendering technique.
