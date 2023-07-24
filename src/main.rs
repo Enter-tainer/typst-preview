@@ -133,7 +133,6 @@ impl DocToSrcJumpRequest {
 // 	})
 #[derive(Debug, Deserialize)]
 struct SrcToDocJumpRequest {
-    event: String,
     filepath: String,
     line: usize,
     /// fixme: character is 0-based, UTF-16 code unit.
@@ -145,6 +144,13 @@ impl SrcToDocJumpRequest {
     pub fn to_byte_offset(&self, src: &typst::syntax::Source) -> Option<usize> {
         src.line_column_to_byte(self.line, self.character)
     }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "event")]
+enum ControlPlaneMessage {
+    #[serde(rename = "panelScrollTo")]
+    SrcToDocJump(SrcToDocJumpRequest),
 }
 
 /// Entry point.
@@ -339,34 +345,40 @@ async fn main() {
                     }
                 }
                 Some(Ok(Message::Text(msg))) = conn.next() => {
-                    let Ok(msg) = serde_json::from_str::<SrcToDocJumpRequest>(&msg) else {
+                    let Ok(msg) = serde_json::from_str::<ControlPlaneMessage>(&msg) else {
                         warn!("failed to parse jump request: {:?}", msg);
                         continue;
                     };
-                    let world = world.lock().await;
-                    let Ok(relative_path) = Path::new(&msg.filepath).strip_prefix(&world.world.root) else {
-                        warn!("failed to strip prefix: {:?}, {:?}. currently jump from typst packages is not supported", msg, world.world.root);
-                        continue;
-                    };
-                    // fixme: in typst v0.6.0, all relative path should start with `/`
-                    let source_id = FileId::new(None, &Path::new("/").join(relative_path));
-                    let Ok(source) = world.world.source(source_id) else {
-                        warn!("filed to resolve source from path: {:?}", msg);
-                        continue;
-                    };
-                    let Some(cursor) = msg.to_byte_offset(&source) else {
-                        warn!("failed to resolve cursor: {:?}", msg);
-                        continue;
-                    };
-                    let Some(doc) = doc_publisher.latest().await else {
-                        warn!("latest doc is empty");
-                        continue;
-                    };
-                    if let Some(pos) = jump_from_cursor(&doc.pages, &source, cursor) {
-                        src_to_doc_jump_publisher.publish(pos.into()).await;
-                    } else {
-                        warn!("failed to jump from cursor: {:?}, {:?}, {:?}", msg, source, cursor);
+
+                    match msg {
+                        ControlPlaneMessage::SrcToDocJump(msg) => {
+                            let world = world.lock().await;
+                            let Ok(relative_path) = Path::new(&msg.filepath).strip_prefix(&world.world.root) else {
+                                warn!("failed to strip prefix: {:?}, {:?}. currently jump from typst packages is not supported", msg, world.world.root);
+                                continue;
+                            };
+                            // fixme: in typst v0.6.0, all relative path should start with `/`
+                            let source_id = FileId::new(None, &Path::new("/").join(relative_path));
+                            let Ok(source) = world.world.source(source_id) else {
+                                warn!("filed to resolve source from path: {:?}", msg);
+                                continue;
+                            };
+                            let Some(cursor) = msg.to_byte_offset(&source) else {
+                                warn!("failed to resolve cursor: {:?}", msg);
+                                continue;
+                            };
+                            let Some(doc) = doc_publisher.latest().await else {
+                                warn!("latest doc is empty");
+                                continue;
+                            };
+                            if let Some(pos) = jump_from_cursor(&doc.pages, &source, cursor) {
+                                src_to_doc_jump_publisher.publish(pos.into()).await;
+                            } else {
+                                warn!("failed to jump from cursor: {:?}, {:?}, {:?}", msg, source, cursor);
+                            }
+                        }
                     }
+
                 }
             }
         }
