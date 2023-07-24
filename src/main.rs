@@ -153,12 +153,21 @@ struct MemoryFiles {
 }
 
 #[derive(Debug, Deserialize)]
+struct MemoryFilesShort {
+    files: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
 #[serde(tag = "event")]
 enum ControlPlaneMessage {
     #[serde(rename = "panelScrollTo")]
     SrcToDocJump(SrcToDocJumpRequest),
     #[serde(rename = "syncMemoryFiles")]
     SyncMemoryFiles(MemoryFiles),
+    #[serde(rename = "updateMemoryFiles")]
+    UpdateMemoryFiles(MemoryFiles),
+    #[serde(rename = "closeMemoryFiles")]
+    CloseMemoryFiles(MemoryFilesShort),
 }
 
 #[derive(Debug, Serialize)]
@@ -405,7 +414,13 @@ async fn main() {
                             }
                         }
                         ControlPlaneMessage::SyncMemoryFiles(msg) => {
-                            info!("sync memory files {:?}", msg.files);
+                            info!("sync memory files {:?}", msg.files.keys());
+                        }
+                        ControlPlaneMessage::UpdateMemoryFiles(msg) => {
+                            info!("update memory files {:?}", msg.files.keys());
+                        }
+                        ControlPlaneMessage::CloseMemoryFiles(msg) => {
+                            info!("close memory files {:?}", msg.files);
                         }
                     }
 

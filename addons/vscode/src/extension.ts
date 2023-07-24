@@ -202,6 +202,7 @@ const panelScrollTo = async (bindDocument: vscode.TextDocument, activeEditor: vs
 
 const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) => {
 	let shadowDispose: vscode.Disposable | undefined = undefined;
+	let shadowDisposeClose: vscode.Disposable | undefined = undefined;
 	const {
 		context,
 		outputChannel,
@@ -273,6 +274,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		}
 		src2docHandlerDispose?.dispose();
 		shadowDispose?.dispose();
+		shadowDisposeClose?.dispose();
 	});
 
 	switch (task.kind) {
@@ -342,8 +344,27 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 				}
 			};
 			shadowDispose = vscode.workspace.onDidChangeTextDocument(async (e) => {
+				if (e.document.uri.scheme === "file") {
+					console.log("... ", "updateMemoryFiles", e.document.fileName);
+					addonΠserver.send(JSON.stringify({
+						event: "updateMemoryFiles",
+						files: {
+							[e.document.fileName]: e.document.getText(),
+						},
+					}));
+				}
+
 				if (e.document === activeEditor?.document) {
 					await update();
+				}
+			});
+			shadowDisposeClose = vscode.workspace.onDidCloseTextDocument(async (e) => {
+				if (e.uri.scheme === "file") {
+					console.log("... ", "closeMemoryFiles", e.fileName);
+					addonΠserver.send(JSON.stringify({
+						event: "closeMemoryFiles",
+						files: [e.fileName],
+					}));
 				}
 			});
 			shadowFilePathMapping.set(shadowFilePath, filePath);
