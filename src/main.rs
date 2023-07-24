@@ -352,6 +352,7 @@ async fn main() {
         .control_plane_host
         .unwrap_or_else(|| "127.0.0.1:23626".to_string());
     let control_plane_handle = tokio::spawn(async move {
+        let doc_publisher = doc_publisher.clone();
         let try_socket = TcpListener::bind(&control_plane_addr).await;
         let listener = try_socket.expect("Failed to bind");
         info!(
@@ -415,12 +416,48 @@ async fn main() {
                         }
                         ControlPlaneMessage::SyncMemoryFiles(msg) => {
                             info!("sync memory files {:?}", msg.files.keys());
+                            let mut world = world.lock().await;
+                            world.world.reset_shadow();
+                            world.world.reset();
+                            for (fc, content) in msg.files.iter() {
+                                let pb = Path::new(fc).to_owned();
+                                let id = world.id_for_path(pb.clone());
+                                world.world.resolve_with(pb, id, content).unwrap();
+                            }
+                            // todo: refactor
+                            if let Some(doc) = world.with_compile_diag::<true, _>(CompileDriver::compile) {
+                                doc_publisher.publish(Arc::new(doc)).await;
+                                comemo::evict(30);
+                            }
                         }
                         ControlPlaneMessage::UpdateMemoryFiles(msg) => {
                             info!("update memory files {:?}", msg.files.keys());
+                            let mut world = world.lock().await;
+                            // don't reset shadow
+                            world.world.reset();
+                            for (fc, content) in msg.files.iter() {
+                                let pb = Path::new(fc).to_owned();
+                                let id = world.id_for_path(pb.clone());
+                                world.world.resolve_with(pb, id, content).unwrap();
+                            }
+                            if let Some(doc) = world.with_compile_diag::<true, _>(CompileDriver::compile) {
+                                doc_publisher.publish(Arc::new(doc)).await;
+                                comemo::evict(30);
+                            }
                         }
                         ControlPlaneMessage::CloseMemoryFiles(msg) => {
                             info!("close memory files {:?}", msg.files);
+                            let mut world = world.lock().await;
+                            // don't reset shadow
+                            world.world.reset();
+                            for fc in msg.files.iter() {
+                                let pb = Path::new(fc);
+                                world.world.remove_shadow(pb);
+                            }
+                            if let Some(doc) = world.with_compile_diag::<true, _>(CompileDriver::compile) {
+                                doc_publisher.publish(Arc::new(doc)).await;
+                                comemo::evict(30);
+                            }
                         }
                     }
 
