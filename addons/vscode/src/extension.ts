@@ -88,8 +88,6 @@ function getProjectRoot(currentPath: string): string | null {
 }
 
 const serverProcesses: Array<any> = [];
-const shadowFilePathMapping: Map<string, string> = new Map;
-const shadowFilePathRevMapping: Map<string, string> = new Map;
 const activeTask = new Map<vscode.TextDocument, TaskControlBlock>();
 
 interface JumpInfo {
@@ -102,11 +100,7 @@ async function processJumpInfo(activeEditor: vscode.TextEditor, jump: JumpInfo) 
 	if (jump.start === null || jump.end === null) {
 		return;
 	}
-	// check if shadowFilesPaths contains filepath
-	const actualPath = shadowFilePathMapping.get(jump.filepath);
-	if (actualPath !== undefined) {
-		jump.filepath = actualPath;
-	}
+
 	// open this file and show in editor
 	const doc = await vscode.workspace.openTextDocument(jump.filepath);
 	const editor = await vscode.window.showTextDocument(doc, activeEditor.viewColumn);
@@ -192,11 +186,7 @@ const panelScrollTo = async (bindDocument: vscode.TextDocument, activeEditor: vs
 		'line': activeEditor.selection.active.line,
 		'character': activeEditor.selection.active.character,
 	};
-	console.log(Array.from(shadowFilePathRevMapping.keys()), scrollRequest);
-	const actualPath = shadowFilePathRevMapping.get(scrollRequest.filepath);
-	if (actualPath !== undefined) {
-		scrollRequest.filepath = actualPath;
-	}
+	console.log(scrollRequest);
 	addonΠserver.send(JSON.stringify(scrollRequest));
 };
 
@@ -210,14 +200,11 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		bindDocument,
 	} = task;
 	const filePath = bindDocument.uri.fsPath;
-	// get file dir using path
-	const rootDir = path.dirname(filePath);
-	const filename = path.basename(filePath);
 
 	const refreshStyle = vscode.workspace.getConfiguration().get<string>('typst-preview.refresh') || "onSave";
 	const scrollSyncMode = vscode.workspace.getConfiguration().get<ScrollSyncMode>('typst-preview.scrollSync') || "never";
 	const fontendPath = path.resolve(context.extensionPath, "out/frontend");
-	const { shadowFilePath } = await watchEditorFiles();
+	await watchEditorFiles();
 	const { serverProcess, port } = await launchTypstWs(task.kind === 'browser' ? fontendPath : null);
 
 	const addonΠserver = new WebSocket("ws://127.0.0.1:23626");
@@ -304,11 +291,6 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		panel.onDidDispose(async () => {
 			// todo: bindDocument.onDidDispose, but we did not find a similar way.
 			activeTask.delete(bindDocument);
-			// remove shadow file
-			// if (refreshStyle === "onType") {
-			// await vscode.workspace.fs.delete(vscode.Uri.file(shadowFilePath));
-			// console.log('removed shadow file');
-			// }
 			serverProcess.kill();
 			console.log('killed preview services');
 			panel.dispose();
@@ -330,22 +312,12 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 	};
 
 	async function watchEditorFiles() {
-		const shadowFilePath = filePath; // path.join(rootDir, '.typst-preview.' + filename);
 		if (refreshStyle === "onType") {
-			console.log('shadow file path:', shadowFilePath);
-			// copy file content to shadow file
-			// const fileContent = activeEditor.document.getText();
-			// await vscode.workspace.fs.writeFile(vscode.Uri.file(shadowFilePath), Buffer.from(fileContent));
-			// const update = async () => {
-			// 	// save file content to shadow file
-			// 	if (activeEditor?.document) {
-			// 		const fileContent = activeEditor?.document.getText();
-			// 		await vscode.workspace.fs.writeFile(vscode.Uri.file(shadowFilePath), Buffer.from(fileContent));
-			// 	}
-			// };
+			console.log('watch editor changes');
+
 			shadowDispose = vscode.workspace.onDidChangeTextDocument(async (e) => {
 				if (e.document.uri.scheme === "file") {
-					console.log("... ", "updateMemoryFiles", e.document.fileName);
+					// console.log("... ", "updateMemoryFiles", e.document.fileName);
 					addonΠserver.send(JSON.stringify({
 						event: "updateMemoryFiles",
 						files: {
@@ -354,29 +326,22 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 					}));
 				}
 
-				// if (e.document === activeEditor?.document) {
-				// 	await update();
-				// }
 			});
 			shadowDisposeClose = vscode.workspace.onDidCloseTextDocument(async (e) => {
 				if (e.uri.scheme === "file") {
-					console.log("... ", "closeMemoryFiles", e.fileName);
+					// console.log("... ", "closeMemoryFiles", e.fileName);
 					addonΠserver.send(JSON.stringify({
 						event: "closeMemoryFiles",
 						files: [e.fileName],
 					}));
 				}
 			});
-			// shadowFilePathMapping.set(shadowFilePath, filePath);
-			// shadowFilePathRevMapping.set(filePath, shadowFilePath);
 		}
-		return { shadowFilePath };
 	};
 
 	async function launchTypstWs(frontendPath: null | string) {
-		const filePathToWatch = refreshStyle === "onSave" ? filePath : shadowFilePath;
 		const serverPath = await getTypstWsPath(context.extensionPath);
-		console.log(`Watching ${filePathToWatch} for changes`);
+		console.log(`Watching ${filePath} for changes`);
 		const projectRoot = getProjectRoot(filePath);
 		const rootArgs = projectRoot ? ["--root", projectRoot] : [];
 		const staticFileArgs = frontendPath ? ["--static-file-path", frontendPath] : [];
@@ -385,7 +350,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 			...rootArgs,
 			...staticFileArgs,
 			...codeGetTypstWsFontArgs(),
-			"watch", filePathToWatch,
+			"watch", filePath,
 		], outputChannel);
 		console.log('Launched server, port:', port);
 		// window.typstWebsocket.send("current");
@@ -446,15 +411,6 @@ export function activate(context: vscode.ExtensionContext) {
 
 // This method is called when your extension is deactivated
 export async function deactivate() {
-	console.log(shadowFilePathMapping);
-	for (const [shadowFilePath, _] of shadowFilePathMapping) {
-		try {
-			await vscode.workspace.fs.delete(vscode.Uri.file(shadowFilePath));
-		} catch (e) {
-			console.error('Failed to remove shadow file: ' + shadowFilePath);
-			console.error(e);
-		}
-	}
 	console.log(activeTask);
 	for (const [_, task] of activeTask) {
 		task.panel?.dispose();
