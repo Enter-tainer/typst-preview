@@ -228,6 +228,21 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 				await processJumpInfo(activeEditor, data);
 				break;
 			}
+			case "syncMemoryChanges": {
+				console.log("recv memory changes request", data);
+				let files: Record<string, string> = {};
+				vscode.workspace.textDocuments.forEach((doc) => {
+					if (doc.isDirty) {
+						files[doc.fileName] = doc.getText();
+					}
+				});
+
+				addonΠserver.send(JSON.stringify({
+					event: "syncMemoryFiles",
+					files,
+				}));
+				break;
+			}
 			default: {
 				console.warn("unknown message", data);
 				break;
