@@ -10,6 +10,7 @@ use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use publisher::Publisher;
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::io::{self, Write};
 use typst::geom::Point;
 
@@ -147,10 +148,17 @@ impl SrcToDocJumpRequest {
 }
 
 #[derive(Debug, Deserialize)]
+struct MemoryFiles {
+    files: HashMap<String, String>,
+}
+
+#[derive(Debug, Deserialize)]
 #[serde(tag = "event")]
 enum ControlPlaneMessage {
     #[serde(rename = "panelScrollTo")]
     SrcToDocJump(SrcToDocJumpRequest),
+    #[serde(rename = "syncMemoryFiles")]
+    SyncMemoryFiles(MemoryFiles),
 }
 
 #[derive(Debug, Serialize)]
@@ -395,6 +403,9 @@ async fn main() {
                             } else {
                                 warn!("failed to jump from cursor: {:?}, {:?}, {:?}", msg, source, cursor);
                             }
+                        }
+                        ControlPlaneMessage::SyncMemoryFiles(msg) => {
+                            info!("sync memory files {:?}", msg.files);
                         }
                     }
 
