@@ -305,10 +305,10 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 			// todo: bindDocument.onDidDispose, but we did not find a similar way.
 			activeTask.delete(bindDocument);
 			// remove shadow file
-			if (refreshStyle === "onType") {
-				await vscode.workspace.fs.delete(vscode.Uri.file(shadowFilePath));
-				console.log('removed shadow file');
-			}
+			// if (refreshStyle === "onType") {
+			// await vscode.workspace.fs.delete(vscode.Uri.file(shadowFilePath));
+			// console.log('removed shadow file');
+			// }
 			serverProcess.kill();
 			console.log('killed preview services');
 			panel.dispose();
@@ -330,19 +330,19 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 	};
 
 	async function watchEditorFiles() {
-		const shadowFilePath = path.join(rootDir, '.typst-preview.' + filename);
+		const shadowFilePath = filePath; // path.join(rootDir, '.typst-preview.' + filename);
 		if (refreshStyle === "onType") {
 			console.log('shadow file path:', shadowFilePath);
 			// copy file content to shadow file
-			const fileContent = activeEditor.document.getText();
-			await vscode.workspace.fs.writeFile(vscode.Uri.file(shadowFilePath), Buffer.from(fileContent));
-			const update = async () => {
-				// save file content to shadow file
-				if (activeEditor?.document) {
-					const fileContent = activeEditor?.document.getText();
-					await vscode.workspace.fs.writeFile(vscode.Uri.file(shadowFilePath), Buffer.from(fileContent));
-				}
-			};
+			// const fileContent = activeEditor.document.getText();
+			// await vscode.workspace.fs.writeFile(vscode.Uri.file(shadowFilePath), Buffer.from(fileContent));
+			// const update = async () => {
+			// 	// save file content to shadow file
+			// 	if (activeEditor?.document) {
+			// 		const fileContent = activeEditor?.document.getText();
+			// 		await vscode.workspace.fs.writeFile(vscode.Uri.file(shadowFilePath), Buffer.from(fileContent));
+			// 	}
+			// };
 			shadowDispose = vscode.workspace.onDidChangeTextDocument(async (e) => {
 				if (e.document.uri.scheme === "file") {
 					console.log("... ", "updateMemoryFiles", e.document.fileName);
@@ -354,9 +354,9 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 					}));
 				}
 
-				if (e.document === activeEditor?.document) {
-					await update();
-				}
+				// if (e.document === activeEditor?.document) {
+				// 	await update();
+				// }
 			});
 			shadowDisposeClose = vscode.workspace.onDidCloseTextDocument(async (e) => {
 				if (e.uri.scheme === "file") {
@@ -367,8 +367,8 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 					}));
 				}
 			});
-			shadowFilePathMapping.set(shadowFilePath, filePath);
-			shadowFilePathRevMapping.set(filePath, shadowFilePath);
+			// shadowFilePathMapping.set(shadowFilePath, filePath);
+			// shadowFilePathRevMapping.set(filePath, shadowFilePath);
 		}
 		return { shadowFilePath };
 	};
