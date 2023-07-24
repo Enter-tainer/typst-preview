@@ -175,8 +175,8 @@ enum ControlPlaneMessage {
 enum ControlPlaneResponse {
     #[serde(rename = "editorScrollTo")]
     EditorScrollTo(JumpInfo),
-    #[serde(rename = "syncMemoryChanges")]
-    SyncMemoryChanges(()),
+    #[serde(rename = "syncEditorChanges")]
+    SyncEditorChanges(()),
 }
 
 /// Entry point.
@@ -364,7 +364,7 @@ async fn main() {
 
         // todo: when the compiler crashed, sync again
         conn.send(Message::Text(
-            serde_json::to_string(&ControlPlaneResponse::SyncMemoryChanges(())).unwrap(),
+            serde_json::to_string(&ControlPlaneResponse::SyncEditorChanges(())).unwrap(),
         ))
         .await
         .unwrap();
