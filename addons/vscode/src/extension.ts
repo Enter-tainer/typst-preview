@@ -90,13 +90,37 @@ function getProjectRoot(currentPath: string): string | null {
 const serverProcesses: Array<any> = [];
 const activeTask = new Map<vscode.TextDocument, TaskControlBlock>();
 
+const panelScrollTo = async (bindDocument: vscode.TextDocument, activeEditor: vscode.TextEditor) => {
+	const tcb = activeTask.get(bindDocument);
+	if (tcb === undefined) {
+		return;
+	}
+	const { addonΠserver } = tcb;
+	const scrollRequest = {
+		'event': 'panelScrollTo',
+		'filepath': bindDocument.uri.fsPath,
+		'line': activeEditor.selection.active.line,
+		'character': activeEditor.selection.active.character,
+	};
+	console.log(scrollRequest);
+	addonΠserver.send(JSON.stringify(scrollRequest));
+};
+
+interface TaskControlBlock {
+	/// related panel
+	panel?: vscode.WebviewPanel;
+	/// channel to communicate with typst-ws
+	addonΠserver: WebSocket;
+}
+
 interface JumpInfo {
 	filepath: string,
 	start: [number, number] | null,
 	end: [number, number] | null,
 }
 
-async function processJumpInfo(activeEditor: vscode.TextEditor, jump: JumpInfo) {
+async function editorScrollTo(activeEditor: vscode.TextEditor, jump: JumpInfo) {
+	console.log("recv editorScrollTo request", jump);
 	if (jump.start === null || jump.end === null) {
 		return;
 	}
@@ -109,6 +133,21 @@ async function processJumpInfo(activeEditor: vscode.TextEditor, jump: JumpInfo) 
 	const range = new vscode.Range(startPosition, endPosition);
 	editor.selection = new vscode.Selection(range.start, range.end);
 	editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
+}
+
+function syncEditorChanges(addonΠserver: WebSocket) {
+	console.log("recv syncEditorChanges request");
+	let files: Record<string, string> = {};
+	vscode.workspace.textDocuments.forEach((doc) => {
+		if (doc.isDirty) {
+			files[doc.fileName] = doc.getText();
+		}
+	});
+
+	addonΠserver.send(JSON.stringify({
+		event: "syncMemoryFiles",
+		files,
+	}));
 }
 
 function runServer(command: string, args: string[], outputChannel: vscode.OutputChannel): Promise<[string, ChildProcessWithoutNullStreams]> {
@@ -167,29 +206,6 @@ interface LaunchInWebViewTask extends LaunchTask {
 	kind: 'webview',
 }
 
-interface TaskControlBlock {
-	/// related panel
-	panel?: vscode.WebviewPanel;
-	/// channel to communicate with typst-ws
-	addonΠserver: WebSocket;
-}
-
-const panelScrollTo = async (bindDocument: vscode.TextDocument, activeEditor: vscode.TextEditor) => {
-	const tcb = activeTask.get(bindDocument);
-	if (tcb === undefined) {
-		return;
-	}
-	const { addonΠserver } = tcb;
-	const scrollRequest = {
-		'event': 'panelScrollTo',
-		'filepath': bindDocument.uri.fsPath,
-		'line': activeEditor.selection.active.line,
-		'character': activeEditor.selection.active.character,
-	};
-	console.log(scrollRequest);
-	addonΠserver.send(JSON.stringify(scrollRequest));
-};
-
 const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) => {
 	let shadowDispose: vscode.Disposable | undefined = undefined;
 	let shadowDisposeClose: vscode.Disposable | undefined = undefined;
@@ -211,26 +227,8 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 	addonΠserver.addEventListener("message", async (message) => {
 		const data = JSON.parse(message.data as string);
 		switch (data.event) {
-			case "editorScrollTo": {
-				console.log("recv jump data", data);
-				await processJumpInfo(activeEditor, data);
-				break;
-			}
-			case "syncMemoryChanges": {
-				console.log("recv memory changes request", data);
-				let files: Record<string, string> = {};
-				vscode.workspace.textDocuments.forEach((doc) => {
-					if (doc.isDirty) {
-						files[doc.fileName] = doc.getText();
-					}
-				});
-
-				addonΠserver.send(JSON.stringify({
-					event: "syncMemoryFiles",
-					files,
-				}));
-				break;
-			}
+			case "editorScrollTo": return await editorScrollTo(activeEditor, data /* JumpInfo */);
+			case "syncEditorChanges": return syncEditorChanges(addonΠserver);
 			default: {
 				console.warn("unknown message", data);
 				break;
@@ -248,7 +246,6 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 			}
 		}
 	};
-
 	const src2docHandlerDispose =
 		scrollSyncMode === "onSelectionChange"
 			? vscode.window.onDidChangeTextEditorSelection(src2docHandler, 500)
