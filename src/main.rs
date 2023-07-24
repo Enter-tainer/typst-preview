@@ -105,13 +105,13 @@ impl Client {
 }
 
 #[derive(Debug, Serialize)]
-struct DocToSrcJumpRequest {
+struct JumpInfo {
     filepath: String,
     start: Option<(usize, usize)>, // row, column
     end: Option<(usize, usize)>,
 }
 
-impl DocToSrcJumpRequest {
+impl JumpInfo {
     pub fn from_option(
         filepath: String,
         start: (Option<usize>, Option<usize>),
@@ -151,6 +151,15 @@ impl SrcToDocJumpRequest {
 enum ControlPlaneMessage {
     #[serde(rename = "panelScrollTo")]
     SrcToDocJump(SrcToDocJumpRequest),
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "event")]
+enum ControlPlaneResponse {
+    #[serde(rename = "editorScrollTo")]
+    EditorScrollTo(JumpInfo),
+    #[serde(rename = "syncMemoryChanges")]
+    SyncMemoryChanges(()),
 }
 
 /// Entry point.
@@ -280,7 +289,7 @@ async fn main() {
                                             let source = world.world.source(src_id).unwrap();
                                             let range = source.find(span).unwrap().range();
                                             let file_path = world.world.path_for_id(src_id).unwrap();
-                                            let jump = DocToSrcJumpRequest::from_option (
+                                            let jump = JumpInfo::from_option (
                                                 file_path.to_string_lossy().to_string(),
                                                 (source.byte_to_line(range.start), source.byte_to_column(range.start)),
                                                 (source.byte_to_line(range.end), source.byte_to_column(range.end))
@@ -297,6 +306,7 @@ async fn main() {
                                     let svg = client.renderer.lock().await.render(doc);
                                     client.conn.lock().await.send(Message::Text(svg)).await.unwrap();
                                 },
+                                // todo: bug, all of the clients will receive the same jump info
                                 pos = src_to_doc_jump_publisher.wait() => {
                                     let mut conn = client.conn.lock().await;
                                     let jump_info = format!("jump,{} {} {}", pos.page, pos.point.x.to_pt(), pos.point.y.to_pt());
@@ -333,9 +343,18 @@ async fn main() {
         );
         let (stream, _) = listener.accept().await.unwrap();
         let mut conn = accept_connection(stream).await;
+
+        // todo: when the compiler crashed, sync again
+        conn.send(Message::Text(
+            serde_json::to_string(&ControlPlaneResponse::SyncMemoryChanges(())).unwrap(),
+        ))
+        .await
+        .unwrap();
+
         loop {
             tokio::select! {
                 Some(jump) = doc_to_src_jump_rx.recv() => {
+                    let jump = ControlPlaneResponse::EditorScrollTo(jump);
                     let res = conn
                         .send(Message::Text(serde_json::to_string(&jump).unwrap()))
                         .await;

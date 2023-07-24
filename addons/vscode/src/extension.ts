@@ -220,10 +220,19 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 	const { serverProcess, port } = await launchTypstWs(task.kind === 'browser' ? fontendPath : null);
 
 	const addonΠserver = new WebSocket("ws://127.0.0.1:23626");
-	addonΠserver.addEventListener('message', async (message) => {
+	addonΠserver.addEventListener("message", async (message) => {
 		const data = JSON.parse(message.data as string);
-		console.log("recv jump data", data);
-		await processJumpInfo(activeEditor, data);
+		switch (data.event) {
+			case "editorScrollTo": {
+				console.log("recv jump data", data);
+				await processJumpInfo(activeEditor, data);
+				break;
+			}
+			default: {
+				console.warn("unknown message", data);
+				break;
+			}
+		}
 	});
 
 	const src2docHandler = (e: vscode.TextEditorSelectionChangeEvent) => {
@@ -236,11 +245,11 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 			}
 		}
 	};
-	
+
 	const src2docHandlerDispose =
-    scrollSyncMode === "onSelectionChange"
+		scrollSyncMode === "onSelectionChange"
 			? vscode.window.onDidChangeTextEditorSelection(src2docHandler, 500)
-      : undefined;
+			: undefined;
 
 	serverProcess.on('exit', (code: any) => {
 		addonΠserver.close();
