@@ -324,11 +324,11 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 				}
 
 			});
-			shadowDisposeClose = vscode.workspace.onDidCloseTextDocument(async (e) => {
+			shadowDisposeClose = vscode.workspace.onDidSaveTextDocument(async (e) => {
 				if (e.uri.scheme === "file") {
-					// console.log("... ", "closeMemoryFiles", e.fileName);
+					console.log("... ", "saveMemoryFiles", e.fileName);
 					addonΠserver.send(JSON.stringify({
-						event: "closeMemoryFiles",
+						event: "removeMemoryFiles",
 						files: [e.fileName],
 					}));
 				}
