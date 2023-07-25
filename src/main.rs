@@ -166,8 +166,8 @@ enum ControlPlaneMessage {
     SyncMemoryFiles(MemoryFiles),
     #[serde(rename = "updateMemoryFiles")]
     UpdateMemoryFiles(MemoryFiles),
-    #[serde(rename = "closeMemoryFiles")]
-    CloseMemoryFiles(MemoryFilesShort),
+    #[serde(rename = "removeMemoryFiles")]
+    RemoveMemoryFiles(MemoryFilesShort),
 }
 
 #[derive(Debug, Serialize)]
@@ -445,7 +445,7 @@ async fn main() {
                                 comemo::evict(30);
                             }
                         }
-                        ControlPlaneMessage::CloseMemoryFiles(msg) => {
+                        ControlPlaneMessage::RemoveMemoryFiles(msg) => {
                             info!("close memory files {:?}", msg.files);
                             let mut world = world.lock().await;
                             // don't reset shadow
