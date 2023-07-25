@@ -81,3 +81,12 @@ Add preview button
   - #52: Bug fix about VDOM operation
 - Enhancement
   - #54: Only scroll the preview panel when the event is triggered by mouse
+
+## v0.6.1
+
+- Fix empty file preview. Previously, if you start with an empty file and type something, the preview will not be updated. This is now fixed.
+
+## v0.6.2
+
+- Fix #60 and #24. Now we watch dirty files in memory therefore no shadow file is needed. Due to the removal of disk read/write, this should also improve performance and latency.
+- Preview on type is now enabled by default for new users. Existing users will not be affected.

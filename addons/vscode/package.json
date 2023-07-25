@@ -8,7 +8,7 @@
     "type": "git",
     "url": "https://github.com/Enter-tainer/typst-preview-vscode"
   },
-  "version": "0.6.1",
+  "version": "0.6.2",
   "engines": {
     "vscode": "^1.77.0"
   },
@@ -80,7 +80,7 @@
             "onSave",
             "onType"
           ],
-          "default": "onSave",
+          "default": "onType",
           "enumDescriptions": [
             "Refresh preview on save",
             "Refresh preview on type"
