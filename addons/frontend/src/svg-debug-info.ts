@@ -87,7 +87,7 @@ export function removeSourceMappingHandler(docRoot: SVGElement) {
   const prevSourceMappingHandler = (docRoot as any).sourceMappingHandler;
   if (prevSourceMappingHandler) {
     docRoot.removeEventListener("click", prevSourceMappingHandler);
-    console.log("remove removeSourceMappingHandler");
+    // console.log("remove removeSourceMappingHandler");
   }
 }
 

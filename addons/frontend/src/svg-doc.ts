@@ -3,13 +3,16 @@ import { removeSourceMappingHandler } from "./svg-debug-info";
 
 export class SvgDocument {
   currentScale: number;
+  cachedOffsetWidth: number;
   imageContainerWidth: number;
   patchQueue: [string, string][];
   svgUpdating: boolean;
   holdingSrcElement: HTMLDivElement | undefined;
+  svgModule: any;
 
   constructor(private hookedElem: HTMLElement) {
     this.currentScale = 1;
+    this.cachedOffsetWidth = 0;
     this.imageContainerWidth = hookedElem.offsetWidth;
     this.patchQueue = [];
     this.svgUpdating = false;
@@ -21,6 +24,7 @@ export class SvgDocument {
       0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.3, 1.5, 1.7, 1.9,
       2.1, 2.4, 2.7, 3, 3.3, 3.7, 4.1, 4.6, 5.1, 5.7, 6.3, 7, 7.7, 8.5, 9.4, 10,
     ];
+    this.hookedElem.style.transformOrigin = "0px 0px";
     const wheelEventHandler = (event: WheelEvent) => {
       if (event.ctrlKey) {
         event.preventDefault();
@@ -59,33 +63,40 @@ export class SvgDocument {
         const scrollY = event.pageY * (scrollFactor - 1);
 
         // Apply new scale
-        this.hookedElem.style.transformOrigin = "0 0";
         this.hookedElem.style.transform = `scale(${this.currentScale})`;
 
         // make sure the cursor is still on the same position
         window.scrollBy(scrollX, scrollY);
       }
     };
-    const vscodeAPI = typeof (acquireVsCodeApi) !== "undefined";
+    const vscodeAPI = typeof acquireVsCodeApi !== "undefined";
     if (vscodeAPI) {
       window.addEventListener("wheel", wheelEventHandler);
     } else {
-      document.body.addEventListener("wheel", wheelEventHandler, { passive: false });
+      document.body.addEventListener("wheel", wheelEventHandler, {
+        passive: false,
+      });
     }
   }
 
+  setModule(svgModule: any) {
+    this.svgModule = svgModule;
+  }
+
   rescale() {
-    const newImageContainerWidth = this.hookedElem.offsetWidth;
+    const newImageContainerWidth = this.cachedOffsetWidth;
     this.currentScale =
       this.currentScale * (newImageContainerWidth / this.imageContainerWidth);
     this.imageContainerWidth = newImageContainerWidth;
 
-    this.hookedElem.style.transformOrigin = "0px 0px";
-    this.hookedElem.style.transform = `scale(${this.currentScale})`;
+    const targetScale = `scale(${this.currentScale})`;
+    if (this.hookedElem.style.transform !== targetScale) {
+      this.hookedElem.style.transform = targetScale;
+    }
   }
 
   initScale() {
-    this.imageContainerWidth = this.hookedElem.offsetWidth;
+    this.imageContainerWidth = this.cachedOffsetWidth;
     const svgWidth = Number.parseFloat(
       this.hookedElem.firstElementChild!.getAttribute("width") || "1"
     );
@@ -146,6 +157,32 @@ export class SvgDocument {
 
         t3 = performance.now();
         break;
+      case "diff-v1": {
+        console.log("diff-v1!!!", svgUpdateEvent[1], this.svgModule);
+
+        this.svgModule.merge_delta(svgUpdateEvent[1]);
+
+        t1 = performance.now();
+
+        const patchStr = this.svgModule.render_in_window(0, 0, 0, 0);
+        t2 = performance.now();
+
+        if (this.hookedElem.firstElementChild) {
+          const elem = document.createElement("div");
+          elem.innerHTML = patchStr;
+          const svgElement = elem.firstElementChild as SVGElement;
+          patchRoot(
+            this.hookedElem.firstElementChild as SVGElement,
+            svgElement
+          );
+          this.grabSourceMappingElement(elem);
+        } else {
+          this.hookedElem.innerHTML = patchStr;
+          this.grabSourceMappingElement(this.hookedElem);
+        }
+        t3 = performance.now();
+        break;
+      }
       default:
         console.log("svgUpdateEvent", svgUpdateEvent);
         t0 = t1 = t2 = t3 = performance.now();
@@ -168,6 +205,7 @@ export class SvgDocument {
 
     this.svgUpdating = true;
     const doSvgUpdate = () => {
+      this.cachedOffsetWidth = this.hookedElem.offsetWidth;
       if (this.patchQueue.length === 0) {
         this.svgUpdating = false;
         this.postprocessChanges();
@@ -179,7 +217,10 @@ export class SvgDocument {
         }
 
         // to hide the rescale behavior at the first time
-        this.initScale();
+        const docRoot = this.hookedElem.firstElementChild as SVGElement;
+        if (docRoot) {
+          this.initScale();
+        }
 
         requestAnimationFrame(doSvgUpdate);
       } catch (e) {

@@ -23,7 +23,7 @@ use std::time::Duration;
 use termcolor::{ColorChoice, StandardStream, WriteColor};
 use tokio::net::{TcpListener, TcpStream};
 use typst::doc::{Document, Frame, FrameItem, Position};
-use typst_ts_svg_exporter::IncrementalSvgExporter;
+use typst_ts_svg_exporter::IncrSvgDocServer;
 
 use crate::args::{CliArguments, Command, CompileCommand};
 use crate::publisher::PublisherImpl;
@@ -88,7 +88,7 @@ impl CompileSettings {
 struct Client {
     conn: Arc<Mutex<WebSocketStream<TcpStream>>>,
     publisher: Publisher<Document>,
-    renderer: Arc<Mutex<IncrementalSvgExporter>>,
+    doc_server: Arc<Mutex<IncrSvgDocServer>>,
 }
 
 impl Client {
@@ -262,12 +262,12 @@ async fn main() {
             while let Ok((stream, _)) = listener.accept().await {
                 let conn = accept_connection(stream).await;
                 {
-                    let mut r = IncrementalSvgExporter::default();
+                    let mut r = IncrSvgDocServer::default();
                     r.set_should_attach_debug_info(true);
                     let client = Client {
                         conn: Arc::new(Mutex::new(conn)),
                         publisher: doc_publisher.clone(),
-                        renderer: Arc::new(Mutex::new(r)),
+                        doc_server: Arc::new(Mutex::new(r)),
                     };
                     let active_client_count = active_client_count.clone();
                     let doc_publisher = doc_publisher.clone();
@@ -281,14 +281,14 @@ async fn main() {
                                 msg = Client::poll_ws_events(client.conn.clone()) => {
                                     if let Some(msg) = msg {
                                         if msg == "current" {
-                                            let mut renderer = client.renderer.lock().await;
-                                            if let Some(res) = renderer.render_current() {
-                                                client.conn.lock().await.send(Message::Text(res)).await.unwrap();
+                                            let mut renderer = client.doc_server.lock().await;
+                                            if let Some(res) = renderer.pack_current() {
+                                                client.conn.lock().await.send(Message::Binary(res)).await.unwrap();
                                             } else {
                                                 let latest_doc = doc_publisher.latest().await;
                                                 if latest_doc.is_some() {
-                                                    let render_result = renderer.render(latest_doc.unwrap());
-                                                    client.conn.lock().await.send(Message::Text(render_result)).await.unwrap();
+                                                    let render_result = renderer.pack_delta(latest_doc.unwrap());
+                                                    client.conn.lock().await.send(Message::Binary(render_result)).await.unwrap();
                                                 } else {
                                                     client.conn.lock().await.send(Message::Text("current not avalible".into())).await.unwrap();
                                                 }
@@ -321,15 +321,15 @@ async fn main() {
                                     }
                                 },
                                 doc = Client::poll_watch_events(client.publisher.clone()) => {
-                                    let svg = client.renderer.lock().await.render(doc);
-                                    client.conn.lock().await.send(Message::Text(svg)).await.unwrap();
+                                    let svg = client.doc_server.lock().await.pack_delta(doc);
+                                    client.conn.lock().await.send(Message::Binary(svg)).await.unwrap();
                                 },
                                 // todo: bug, all of the clients will receive the same jump info
                                 pos = src_to_doc_jump_publisher.wait() => {
                                     let mut conn = client.conn.lock().await;
                                     let jump_info = format!("jump,{} {} {}", pos.page, pos.point.x.to_pt(), pos.point.y.to_pt());
                                     info!("sending src2doc jump info {}", jump_info);
-                                    conn.send(Message::Text(jump_info)).await.unwrap();
+                                    conn.send(Message::Binary(jump_info.into_bytes())).await.unwrap();
                                 }
                             }
                         }
