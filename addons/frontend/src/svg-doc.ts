@@ -29,7 +29,7 @@ export class SvgDocument {
           // is auto resizing
           window.onresize = null;
         }
-
+        const prevScale = this.currentScale;
         // Get wheel scroll direction and calculate new scale
         if (event.deltaY < 0) {
           // enlarge
@@ -54,10 +54,16 @@ export class SvgDocument {
           // no y-axis scroll
           return;
         }
+        const scrollFactor = this.currentScale / prevScale;
+        const scrollX = event.pageX * (scrollFactor - 1);
+        const scrollY = event.pageY * (scrollFactor - 1);
 
         // Apply new scale
         this.hookedElem.style.transformOrigin = "0 0";
         this.hookedElem.style.transform = `scale(${this.currentScale})`;
+
+        // make sure the cursor is still on the same position
+        window.scrollBy(scrollX, scrollY);
       }
     };
     const vscodeAPI = typeof (acquireVsCodeApi) !== "undefined";
