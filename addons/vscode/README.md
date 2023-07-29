@@ -19,7 +19,7 @@ https://github.com/Enter-tainer/typst-preview-vscode/assets/25521218/600529ce-8f
 TODO
 ## Known Issues
 
-- Ctrl+wheel is kind of strange
+See [issues](https://github.com/Enter-tainer/typst-preview-vscode/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc) on GitHub.
 
 ## Release Notes
 
