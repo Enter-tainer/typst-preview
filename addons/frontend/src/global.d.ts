@@ -4,3 +4,4 @@ interface Window {
   handleTypstLocation(elem: Element, page: number, x: number, y: number);
   typstWebsocket: WebSocket;
 }
+const acquireVsCodeApi: any;
