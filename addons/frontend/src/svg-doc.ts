@@ -21,7 +21,7 @@ export class SvgDocument {
       0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.3, 1.5, 1.7, 1.9,
       2.1, 2.4, 2.7, 3, 3.3, 3.7, 4.1, 4.6, 5.1, 5.7, 6.3, 7, 7.7, 8.5, 9.4, 10,
     ];
-    this.hookedElem.addEventListener("wheel", (event) => {
+    const wheelEventHandler = (event: WheelEvent) => {
       if (event.ctrlKey) {
         event.preventDefault();
 
@@ -59,7 +59,13 @@ export class SvgDocument {
         this.hookedElem.style.transformOrigin = "0 0";
         this.hookedElem.style.transform = `scale(${this.currentScale})`;
       }
-    });
+    };
+    const vscodeAPI = typeof (acquireVsCodeApi) !== "undefined";
+    if (vscodeAPI) {
+      window.addEventListener("wheel", wheelEventHandler);
+    } else {
+      document.body.addEventListener("wheel", wheelEventHandler, { passive: false });
+    }
   }
 
   rescale() {
