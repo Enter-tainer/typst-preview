@@ -90,3 +90,7 @@ Add preview button
 
 - Fix #60 and #24. Now we watch dirty files in memory therefore no shadow file is needed. Due to the removal of disk read/write, this should also improve performance and latency.
 - Preview on type is now enabled by default for new users. Existing users will not be affected.
+
+## v0.6.3
+
+- Fix #13, #63: Now ctrl+wheel zoom should zoom the content to the cursor position. And when the cursor is not within the document, the zoom sill works.

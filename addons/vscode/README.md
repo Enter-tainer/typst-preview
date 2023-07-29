@@ -16,7 +16,11 @@ https://github.com/Enter-tainer/typst-preview-vscode/assets/25521218/600529ce-8f
 
 ## Extension Settings
 
-TODO
+- `typst-preview.executable`: The executable path of typst-ws. Typically you don't need to change this because we already bundle typst-ws within the extension for all major platforms.
+- `typst-preview.fontPaths`: Absolute path to a directory or file containing font assets inaddition to the default font search paths.
+- `typst-preview.refresh`: When to refresh the preview. Refresh preview when the document is saved or when the document is changed. Possible values are `onType` and `onSave`. Default is `onType`.
+- `typst-preview.scrollSync`: Whether to sync the preview position with the cursor. Default is `onSelectionChange`.
+
 ## Known Issues
 
 See [issues](https://github.com/Enter-tainer/typst-preview-vscode/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc) on GitHub.
@@ -108,3 +112,7 @@ Add preview button
 
 - Fix #60 and #24. Now we watch dirty files in memory therefore no shadow file is needed. Due to the removal of disk read/write, this should also improve performance and latency.
 - Preview on type is now enabled by default for new users. Existing users will not be affected.
+
+### v0.6.3
+
+- Fix #13, #63: Now ctrl+wheel zoom should zoom the content to the cursor position. And when the cursor is not within the document, the zoom sill works.
