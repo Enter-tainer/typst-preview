@@ -184,6 +184,7 @@ enum ControlPlaneResponse {
 async fn main() {
     let _ = env_logger::builder()
         .filter_module("typst_ws", log::LevelFilter::Info)
+        .filter_module("typst_ts", log::LevelFilter::Info)
         .try_init();
     let arguments = CliArguments::parse();
     info!("Arguments: {:#?}", arguments);
