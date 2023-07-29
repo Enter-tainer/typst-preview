@@ -4,6 +4,7 @@ import { removeSourceMappingHandler } from "./svg-debug-info";
 export class SvgDocument {
   currentScale: number;
   cachedOffsetWidth: number;
+  cachedBoundingRect: DOMRect;
   imageContainerWidth: number;
   patchQueue: [string, string][];
   svgUpdating: boolean;
@@ -11,8 +12,10 @@ export class SvgDocument {
   svgModule: any;
 
   constructor(private hookedElem: HTMLElement) {
-    this.currentScale = 1;
     this.cachedOffsetWidth = 0;
+    this.cachedBoundingRect = hookedElem.getBoundingClientRect();
+
+    this.currentScale = 1;
     this.imageContainerWidth = hookedElem.offsetWidth;
     this.patchQueue = [];
     this.svgUpdating = false;
@@ -93,6 +96,7 @@ export class SvgDocument {
     if (this.hookedElem.style.transform !== targetScale) {
       this.hookedElem.style.transform = targetScale;
     }
+    console.log("rescale", this.currentScale);
   }
 
   initScale() {
@@ -123,6 +127,42 @@ export class SvgDocument {
 
       this.initScale();
     }
+  }
+
+  private toggleViewportChange() {
+    const docRect = this.cachedBoundingRect;
+    const scale = this.cachedOffsetWidth
+      ? this.svgModule.doc_width / this.cachedOffsetWidth
+      : 1;
+    const left = (window.screenLeft - docRect.left) * scale;
+    const top = (window.screenTop - docRect.top) * scale;
+    const width = window.innerWidth * scale;
+    const height = window.innerHeight * scale;
+
+    console.log("render_in_window", scale, left, top, width, height);
+
+    // with 1px padding to avoid edge error
+    const patchStr = this.svgModule.render_in_window(
+      left - 1,
+      top - 1,
+      left + width + 1,
+      top + height + 1
+    );
+    const t2 = performance.now();
+
+    if (this.hookedElem.firstElementChild) {
+      const elem = document.createElement("div");
+      elem.innerHTML = patchStr;
+      const svgElement = elem.firstElementChild as SVGElement;
+      patchRoot(this.hookedElem.firstElementChild as SVGElement, svgElement);
+      this.grabSourceMappingElement(elem);
+    } else {
+      this.hookedElem.innerHTML = patchStr;
+      this.grabSourceMappingElement(this.hookedElem);
+    }
+    const t3 = performance.now();
+
+    return [t2, t3];
   }
 
   private processQueue(svgUpdateEvent: [string, string]) {
@@ -158,29 +198,20 @@ export class SvgDocument {
         t3 = performance.now();
         break;
       case "diff-v1": {
-        console.log("diff-v1!!!", svgUpdateEvent[1], this.svgModule);
-
         this.svgModule.merge_delta(svgUpdateEvent[1]);
 
         t1 = performance.now();
-
-        const patchStr = this.svgModule.render_in_window(0, 0, 0, 0);
-        t2 = performance.now();
-
-        if (this.hookedElem.firstElementChild) {
-          const elem = document.createElement("div");
-          elem.innerHTML = patchStr;
-          const svgElement = elem.firstElementChild as SVGElement;
-          patchRoot(
-            this.hookedElem.firstElementChild as SVGElement,
-            svgElement
-          );
-          this.grabSourceMappingElement(elem);
-        } else {
-          this.hookedElem.innerHTML = patchStr;
-          this.grabSourceMappingElement(this.hookedElem);
-        }
-        t3 = performance.now();
+        // todo: trigger viewport change once
+        const [_t2, _t3] = this.toggleViewportChange();
+        t2 = _t2;
+        t3 = _t3;
+        break;
+      }
+      case "viewport-change": {
+        t1 = performance.now();
+        const [_t2, _t3] = this.toggleViewportChange();
+        t2 = _t2;
+        t3 = _t3;
         break;
       }
       default:
@@ -206,6 +237,8 @@ export class SvgDocument {
     this.svgUpdating = true;
     const doSvgUpdate = () => {
       this.cachedOffsetWidth = this.hookedElem.offsetWidth;
+      this.cachedBoundingRect = this.hookedElem.getBoundingClientRect();
+
       if (this.patchQueue.length === 0) {
         this.svgUpdating = false;
         this.postprocessChanges();

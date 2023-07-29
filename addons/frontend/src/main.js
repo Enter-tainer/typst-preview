@@ -13,7 +13,9 @@ window.onload = function () {
   const svgDoc = new SvgDocument(hookedElem);
 
   // drag (panal resizing) -> rescaling
-  window.onresize = () => svgDoc.rescale();
+  // window.onresize = () => svgDoc.rescale();
+  window.onresize = () => svgDoc.addChangement(["viewport-change", ""]);
+  window.onwheel = () => svgDoc.addChangement(["viewport-change", ""]);
 
   let socketOpen = false;
   let plugin = createTypstSvgRenderer();
