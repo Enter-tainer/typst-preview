@@ -144,9 +144,9 @@ export class SvgDocument {
     // with 1px padding to avoid edge error
     const patchStr = this.svgModule.render_in_window(
       left - 1,
-      top - 1,
+      top - 1 - height,
       left + width + 1,
-      top + height + 1
+      top + height * 3 + 1
     );
     const t2 = performance.now();
 
