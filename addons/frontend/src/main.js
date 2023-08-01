@@ -14,8 +14,9 @@ window.onload = function () {
 
   // drag (panal resizing) -> rescaling
   // window.onresize = () => svgDoc.rescale();
-  window.onresize = () => svgDoc.addChangement(["viewport-change", ""]);
-  window.onwheel = () => svgDoc.addChangement(["viewport-change", ""]);
+  window.onresize = () => svgDoc.addViewportChange();
+  window.onwheel = () => svgDoc.addViewportChange();
+  window.onscroll = () => svgDoc.addViewportChange();
 
   let socketOpen = false;
   let plugin = createTypstSvgRenderer();
@@ -68,6 +69,8 @@ window.onload = function () {
           const rootElem =
             document.getElementById("imageContainer")?.firstElementChild;
           if (rootElem) {
+            /// Note: when it is really scrolled, it will trigger `svgDoc.addViewportChange`
+            /// via `window.onscroll` event
             window.handleTypstLocation(rootElem, page, x, y);
           }
           return;

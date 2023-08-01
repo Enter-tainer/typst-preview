@@ -67,6 +67,7 @@ export class SvgDocument {
 
         // Apply new scale
         this.hookedElem.style.transform = `scale(${this.currentScale})`;
+        this.addViewportChange();
 
         // make sure the cursor is still on the same position
         window.scrollBy(scrollX, scrollY);
@@ -271,5 +272,9 @@ export class SvgDocument {
     }
     this.patchQueue.push(change);
     this.triggerSvgUpdate();
+  }
+
+  addViewportChange() {
+    this.addChangement(["viewport-change", ""]);
   }
 }
