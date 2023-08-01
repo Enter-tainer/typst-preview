@@ -30,7 +30,7 @@ window.onload = function () {
     });
 
     window.typstWebsocket.addEventListener("close", () => {
-      setTimeout(setupSocket, 1000);
+      setTimeout(() => setupSocket(svgDoc), 1000);
     });
 
     // 当收到WebSocket数据时

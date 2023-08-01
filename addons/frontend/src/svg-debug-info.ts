@@ -70,7 +70,13 @@ export function removeSourceMappingHandler(docRoot: HTMLElement) {
   }
 }
 
-export function installEditorJumpToHandler(_svgDoc: any, docRoot: HTMLElement) {
+function findIndexOfChild(elem: Element, child: Element) {
+  const children = castChildrenToSourceMappingElement(elem);
+  console.log(elem, "::", children, "=>", child);
+  return children.findIndex((x) => x[1] === child);
+}
+
+export function installEditorJumpToHandler(svgDoc: any, docRoot: HTMLElement) {
   void castChildrenToSourceMappingElement;
 
   const findSourceLocation = (elem: Element) => {
@@ -86,8 +92,41 @@ export function installEditorJumpToHandler(_svgDoc: any, docRoot: HTMLElement) {
       elem = elem.parentElement!;
     }
 
-    console.log(visitChain);
-    return undefined;
+    if (visitChain.length === 0) {
+      return undefined;
+    }
+
+    for (let idx = 1; idx < visitChain.length; idx++) {
+      const childIdx = findIndexOfChild(
+        visitChain[idx][1],
+        visitChain[idx - 1][1]
+      );
+      if (childIdx < 0) {
+        return undefined;
+      }
+      (visitChain[idx - 1][1] as any) = childIdx;
+    }
+
+    visitChain.reverse();
+
+    const pg = visitChain[0];
+    if (pg[0] !== SourceMappingType.Page) {
+      return undefined;
+    }
+    const childIdx = findIndexOfChild(pg[1].parentElement!, visitChain[0][1]);
+    if (childIdx < 0) {
+      return undefined;
+    }
+    (visitChain[0][1] as any) = childIdx;
+
+    const sourceNodePath = visitChain.flat();
+
+    // The page always shadowed by group, so we remove it.
+    // todo: where should I remove group under page? Putting here is a bit magical.
+    sourceNodePath.splice(2, 2);
+    console.log(sourceNodePath);
+
+    return svgDoc.get_source_loc(sourceNodePath);
   };
 
   removeSourceMappingHandler(docRoot);
@@ -117,7 +156,7 @@ export function installEditorJumpToHandler(_svgDoc: any, docRoot: HTMLElement) {
       "typst-debug-react-ripple-effect .4s linear"
     );
 
-    window.typstWebsocket.send(`srclocation ${sourceLoc[1][0]}`);
+    window.typstWebsocket.send(`srclocation ${sourceLoc}`);
     return;
   });
 
