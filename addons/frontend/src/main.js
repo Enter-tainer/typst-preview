@@ -8,33 +8,28 @@ const dec = new TextDecoder("utf-8");
 const NOT_AVAIABLE = "current not avalible";
 const COMMA = enc.encode(",");
 
-window.onload = function () {
-  const hookedElem = document.getElementById("imageContainer");
-  const svgDoc = new SvgDocument(hookedElem);
+function createSvgDocument(hookedElem, wasmDocRef) {
+  const svgDoc = new SvgDocument(hookedElem, wasmDocRef);
 
   // drag (panal resizing) -> rescaling
   // window.onresize = () => svgDoc.rescale();
   window.onresize = () => svgDoc.addViewportChange();
-  window.onwheel = () => svgDoc.addViewportChange();
   window.onscroll = () => svgDoc.addViewportChange();
 
-  let socketOpen = false;
-  let plugin = createTypstSvgRenderer();
-  let currentModule = undefined;
-  console.log(plugin);
+  return svgDoc;
+}
 
-  function setupSocket() {
+window.onload = function () {
+  function setupSocket(svgDoc) {
     window.typstWebsocket = new WebSocket("ws://127.0.0.1:23625");
     // socket.binaryType = "arraybuffer";
     window.typstWebsocket.addEventListener("open", () => {
-      socketOpen = true;
       console.log("WebSocket connection opened");
-      currentModule.reset();
+      svgDoc.reset();
       window.typstWebsocket.send("current");
     });
 
     window.typstWebsocket.addEventListener("close", () => {
-      socketOpen = false;
       setTimeout(setupSocket, 1000);
     });
 
@@ -91,19 +86,17 @@ window.onload = function () {
     });
   }
 
+  let plugin = createTypstSvgRenderer();
   plugin
     .init({
       getModule: () => renderModule,
     })
-    .then(() => {
-      return plugin.createModule();
-    })
-    .then((m) => {
-      svgDoc.setModule((currentModule = m));
-    })
-    .then(async () => {
+    .then(() => plugin.createModule())
+    .then(async (kModule /* module kernel from wasm */) => {
+      const hookedElem = document.getElementById("imageContainer");
+      const svgDoc = createSvgDocument(hookedElem, kModule);
+
       // todo: plugin init and setup socket at the same time
-      setupSocket();
-      console.log(plugin);
+      setupSocket(svgDoc);
     });
 };

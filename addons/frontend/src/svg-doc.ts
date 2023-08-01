@@ -1,25 +1,52 @@
 import { patchRoot } from "./svg-patch";
-import { removeSourceMappingHandler } from "./svg-debug-info";
+import { installEditorJumpToHandler } from "./svg-debug-info";
 
 export class SvgDocument {
-  currentScale: number;
-  cachedOffsetWidth: number;
-  cachedBoundingRect: DOMRect;
-  imageContainerWidth: number;
-  patchQueue: [string, string][];
-  svgUpdating: boolean;
-  holdingSrcElement: HTMLDivElement | undefined;
-  svgModule: any;
+  /// State fields
 
-  constructor(private hookedElem: HTMLElement) {
+  /// whether svg is updating (in triggerSvgUpdate)
+  svgUpdating: boolean;
+  /// whether kModule is initialized
+  moduleInitialized: boolean;
+  /// current scale of `hookedElem`
+  currentContainerScale: number;
+  /// current width of `hookedElem`
+  currentContainerWidth: number;
+  /// patch queue for updating svg.
+  patchQueue: [string, string][];
+
+  /// Cache fields
+
+  /// cached `hookedElem.offsetWidth`
+  cachedOffsetWidth: number;
+  /// cached `hookedElem.getBoundingClientRect()`
+  cachedBoundingRect: DOMRect;
+
+  constructor(private hookedElem: HTMLElement, public kModule: any) {
+    /// Cache fields
     this.cachedOffsetWidth = 0;
     this.cachedBoundingRect = hookedElem.getBoundingClientRect();
 
-    this.currentScale = 1;
-    this.imageContainerWidth = hookedElem.offsetWidth;
-    this.patchQueue = [];
+    /// State fields
     this.svgUpdating = false;
+    this.moduleInitialized = false;
+    this.currentContainerScale = 1;
+    this.currentContainerWidth = hookedElem.offsetWidth;
+    this.patchQueue = [];
 
+    /// for ctrl-wheel rescaling
+    this.hookedElem.style.transformOrigin = "0px 0px";
+
+    installEditorJumpToHandler(this.kModule, this.hookedElem);
+    this.installCtrlWheelHandler();
+  }
+
+  reset() {
+    this.kModule.reset();
+    this.moduleInitialized = false;
+  }
+
+  installCtrlWheelHandler() {
     // Ctrl+scroll rescaling
     // will disable auto resizing
     // fixed factors, same as pdf.js
@@ -27,7 +54,6 @@ export class SvgDocument {
       0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.3, 1.5, 1.7, 1.9,
       2.1, 2.4, 2.7, 3, 3.3, 3.7, 4.1, 4.6, 5.1, 5.7, 6.3, 7, 7.7, 8.5, 9.4, 10,
     ];
-    this.hookedElem.style.transformOrigin = "0px 0px";
     const wheelEventHandler = (event: WheelEvent) => {
       if (event.ctrlKey) {
         event.preventDefault();
@@ -36,41 +62,44 @@ export class SvgDocument {
           // is auto resizing
           window.onresize = null;
         }
-        const prevScale = this.currentScale;
+        const prevScale = this.currentContainerScale;
         // Get wheel scroll direction and calculate new scale
         if (event.deltaY < 0) {
           // enlarge
-          if (this.currentScale >= factors.at(-1)!) {
+          if (this.currentContainerScale >= factors.at(-1)!) {
             // already large than max factor
             return;
           } else {
-            this.currentScale = factors
-              .filter((x) => x > this.currentScale)
+            this.currentContainerScale = factors
+              .filter((x) => x > this.currentContainerScale)
               .at(0)!;
           }
         } else if (event.deltaY > 0) {
           // reduce
-          if (this.currentScale <= factors.at(0)!) {
+          if (this.currentContainerScale <= factors.at(0)!) {
             return;
           } else {
-            this.currentScale = factors
-              .filter((x) => x < this.currentScale)
+            this.currentContainerScale = factors
+              .filter((x) => x < this.currentContainerScale)
               .at(-1)!;
           }
         } else {
           // no y-axis scroll
           return;
         }
-        const scrollFactor = this.currentScale / prevScale;
+        const scrollFactor = this.currentContainerScale / prevScale;
         const scrollX = event.pageX * (scrollFactor - 1);
         const scrollY = event.pageY * (scrollFactor - 1);
 
         // Apply new scale
-        this.hookedElem.style.transform = `scale(${this.currentScale})`;
-        this.addViewportChange();
+        this.hookedElem.style.transform = `scale(${this.currentContainerScale})`;
 
         // make sure the cursor is still on the same position
         window.scrollBy(scrollX, scrollY);
+
+        /// Note: even if `window.scrollBy` can trigger viewport change event,
+        /// we still manually trigger it for explicitness.
+        this.addViewportChange();
       }
     };
     const vscodeAPI = typeof acquireVsCodeApi !== "undefined";
@@ -83,57 +112,34 @@ export class SvgDocument {
     }
   }
 
-  setModule(svgModule: any) {
-    this.svgModule = svgModule;
-  }
-
   rescale() {
-    const newImageContainerWidth = this.cachedOffsetWidth;
-    this.currentScale =
-      this.currentScale * (newImageContainerWidth / this.imageContainerWidth);
-    this.imageContainerWidth = newImageContainerWidth;
+    const newContainerWidth = this.cachedOffsetWidth;
+    this.currentContainerScale =
+      this.currentContainerScale *
+      (newContainerWidth / this.currentContainerWidth);
+    this.currentContainerWidth = newContainerWidth;
 
-    const targetScale = `scale(${this.currentScale})`;
+    const targetScale = `scale(${this.currentContainerScale})`;
     if (this.hookedElem.style.transform !== targetScale) {
       this.hookedElem.style.transform = targetScale;
     }
-    console.log("rescale", this.currentScale);
+    // console.log("rescale", this.currentContainerScale);
   }
 
   initScale() {
-    this.imageContainerWidth = this.cachedOffsetWidth;
+    this.currentContainerWidth = this.cachedOffsetWidth;
     const svgWidth = Number.parseFloat(
       this.hookedElem.firstElementChild!.getAttribute("width") || "1"
     );
-    this.currentScale = this.imageContainerWidth / svgWidth;
+    this.currentContainerScale = this.currentContainerWidth / svgWidth;
 
     this.rescale();
-  }
-
-  private grabSourceMappingElement(svgElement: HTMLElement) {
-    let srcElement = (svgElement.lastElementChild || undefined) as
-      | HTMLDivElement
-      | undefined;
-    if (!srcElement || !srcElement.classList.contains("typst-source-mapping")) {
-      srcElement = undefined;
-    }
-    this.holdingSrcElement = srcElement;
-  }
-
-  private postprocessChanges() {
-    const docRoot = this.hookedElem.firstElementChild as SVGElement;
-    if (docRoot) {
-      window.initTypstSvg(docRoot, this.holdingSrcElement);
-      this.holdingSrcElement = undefined;
-
-      this.initScale();
-    }
   }
 
   private toggleViewportChange() {
     const docRect = this.cachedBoundingRect;
     const scale = this.cachedOffsetWidth
-      ? this.svgModule.doc_width / this.cachedOffsetWidth
+      ? this.kModule.doc_width / this.cachedOffsetWidth
       : 1;
     const left = (window.screenLeft - docRect.left) * scale;
     const top = (window.screenTop - docRect.top) * scale;
@@ -143,7 +149,7 @@ export class SvgDocument {
     console.log("render_in_window", scale, left, top, width, height);
 
     // with 1px padding to avoid edge error
-    const patchStr = this.svgModule.render_in_window(
+    const patchStr = this.kModule.render_in_window(
       left - 1,
       top - 1 - height,
       left + width + 1,
@@ -156,10 +162,8 @@ export class SvgDocument {
       elem.innerHTML = patchStr;
       const svgElement = elem.firstElementChild as SVGElement;
       patchRoot(this.hookedElem.firstElementChild as SVGElement, svgElement);
-      this.grabSourceMappingElement(elem);
     } else {
       this.hookedElem.innerHTML = patchStr;
-      this.grabSourceMappingElement(this.hookedElem);
     }
     const t3 = performance.now();
 
@@ -172,43 +176,23 @@ export class SvgDocument {
     let t2 = undefined;
     let t3 = undefined;
     switch (svgUpdateEvent[0]) {
-      case "new":
-        this.hookedElem.innerHTML = svgUpdateEvent[1];
-        t1 = t2 = performance.now();
-
-        this.grabSourceMappingElement(this.hookedElem);
-
-        t3 = performance.now();
-        break;
-      case "diff-v0":
-        /// although there is still a race condition, we try to avoid it
-        if (this.hookedElem.firstElementChild) {
-          removeSourceMappingHandler(
-            this.hookedElem.firstElementChild as SVGElement
-          );
-        }
-
-        const elem = document.createElement("div");
-        elem.innerHTML = svgUpdateEvent[1];
-        const svgElement = elem.firstElementChild as SVGElement;
-        t1 = performance.now();
-        patchRoot(this.hookedElem.firstElementChild as SVGElement, svgElement);
-        this.grabSourceMappingElement(elem);
-        t2 = performance.now();
-
-        t3 = performance.now();
-        break;
       case "diff-v1": {
-        this.svgModule.merge_delta(svgUpdateEvent[1]);
+        this.kModule.merge_delta(svgUpdateEvent[1]);
 
         t1 = performance.now();
         // todo: trigger viewport change once
         const [_t2, _t3] = this.toggleViewportChange();
         t2 = _t2;
         t3 = _t3;
+        this.moduleInitialized = true;
         break;
       }
       case "viewport-change": {
+        if (!this.moduleInitialized) {
+          console.log("viewport-change before initialization");
+          t0 = t1 = t2 = t3 = performance.now();
+          break;
+        }
         t1 = performance.now();
         const [_t2, _t3] = this.toggleViewportChange();
         t2 = _t2;
@@ -221,12 +205,16 @@ export class SvgDocument {
         break;
     }
 
+    /// perf event
+    const d = (e: string, x: number, y: number) =>
+      `${e} ${(y - x).toFixed(2)} ms`;
     console.log(
-      `parse ${(t1 - t0).toFixed(2)} ms, replace ${(t2 - t1).toFixed(
-        2
-      )} ms, postprocess ${(t3 - t2).toFixed(2)} ms, total ${(t3 - t0).toFixed(
-        2
-      )} ms`
+      [
+        d("parse", t0, t1),
+        d("check-diff", t1, t2),
+        d("patch", t2, t3),
+        d("total", t0, t3),
+      ].join(", ")
     );
   }
 
@@ -264,6 +252,15 @@ export class SvgDocument {
       }
     };
     requestAnimationFrame(doSvgUpdate);
+  }
+
+  private postprocessChanges() {
+    const docRoot = this.hookedElem.firstElementChild as SVGElement;
+    if (docRoot) {
+      window.initTypstSvg(docRoot);
+
+      this.initScale();
+    }
   }
 
   addChangement(change: [string, string]) {
