@@ -1,6 +1,9 @@
 import "./typst.css";
 import { SvgDocument } from "./svg-doc";
-import { createTypstSvgRenderer } from "@myriaddreamin/typst.ts";
+import {
+  rendererBuildInfo,
+  createTypstSvgRenderer,
+} from "@myriaddreamin/typst.ts";
 import renderModule from "@myriaddreamin/typst-ts-renderer/typst_ts_renderer_bg.wasm?url";
 
 const enc = new TextEncoder("utf-8");
@@ -93,6 +96,8 @@ window.onload = function () {
     })
     .then(() => plugin.createModule())
     .then(async (kModule /* module kernel from wasm */) => {
+      console.log("plugin initialized, build info:", rendererBuildInfo());
+
       const hookedElem = document.getElementById("imageContainer");
       const svgDoc = createSvgDocument(hookedElem, kModule);
 
