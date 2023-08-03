@@ -175,8 +175,13 @@ export class SvgDocument {
     let t1 = undefined;
     let t2 = undefined;
     let t3 = undefined;
-    switch (svgUpdateEvent[0]) {
+    const eventName = svgUpdateEvent[0];
+    switch (eventName) {
+      case "new":
       case "diff-v1": {
+        if (eventName === "new") {
+          this.reset();
+        }
         this.kModule.merge_delta(svgUpdateEvent[1]);
 
         t1 = performance.now();
