@@ -72,6 +72,9 @@ window.onload = function () {
             window.handleTypstLocation(rootElem, page, x, y);
           }
           return;
+        } else if (message[0] === "partial-rendering") {
+          console.log("Experimental feature: partial rendering enabled")
+          svgDoc.setPartialRendering(true);
         }
 
         svgDoc.addChangement(message);

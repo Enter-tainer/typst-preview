@@ -14,6 +14,8 @@ export class SvgDocument {
   currentContainerWidth: number;
   /// patch queue for updating svg.
   patchQueue: [string, string][];
+  /// enable partial rendering
+  partialRendering: boolean;
 
   /// Cache fields
 
@@ -33,6 +35,7 @@ export class SvgDocument {
     this.currentContainerScale = 1;
     this.currentContainerWidth = hookedElem.offsetWidth;
     this.patchQueue = [];
+    this.partialRendering = false;
 
     /// for ctrl-wheel rescaling
     this.hookedElem.style.transformOrigin = "0px 0px";
@@ -146,15 +149,22 @@ export class SvgDocument {
     const width = window.innerWidth * scale;
     const height = window.innerHeight * scale;
 
-    console.log("render_in_window", scale, left, top, width, height);
 
+    let patchStr: string;
     // with 1px padding to avoid edge error
-    const patchStr = this.kModule.render_in_window(
-      left - 1,
-      top - height - 1,
-      left + width + 1,
-      top + height * 2 + 1
-    );
+    if (this.partialRendering) {
+      console.log("render_in_window with partial rendering enabled", scale, left, top, width, height);
+      patchStr = this.kModule.render_in_window(
+        left - 1,
+        top - height - 1,
+        left + width + 1,
+        top + height * 2 + 1
+      );
+    } else {
+      console.log("render_in_window with partial rendering disabled", 0, 0, 3.40282347E+38, 3.40282347E+38)
+      patchStr = this.kModule.render_in_window(0, 0, 3.40282347E+38, 3.40282347E+38);
+    }
+
     const t2 = performance.now();
 
     if (this.hookedElem.firstElementChild) {
@@ -195,6 +205,10 @@ export class SvgDocument {
       case "viewport-change": {
         if (!this.moduleInitialized) {
           console.log("viewport-change before initialization");
+          t0 = t1 = t2 = t3 = performance.now();
+          break;
+        }
+        if (!this.partialRendering) {
           t0 = t1 = t2 = t3 = performance.now();
           break;
         }
@@ -278,5 +292,9 @@ export class SvgDocument {
 
   addViewportChange() {
     this.addChangement(["viewport-change", ""]);
+  }
+
+  setPartialRendering(partialRendering: boolean) {
+    this.partialRendering = partialRendering;
   }
 }

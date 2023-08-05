@@ -77,10 +77,7 @@ impl CompileSettings {
     /// Panics if the command is not a compile or watch command.
     pub fn with_arguments(args: CliArguments) -> Self {
         let _watch = matches!(args.command, Command::Watch(_));
-        let CompileCommand { input } = match args.command {
-            Command::Watch(command) => command,
-            _ => unreachable!(),
-        };
+        let Command::Watch(CompileCommand { input }) = args.command;
         Self::new(input, true, args.root, args.font_paths)
     }
 }
@@ -190,6 +187,7 @@ async fn main() {
     info!("Arguments: {:#?}", arguments);
     let doc_publisher: Publisher<Document> = PublisherImpl::new().into();
     let command = CompileSettings::with_arguments(arguments.clone());
+    let enable_partial_rendering = arguments.enable_partial_rendering;
     let root = if let Some(root) = &command.root {
         root.clone()
     } else if let Some(dir) = command
@@ -275,6 +273,15 @@ async fn main() {
                     let src_to_doc_jump_publisher = src_to_doc_jump_publisher.clone();
                     tokio::spawn(async move {
                         active_client_count.fetch_add(1, Ordering::SeqCst);
+                        if enable_partial_rendering {
+                            client
+                                .conn
+                                .lock()
+                                .await
+                                .send(Message::Binary("partial-rendering,true".into()))
+                                .await
+                                .unwrap();
+                        }
                         loop {
                             tokio::select! {
                                 msg = Client::poll_ws_events(client.conn.clone()) => {
@@ -289,7 +296,7 @@ async fn main() {
                                                     let render_result = renderer.pack_delta(latest_doc.unwrap());
                                                     client.conn.lock().await.send(Message::Binary(render_result)).await.unwrap();
                                                 } else {
-                                                    client.conn.lock().await.send(Message::Text("current not avalible".into())).await.unwrap();
+                                                    client.conn.lock().await.send(Message::Binary("current not avalible".into())).await.unwrap();
                                                 }
                                             }
                                         } else if msg.starts_with("srclocation") {
@@ -313,7 +320,7 @@ async fn main() {
                                             );
                                             let _ = jump_tx.send(jump).await;
                                         } else {
-                                            client.conn.lock().await.send(Message::Text(format!("unknown command {msg}"))).await.unwrap();
+                                            client.conn.lock().await.send(Message::Binary(format!("unknown command {msg}").into())).await.unwrap();
                                         }
                                     } else {
                                         break;

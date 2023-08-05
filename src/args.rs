@@ -28,6 +28,9 @@ pub struct CliArguments {
     #[clap(long = "static-file-path")]
     pub static_file_path: Option<String>,
 
+    #[clap(long = "partial-rendering")]
+    pub enable_partial_rendering: bool,
+
     /// The typst command to run
     #[command(subcommand)]
     pub command: Command,

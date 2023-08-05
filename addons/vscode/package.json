@@ -97,6 +97,11 @@
           "enumDescriptions": [
             "Scroll preview to current cursor position when selection changes"
           ]
+        },
+        "typst-preview.partialRendering": {
+          "description": "Only render visible part of the document. This can improve performance but still being experimental.",
+          "type": "boolean",
+          "default": false
         }
       }
     }

@@ -342,10 +342,12 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		const projectRoot = getProjectRoot(filePath);
 		const rootArgs = projectRoot ? ["--root", projectRoot] : [];
 		const staticFileArgs = frontendPath ? ["--static-file-path", frontendPath] : [];
+		const partialRenderingArgs = vscode.workspace.getConfiguration().get<boolean>('typst-preview.partialRendering') ? ["--partial-rendering"] : [];
 		const [port, serverProcess] = await runServer(serverPath, [
 			"--data-plane-host", "127.0.0.1:23625",
 			...rootArgs,
 			...staticFileArgs,
+			...partialRenderingArgs,
 			...codeGetTypstWsFontArgs(),
 			"watch", filePath,
 		], outputChannel);
