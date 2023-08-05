@@ -40,9 +40,6 @@ pub enum Command {
     /// Watches the input file and recompiles on changes
     #[command(visible_alias = "w")]
     Watch(CompileCommand),
-
-    /// List all discovered fonts in system and custom font paths
-    Fonts(FontsCommand),
 }
 
 /// Compiles the input file into a PDF file
@@ -50,12 +47,4 @@ pub enum Command {
 pub struct CompileCommand {
     /// Path to input Typst file
     pub input: PathBuf,
-}
-
-/// List all discovered fonts in system and custom font paths
-#[derive(Debug, Clone, Parser)]
-pub struct FontsCommand {
-    /// Also list style variants of each font family
-    #[arg(long)]
-    pub variants: bool,
 }

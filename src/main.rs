@@ -225,7 +225,6 @@ async fn main() {
         tokio::spawn(async move {
             let res = match &arguments.command {
                 Command::Watch(_) => watch(world, publisher).await,
-                Command::Fonts(_) => todo!(), // fonts(FontsSettings::with_arguments(arguments)),
             };
 
             if let Err(msg) = res {
