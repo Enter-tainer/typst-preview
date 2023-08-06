@@ -5,24 +5,35 @@ export class SvgDocument {
   /// State fields
 
   /// whether svg is updating (in triggerSvgUpdate)
-  svgUpdating: boolean;
+  private svgUpdating: boolean;
   /// whether kModule is initialized
-  moduleInitialized: boolean;
-  /// current scale of `hookedElem`
-  currentContainerScale: number;
+  private moduleInitialized: boolean;
   /// current width of `hookedElem`
-  currentContainerWidth: number;
+  private currentContainerWidth: number;
   /// patch queue for updating svg.
-  patchQueue: [string, string][];
+  private patchQueue: [string, string][];
   /// enable partial rendering
-  partialRendering: boolean;
+  private partialRendering: boolean;
+
+  /// There are two scales in this class:
+  /// The real scale is to adjust the size of `hookedElem` to fit the svg.
+  /// The virtual scale (scale ratio) is to let user zoom in/out the svg.
+  /// For example:
+  /// + the default value of virtual scale is 1, which means the svg is
+  ///   totally fit in `hookedElem`.
+  /// + if user set virtual scale to 0.5, then the svg will be zoomed out
+  ///   to fit in half width of `hookedElem`.
+  /// "real" current scale of `hookedElem`
+  private currentRealScale: number;
+  /// "virtual" current scale of `hookedElem`
+  private currentScaleRatio: number;
 
   /// Cache fields
 
   /// cached `hookedElem.offsetWidth`
-  cachedOffsetWidth: number;
+  private cachedOffsetWidth: number;
   /// cached `hookedElem.getBoundingClientRect()`
-  cachedBoundingRect: DOMRect;
+  private cachedBoundingRect: DOMRect;
 
   constructor(private hookedElem: HTMLElement, public kModule: any) {
     /// Cache fields
@@ -32,10 +43,11 @@ export class SvgDocument {
     /// State fields
     this.svgUpdating = false;
     this.moduleInitialized = false;
-    this.currentContainerScale = 1;
+    this.currentRealScale = 1;
     this.currentContainerWidth = hookedElem.offsetWidth;
     this.patchQueue = [];
-    this.partialRendering = false;
+    this.partialRendering = true;
+    this.currentScaleRatio = 1;
 
     /// for ctrl-wheel rescaling
     this.hookedElem.style.transformOrigin = "0px 0px";
@@ -65,37 +77,38 @@ export class SvgDocument {
           // is auto resizing
           window.onresize = null;
         }
-        const prevScale = this.currentContainerScale;
+        const prevScaleRatio = this.currentScaleRatio;
         // Get wheel scroll direction and calculate new scale
         if (event.deltaY < 0) {
           // enlarge
-          if (this.currentContainerScale >= factors.at(-1)!) {
+          if (this.currentScaleRatio >= factors.at(-1)!) {
             // already large than max factor
             return;
           } else {
-            this.currentContainerScale = factors
-              .filter((x) => x > this.currentContainerScale)
+            this.currentScaleRatio = factors
+              .filter((x) => x > this.currentScaleRatio)
               .at(0)!;
           }
         } else if (event.deltaY > 0) {
           // reduce
-          if (this.currentContainerScale <= factors.at(0)!) {
+          if (this.currentScaleRatio <= factors.at(0)!) {
             return;
           } else {
-            this.currentContainerScale = factors
-              .filter((x) => x < this.currentContainerScale)
+            this.currentScaleRatio = factors
+              .filter((x) => x < this.currentScaleRatio)
               .at(-1)!;
           }
         } else {
           // no y-axis scroll
           return;
         }
-        const scrollFactor = this.currentContainerScale / prevScale;
+        const scrollFactor = this.currentScaleRatio / prevScaleRatio;
         const scrollX = event.pageX * (scrollFactor - 1);
         const scrollY = event.pageY * (scrollFactor - 1);
 
         // Apply new scale
-        this.hookedElem.style.transform = `scale(${this.currentContainerScale})`;
+        const scale = this.currentRealScale * this.currentScaleRatio;
+        this.hookedElem.style.transform = `scale(${scale})`;
 
         // make sure the cursor is still on the same position
         window.scrollBy(scrollX, scrollY);
@@ -103,11 +116,15 @@ export class SvgDocument {
         /// Note: even if `window.scrollBy` can trigger viewport change event,
         /// we still manually trigger it for explicitness.
         this.addViewportChange();
+
+        return false;
       }
     };
     const vscodeAPI = typeof acquireVsCodeApi !== "undefined";
     if (vscodeAPI) {
-      window.addEventListener("wheel", wheelEventHandler);
+      window.addEventListener("wheel", wheelEventHandler, {
+        passive: false,
+      });
     } else {
       document.body.addEventListener("wheel", wheelEventHandler, {
         passive: false,
@@ -117,16 +134,17 @@ export class SvgDocument {
 
   rescale() {
     const newContainerWidth = this.cachedOffsetWidth;
-    this.currentContainerScale =
-      this.currentContainerScale *
+    this.currentRealScale =
+      this.currentRealScale *
       (newContainerWidth / this.currentContainerWidth);
     this.currentContainerWidth = newContainerWidth;
 
-    const targetScale = `scale(${this.currentContainerScale})`;
+    const scale = this.currentRealScale * this.currentScaleRatio;
+    const targetScale = `scale(${scale})`;
     if (this.hookedElem.style.transform !== targetScale) {
       this.hookedElem.style.transform = targetScale;
     }
-    // console.log("rescale", this.currentContainerScale);
+    // console.log("rescale", scale, this.currentScaleRatio);
   }
 
   initScale() {
@@ -134,26 +152,29 @@ export class SvgDocument {
     const svgWidth = Number.parseFloat(
       this.hookedElem.firstElementChild!.getAttribute("width") || "1"
     );
-    this.currentContainerScale = this.currentContainerWidth / svgWidth;
+    this.currentRealScale = this.currentContainerWidth / svgWidth;
 
     this.rescale();
   }
 
   private toggleViewportChange() {
     const docRect = this.cachedBoundingRect;
-    const scale = this.cachedOffsetWidth
+    // scale derived from svg width and container with.
+    const computedRevScale = this.cachedOffsetWidth
       ? this.kModule.doc_width / this.cachedOffsetWidth
       : 1;
-    const left = (window.screenLeft - docRect.left) * scale;
-    const top = (window.screenTop - docRect.top) * scale;
-    const width = window.innerWidth * scale;
-    const height = window.innerHeight * scale;
+    // respect current scale ratio
+    const revScale = computedRevScale / this.currentScaleRatio;
+    const left = (window.screenLeft - docRect.left) * revScale;
+    const top = (window.screenTop - docRect.top) * revScale;
+    const width = window.innerWidth * revScale;
+    const height = window.innerHeight * revScale;
 
 
     let patchStr: string;
     // with 1px padding to avoid edge error
     if (this.partialRendering) {
-      console.log("render_in_window with partial rendering enabled", scale, left, top, width, height);
+      console.log("render_in_window with partial rendering enabled", revScale, left, top, width, height);
       patchStr = this.kModule.render_in_window(
         left - 1,
         top - height - 1,

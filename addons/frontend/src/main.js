@@ -16,8 +16,8 @@ function createSvgDocument(hookedElem, wasmDocRef) {
 
   // drag (panal resizing) -> rescaling
   // window.onresize = () => svgDoc.rescale();
-  window.onresize = () => svgDoc.addViewportChange();
-  window.onscroll = () => svgDoc.addViewportChange();
+  window.addEventListener("resize", () => svgDoc.addViewportChange());
+  window.addEventListener("scroll", () => svgDoc.addViewportChange());
 
   return svgDoc;
 }
@@ -73,7 +73,7 @@ window.onload = function () {
           }
           return;
         } else if (message[0] === "partial-rendering") {
-          console.log("Experimental feature: partial rendering enabled")
+          console.log("Experimental feature: partial rendering enabled");
           svgDoc.setPartialRendering(true);
         }
 
