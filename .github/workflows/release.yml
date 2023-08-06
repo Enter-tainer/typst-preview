@@ -81,9 +81,9 @@ jobs:
           sudo apt-get install gcc-arm-linux-gnueabihf
       - shell: pwsh
         run: |
-          cargo build --release -p typst-ws --target ${{ matrix.rust-target }}
-          cp "target/${{ matrix.rust-target }}/release/typst-ws$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "addons/vscode/out/"
-          cp "target/${{ matrix.rust-target }}/release/typst-ws$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "typst-ws-${{ env.target }}$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )"
+          cargo build --release -p typst-preview --target ${{ matrix.rust-target }}
+          cp "target/${{ matrix.rust-target }}/release/typst-preview$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "addons/vscode/out/"
+          cp "target/${{ matrix.rust-target }}/release/typst-preview$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "typst-preview-${{ env.target }}$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )"
       - shell: pwsh
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
         working-directory: ./addons/vscode
@@ -93,8 +93,8 @@ jobs:
           path: addons/vscode/typst-preview-${{ env.target }}.vsix
       - uses: actions/upload-artifact@v2
         with:
-          name: typst-ws-${{ env.target }}
-          path: typst-ws-${{ env.target }}${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
+          name: typst-preview-${{ env.target }}
+          path: typst-preview-${{ env.target }}${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
 
   build_alpine:
     name: build (x86_64-unknown-linux-musl)
@@ -122,10 +122,10 @@ jobs:
         working-directory: ./addons/vscode
       - name: build server binary
         run: |
-          cargo build --release -p typst-ws --target $RUST_TARGET
+          cargo build --release -p typst-preview --target $RUST_TARGET
           mkdir -p addons/vscode/out
-          cp "target/$RUST_TARGET/release/typst-ws" "addons/vscode/out/"
-          cp "target/$RUST_TARGET/release/typst-ws" "typst-ws-alpine-x64"
+          cp "target/$RUST_TARGET/release/typst-preview" "addons/vscode/out/"
+          cp "target/$RUST_TARGET/release/typst-preview" "typst-preview-alpine-x64"
       - name: package extension
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
         working-directory: ./addons/vscode
@@ -135,8 +135,8 @@ jobs:
           path: addons/vscode/typst-preview-${{ env.target }}.vsix
       - uses: actions/upload-artifact@v2
         with:
-          name: typst-ws-${{ env.target }}
-          path: typst-ws-${{ env.target }}
+          name: typst-preview-${{ env.target }}
+          path: typst-preview-${{ env.target }}
 
   release:
     runs-on: ubuntu-latest

@@ -19,36 +19,36 @@ suite('Extension Test Suite', () => {
 	test('Executable Configuration Test', async () => {
 		assert.strictEqual('', vscode.workspace.getConfiguration().get<string>('typst-preview.executable'), 'default path');
     
-    assert.notStrictEqual('', await ext.getTypstWsPath(), 'never resolve empty string');
-    assert.notStrictEqual(undefined, await ext.getTypstWsPath(), 'never resolve undefined');
+    assert.notStrictEqual('', await ext.getTypstPreviewPath(), 'never resolve empty string');
+    assert.notStrictEqual(undefined, await ext.getTypstPreviewPath(), 'never resolve undefined');
 
-    const state = ext.getTypstWsPath as unknown as any;
+    const state = ext.getTypstPreviewPath as unknown as any;
     let resolved: string;
 
     const BINARY_NAME = state.BINARY_NAME;
-		assert.strictEqual('typst-ws', BINARY_NAME, 'default binary path is typst-ws');
+    assert.strictEqual('typst-preview', BINARY_NAME, 'default binary path is typst-preview');
 
-    resolved = await ext.getTypstWsPath();
+    resolved = await ext.getTypstPreviewPath();
     assert.strictEqual(state.bundledPath, resolved, 'the bundle path exists and detected');
 
-    state.BINARY_NAME = 'bad-typst-ws';
-    assert.strictEqual('bad-typst-ws', await ext.getTypstWsPath(), 'fallback to binary name if not exists');
+    state.BINARY_NAME = 'bad-typst-preview';
+    assert.strictEqual('bad-typst-preview', await ext.getTypstPreviewPath(), 'fallback to binary name if not exists');
 
     const oldGetConfig = state.getConfig;
-    state.getConfig = () => 'config-typst-ws';
-    assert.strictEqual('config-typst-ws', await ext.getTypstWsPath(), 'use config if set');
+    state.getConfig = () => 'config-typst-preview';
+    assert.strictEqual('config-typst-preview', await ext.getTypstPreviewPath(), 'use config if set');
     
-    state.BINARY_NAME = 'typst-ws';
+    state.BINARY_NAME = 'typst-preview';
     state.getConfig = oldGetConfig;
-    resolved = await ext.getTypstWsPath();
+    resolved = await ext.getTypstPreviewPath();
     assert.strictEqual(state.bundledPath, resolved, 'reactive state');
 
-    resolved = await ext.getTypstWsPath();
+    resolved = await ext.getTypstPreviewPath();
     assert.strictEqual(true, resolved.endsWith(state.BINARY_NAME), 'exact file suffix');
 
     /// fast path should hit
     for (let i = 0; i < 1000; i++) {
-      await ext.getTypstWsPath();
+      await ext.getTypstPreviewPath();
     }
   });
 
@@ -61,16 +61,16 @@ suite('Extension Test Suite', () => {
     );
 
     jsonIs(assert.strictEqual)(
-      [], ext.getTypstWsFontArgs(undefined));
+      [], ext.getTypstPreviewFontArgs(undefined));
 
     jsonIs(assert.strictEqual)(
-      [], ext.getTypstWsFontArgs([]));
+      [], ext.getTypstPreviewFontArgs([]));
 
     jsonIs(assert.strictEqual)(
-      [], ext.codeGetTypstWsFontArgs());
+      [], ext.codeGetTypstPreviewFontArgs());
 
     jsonIs(assert.strictEqual)(
       ["--font-path", "/path/to/font1", "--font-path", "/path/to/font2"], 
-      ext.getTypstWsFontArgs(["/path/to/font1", "/path/to/font2"]));
+      ext.getTypstPreviewFontArgs(["/path/to/font1", "/path/to/font2"]));
   });
 });
