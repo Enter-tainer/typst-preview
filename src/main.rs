@@ -5,6 +5,8 @@ use clap::Parser;
 use codespan_reporting::term::{self, termcolor};
 
 use futures::{SinkExt, StreamExt};
+use hyper::http::Error;
+use hyper::service::{make_service_fn, service_fn};
 use log::{error, info, warn};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use publisher::Publisher;
@@ -176,6 +178,8 @@ enum ControlPlaneResponse {
     SyncEditorChanges(()),
 }
 
+const HTML: &str = include_str!("../addons/vscode/out/frontend/index.html");
+
 /// Entry point.
 #[tokio::main]
 async fn main() {
@@ -237,6 +241,7 @@ async fn main() {
         std::process::exit(0);
     });
 
+    let (data_plane_port_tx, data_plane_port_rx) = tokio::sync::oneshot::channel();
     let data_plane_addr = arguments
         .data_plane_host
         .unwrap_or_else(|| "127.0.0.1:23625".to_string());
@@ -254,7 +259,7 @@ async fn main() {
                 "Data plane server listening on: {}",
                 listener.local_addr().unwrap()
             );
-
+            let _ = data_plane_port_tx.send(listener.local_addr().unwrap().port());
             let active_client_count = Arc::new(AtomicUsize::new(0));
             loop {
                 let listen_timeout =
@@ -351,8 +356,8 @@ async fn main() {
                             info!("Peer closed WebSocket connection.");
                             let prev = active_client_count.fetch_sub(1, Ordering::SeqCst);
                             if prev == 1 {
-                                // There is no clients left. Wait 30s and shutdown if no new clients connect.
-                                tokio::time::sleep(Duration::from_secs(30)).await;
+                                // There is no clients left. Wait 10s and shutdown if no new clients connect.
+                                tokio::time::sleep(Duration::from_secs(10)).await;
                                 if active_client_count.load(Ordering::SeqCst) == 0 {
                                     info!("No active clients. Shutting down.");
                                     std::process::exit(0);
@@ -485,21 +490,39 @@ async fn main() {
     let static_file_addr = arguments
         .static_file_host
         .unwrap_or_else(|| "127.0.0.1:23267".to_string());
-    if let Some(path) = arguments.static_file_path {
-        let server = actix_web::HttpServer::new(move || {
-            actix_web::App::new()
-                .service(actix_files::Files::new("/", &path).index_file("index.html"))
-            // Enable the logger.
-            // .wrap(actix_web::middleware::Logger::default())
+    if arguments.serve_static_file {
+        let data_plane_port = data_plane_port_rx.await.unwrap();
+        let make_service = make_service_fn(|_| {
+            let data_plane_port = data_plane_port;
+            async move {
+                Ok::<_, hyper::http::Error>(service_fn(move |req| {
+                    async move {
+                        if req.uri().path() == "/" {
+                            let html = HTML.replace(
+                                "ws://127.0.0.1:23625",
+                                format!("ws://127.0.0.1:{data_plane_port}").as_str(),
+                            );
+                            Ok::<_, Error>(hyper::Response::new(hyper::Body::from(html)))
+                        } else {
+                            // jump to /
+                            let mut res = hyper::Response::new(hyper::Body::empty());
+                            *res.status_mut() = hyper::StatusCode::FOUND;
+                            res.headers_mut().insert(
+                                hyper::header::LOCATION,
+                                hyper::header::HeaderValue::from_static("/"),
+                            );
+                            Ok(res)
+                        }
+                    }
+                }))
+            }
         });
-        open::that_detached(format!("http://{}", static_file_addr)).unwrap();
-        server
-            .bind(&static_file_addr)
-            .unwrap()
-            .workers(1)
-            .run()
-            .await
-            .unwrap();
+        let server = hyper::Server::bind(&static_file_addr.parse().unwrap()).serve(make_service);
+        open::that_detached(format!("http://{}", server.local_addr())).unwrap();
+        info!("Static file server listening on: {}", server.local_addr());
+        if let Err(e) = server.await {
+            error!("Static file server error: {}", e);
+        }
     }
     let _ = tokio::join!(data_plane_handle, control_plane_handle);
 }

@@ -25,8 +25,8 @@ pub struct CliArguments {
     #[clap(long = "static-file-host")]
     pub static_file_host: Option<String>,
 
-    #[clap(long = "static-file-path")]
-    pub static_file_path: Option<String>,
+    #[clap(long = "serve-static-file")]
+    pub serve_static_file: bool,
 
     #[clap(long = "partial-rendering")]
     pub enable_partial_rendering: bool,

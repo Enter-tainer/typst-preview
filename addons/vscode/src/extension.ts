@@ -228,7 +228,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 	const scrollSyncMode = vscode.workspace.getConfiguration().get<ScrollSyncMode>('typst-preview.scrollSync') || "never";
 	const fontendPath = path.resolve(context.extensionPath, "out/frontend");
 	await watchEditorFiles();
-	const { serverProcess, controlPlanePort, dataPlanePort } = await launchTypstWs(task.kind === 'browser' ? fontendPath : null);
+	const { serverProcess, controlPlanePort, dataPlanePort } = await launchTypstWs(task.kind === 'browser');
 
 	const addonΠserver = new WebSocket(`ws://127.0.0.1:${controlPlanePort}`);
 	addonΠserver.addEventListener("message", async (message) => {
@@ -343,12 +343,12 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		}
 	};
 
-	async function launchTypstWs(frontendPath: null | string) {
+	async function launchTypstWs(serveStaticFile: boolean) {
 		const serverPath = await getTypstWsPath(context.extensionPath);
 		console.log(`Watching ${filePath} for changes`);
 		const projectRoot = getProjectRoot(filePath);
 		const rootArgs = projectRoot ? ["--root", projectRoot] : [];
-		const staticFileArgs = frontendPath ? ["--static-file-path", frontendPath] : [];
+		const staticFileArgs = serveStaticFile ? ["--serve-static-file"] : [];
 		const partialRenderingArgs = vscode.workspace.getConfiguration().get<boolean>('typst-preview.partialRendering') ? ["--partial-rendering"] : [];
 		const [dataPlanePort, controlPlanePort, serverProcess] = await runServer(serverPath, [
 			"--data-plane-host", "127.0.0.1:0",
