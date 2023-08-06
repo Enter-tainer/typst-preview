@@ -4,7 +4,7 @@ Preview your Typst files in vscode instantly!
 
 Install this extension from [marketplace](https://marketplace.visualstudio.com/items?itemName=mgt19937.typst-preview), open command palette (Ctrl+Shift+P), and type `>Typst Preview:`.
 
-https://github.com/Enter-tainer/typst-preview-vscode/assets/25521218/600529ce-8f42-4c2f-a224-b6b73e6ad017
+https://github.com/Enter-tainer/typst-preview/assets/25521218/600529ce-8f42-4c2f-a224-b6b73e6ad017
 
 This repo contains:
 - the native part of the extension, in rust
@@ -21,6 +21,10 @@ This repo contains:
 The extension watches for file changes, and incrementally compile your document to svg files. Then we use a websocket to send the rendered svg to the client. The client calculates the diff between the new svg and the old one, and apply the diff to the old one. This is done by a VDOM based incremental rendering technique.
 
 With all these techniques, we can achieve instant preview on type.
+
+## Use without VSCode
+
+You can use the binary `typst-preview` as a standalone typst preview server. It can be used to preview your document in browser. For example: `typst-preview ./assets/demo/main.typ --open-in-browser --partial-rendering`. This should be useful if you don't use VSCode but still want to experience the low latency preview.
 
 ## Acknowledgements
 

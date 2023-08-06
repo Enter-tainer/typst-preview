@@ -1,4 +1,4 @@
-# [Typst Preview VSCode](https://github.com/Enter-tainer/typst-preview-vscode)
+# [Typst Preview VSCode](https://github.com/Enter-tainer/typst-preview)
 
 Preview your Typst files in vscode instantly!
 
@@ -12,7 +12,7 @@ Install this extension from [marketplace](https://marketplace.visualstudio.com/i
 
 ![demo](demo.png)
 
-https://github.com/Enter-tainer/typst-preview-vscode/assets/25521218/600529ce-8f42-4c2f-a224-b6b73e6ad017
+https://github.com/Enter-tainer/typst-preview/assets/25521218/600529ce-8f42-4c2f-a224-b6b73e6ad017
 
 ## Extension Settings
 
@@ -20,10 +20,11 @@ https://github.com/Enter-tainer/typst-preview-vscode/assets/25521218/600529ce-8f
 - `typst-preview.fontPaths`: Absolute path to a directory or file containing font assets inaddition to the default font search paths.
 - `typst-preview.refresh`: When to refresh the preview. Refresh preview when the document is saved or when the document is changed. Possible values are `onType` and `onSave`. Default is `onType`.
 - `typst-preview.scrollSync`: Whether to sync the preview position with the cursor. Default is `onSelectionChange`.
+- `typst-preview.partialRendering`: Whether to render only the visible part of the document. This provides better performance on long document. Default is `false`. This is an experimental feature.
 
 ## Known Issues
 
-See [issues](https://github.com/Enter-tainer/typst-preview-vscode/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc) on GitHub.
+See [issues](https://github.com/Enter-tainer/typst-preview/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc) on GitHub.
 
 ## Release Notes
 
@@ -116,3 +117,10 @@ Add preview button
 ### v0.6.3
 
 - Fix #13, #63: Now ctrl+wheel zoom should zoom the content to the cursor position. And when the cursor is not within the document, the zoom sill works.
+
+### v0.6.4
+
+- Rename to Typst Preview.
+- Add page level partial rendering. This should improve performance on long document. This is an experimental feature and is disabled by default. You can enable it by setting `typst-preview.partialRendering` to `true`.
+- The binary `typst-preview` now can be used as a standalone preview server. You can use it to preview your document in browser. For example: `typst-preview ./assets/demo/main.typ --open-in-browser --partial-rendering`
+- Fix #70: now you can launch many preview instances at the same time.

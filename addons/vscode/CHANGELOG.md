@@ -94,3 +94,10 @@ Add preview button
 ## v0.6.3
 
 - Fix #13, #63: Now ctrl+wheel zoom should zoom the content to the cursor position. And when the cursor is not within the document, the zoom sill works.
+
+## v0.6.4
+
+- Rename to Typst Preview.
+- Add page level partial rendering. This should improve performance on long document. This is an experimental feature and is disabled by default. You can enable it by setting `typst-preview.partialRendering` to `true`.
+- The binary `typst-preview` now can be used as a standalone typst server. You can use it to preview your document in browser. For example: `typst-preview ./assets/demo/main.typ --open-in-browser --partial-rendering`
+- Fix #70: now you can launch many preview instances at the same time.
