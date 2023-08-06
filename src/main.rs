@@ -195,10 +195,8 @@ async fn main() {
     } else {
         let input_path = command.input.canonicalize().unwrap();
         let root = input_path.parent().unwrap().to_owned();
-        let entry: PathBuf = input_path.file_name().unwrap().to_owned().into();
-        (root, entry)
+        (root, input_path)
     };
-    info!("root: {:?}, entry: {:?}", root, entry);
     let compile_driver = {
         let world = TypstSystemWorld::new(CompileOpts {
             root_dir: root.clone(),
