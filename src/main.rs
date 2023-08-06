@@ -190,13 +190,24 @@ async fn main() {
     let doc_publisher: Publisher<Document> = PublisherImpl::new().into();
     let command = CompileSettings::with_arguments(arguments.clone());
     let enable_partial_rendering = arguments.enable_partial_rendering;
-    let (root, entry) = if let Some(root) = &command.root {
-        (root.clone(), command.input.clone())
+    let entry = if command.input.is_absolute() {
+        command.input.clone()
     } else {
-        let input_path = command.input.canonicalize().unwrap();
-        let root = input_path.parent().unwrap().to_owned();
-        (root, input_path)
+        std::env::current_dir().unwrap().join(command.input)
     };
+    let root = if let Some(root) = &command.root {
+        if root.is_absolute() {
+            root.clone()
+        } else {
+            std::env::current_dir().unwrap().join(root)
+        }
+    } else {
+        std::env::current_dir().unwrap()
+    };
+    if !entry.starts_with(&root) {
+        error!("entry file must be in the root directory");
+        std::process::exit(1);
+    }
     let compile_driver = {
         let world = TypstSystemWorld::new(CompileOpts {
             root_dir: root.clone(),
