@@ -229,10 +229,6 @@ export class SvgDocument {
           t0 = t1 = t2 = t3 = performance.now();
           break;
         }
-        if (!this.partialRendering) {
-          t0 = t1 = t2 = t3 = performance.now();
-          break;
-        }
         t1 = performance.now();
         const [_t2, _t3] = this.toggleViewportChange();
         t2 = _t2;
@@ -304,6 +300,9 @@ export class SvgDocument {
   }
 
   addChangement(change: [string, string]) {
+    if (!this.partialRendering && change[0] === "viewport-change") {
+      return;
+    }
     if (change[0] === "new") {
       this.patchQueue.splice(0, this.patchQueue.length);
     }
