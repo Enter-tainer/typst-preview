@@ -1,19 +1,67 @@
 import { patchRoot } from "./svg-patch";
-import { removeSourceMappingHandler } from "./svg-debug-info";
+import { installEditorJumpToHandler } from "./svg-debug-info";
 
 export class SvgDocument {
-  currentScale: number;
-  imageContainerWidth: number;
-  patchQueue: [string, string][];
-  svgUpdating: boolean;
-  holdingSrcElement: HTMLDivElement | undefined;
+  /// State fields
 
-  constructor(private hookedElem: HTMLElement) {
-    this.currentScale = 1;
-    this.imageContainerWidth = hookedElem.offsetWidth;
-    this.patchQueue = [];
+  /// whether svg is updating (in triggerSvgUpdate)
+  private svgUpdating: boolean;
+  /// whether kModule is initialized
+  private moduleInitialized: boolean;
+  /// current width of `hookedElem`
+  private currentContainerWidth: number;
+  /// patch queue for updating svg.
+  private patchQueue: [string, string][];
+  /// enable partial rendering
+  private partialRendering: boolean;
+
+  /// There are two scales in this class:
+  /// The real scale is to adjust the size of `hookedElem` to fit the svg.
+  /// The virtual scale (scale ratio) is to let user zoom in/out the svg.
+  /// For example:
+  /// + the default value of virtual scale is 1, which means the svg is
+  ///   totally fit in `hookedElem`.
+  /// + if user set virtual scale to 0.5, then the svg will be zoomed out
+  ///   to fit in half width of `hookedElem`.
+  /// "real" current scale of `hookedElem`
+  private currentRealScale: number;
+  /// "virtual" current scale of `hookedElem`
+  private currentScaleRatio: number;
+
+  /// Cache fields
+
+  /// cached `hookedElem.offsetWidth`
+  private cachedOffsetWidth: number;
+  /// cached `hookedElem.getBoundingClientRect()`
+  private cachedBoundingRect: DOMRect;
+
+  constructor(private hookedElem: HTMLElement, public kModule: any) {
+    /// Cache fields
+    this.cachedOffsetWidth = 0;
+    this.cachedBoundingRect = hookedElem.getBoundingClientRect();
+
+    /// State fields
     this.svgUpdating = false;
+    this.moduleInitialized = false;
+    this.currentRealScale = 1;
+    this.currentContainerWidth = hookedElem.offsetWidth;
+    this.patchQueue = [];
+    this.partialRendering = false;
+    this.currentScaleRatio = 1;
 
+    /// for ctrl-wheel rescaling
+    this.hookedElem.style.transformOrigin = "0px 0px";
+
+    installEditorJumpToHandler(this.kModule, this.hookedElem);
+    this.installCtrlWheelHandler();
+  }
+
+  reset() {
+    this.kModule.reset();
+    this.moduleInitialized = false;
+  }
+
+  installCtrlWheelHandler() {
     // Ctrl+scroll rescaling
     // will disable auto resizing
     // fixed factors, same as pdf.js
@@ -29,89 +77,128 @@ export class SvgDocument {
           // is auto resizing
           window.onresize = null;
         }
-        const prevScale = this.currentScale;
+        const prevScaleRatio = this.currentScaleRatio;
         // Get wheel scroll direction and calculate new scale
         if (event.deltaY < 0) {
           // enlarge
-          if (this.currentScale >= factors.at(-1)!) {
+          if (this.currentScaleRatio >= factors.at(-1)!) {
             // already large than max factor
             return;
           } else {
-            this.currentScale = factors
-              .filter((x) => x > this.currentScale)
+            this.currentScaleRatio = factors
+              .filter((x) => x > this.currentScaleRatio)
               .at(0)!;
           }
         } else if (event.deltaY > 0) {
           // reduce
-          if (this.currentScale <= factors.at(0)!) {
+          if (this.currentScaleRatio <= factors.at(0)!) {
             return;
           } else {
-            this.currentScale = factors
-              .filter((x) => x < this.currentScale)
+            this.currentScaleRatio = factors
+              .filter((x) => x < this.currentScaleRatio)
               .at(-1)!;
           }
         } else {
           // no y-axis scroll
           return;
         }
-        const scrollFactor = this.currentScale / prevScale;
+        const scrollFactor = this.currentScaleRatio / prevScaleRatio;
         const scrollX = event.pageX * (scrollFactor - 1);
         const scrollY = event.pageY * (scrollFactor - 1);
 
         // Apply new scale
-        this.hookedElem.style.transformOrigin = "0 0";
-        this.hookedElem.style.transform = `scale(${this.currentScale})`;
+        const scale = this.currentRealScale * this.currentScaleRatio;
+        this.hookedElem.style.transform = `scale(${scale})`;
 
         // make sure the cursor is still on the same position
         window.scrollBy(scrollX, scrollY);
+
+        /// Note: even if `window.scrollBy` can trigger viewport change event,
+        /// we still manually trigger it for explicitness.
+        this.addViewportChange();
+
+        return false;
       }
     };
-    const vscodeAPI = typeof (acquireVsCodeApi) !== "undefined";
+    const vscodeAPI = typeof acquireVsCodeApi !== "undefined";
     if (vscodeAPI) {
-      window.addEventListener("wheel", wheelEventHandler);
+      window.addEventListener("wheel", wheelEventHandler, {
+        passive: false,
+      });
     } else {
-      document.body.addEventListener("wheel", wheelEventHandler, { passive: false });
+      document.body.addEventListener("wheel", wheelEventHandler, {
+        passive: false,
+      });
     }
   }
 
   rescale() {
-    const newImageContainerWidth = this.hookedElem.offsetWidth;
-    this.currentScale =
-      this.currentScale * (newImageContainerWidth / this.imageContainerWidth);
-    this.imageContainerWidth = newImageContainerWidth;
+    const newContainerWidth = this.cachedOffsetWidth;
+    this.currentRealScale =
+      this.currentRealScale *
+      (newContainerWidth / this.currentContainerWidth);
+    this.currentContainerWidth = newContainerWidth;
 
-    this.hookedElem.style.transformOrigin = "0px 0px";
-    this.hookedElem.style.transform = `scale(${this.currentScale})`;
+    const scale = this.currentRealScale * this.currentScaleRatio;
+    const targetScale = `scale(${scale})`;
+    if (this.hookedElem.style.transform !== targetScale) {
+      this.hookedElem.style.transform = targetScale;
+    }
+    // console.log("rescale", scale, this.currentScaleRatio);
   }
 
   initScale() {
-    this.imageContainerWidth = this.hookedElem.offsetWidth;
+    this.currentContainerWidth = this.cachedOffsetWidth;
     const svgWidth = Number.parseFloat(
       this.hookedElem.firstElementChild!.getAttribute("width") || "1"
     );
-    this.currentScale = this.imageContainerWidth / svgWidth;
+    this.currentRealScale = this.currentContainerWidth / svgWidth;
 
     this.rescale();
   }
 
-  private grabSourceMappingElement(svgElement: HTMLElement) {
-    let srcElement = (svgElement.lastElementChild || undefined) as
-      | HTMLDivElement
-      | undefined;
-    if (!srcElement || !srcElement.classList.contains("typst-source-mapping")) {
-      srcElement = undefined;
-    }
-    this.holdingSrcElement = srcElement;
-  }
+  private toggleViewportChange() {
+    const docRect = this.cachedBoundingRect;
+    // scale derived from svg width and container with.
+    const computedRevScale = this.cachedOffsetWidth
+      ? this.kModule.doc_width / this.cachedOffsetWidth
+      : 1;
+    // respect current scale ratio
+    const revScale = computedRevScale / this.currentScaleRatio;
+    const left = (window.screenLeft - docRect.left) * revScale;
+    const top = (window.screenTop - docRect.top) * revScale;
+    const width = window.innerWidth * revScale;
+    const height = window.innerHeight * revScale;
 
-  private postprocessChanges() {
-    const docRoot = this.hookedElem.firstElementChild as SVGElement;
-    if (docRoot) {
-      window.initTypstSvg(docRoot, this.holdingSrcElement);
-      this.holdingSrcElement = undefined;
 
-      this.initScale();
+    let patchStr: string;
+    // with 1px padding to avoid edge error
+    if (this.partialRendering) {
+      console.log("render_in_window with partial rendering enabled", revScale, left, top, width, height);
+      patchStr = this.kModule.render_in_window(
+        left - 1,
+        top - height - 1,
+        left + width + 1,
+        top + height * 2 + 1
+      );
+    } else {
+      console.log("render_in_window with partial rendering disabled", 0, 0, 1e33, 1e33)
+      patchStr = this.kModule.render_in_window(0, 0, 1e33, 1e33);
     }
+
+    const t2 = performance.now();
+
+    if (this.hookedElem.firstElementChild) {
+      const elem = document.createElement("div");
+      elem.innerHTML = patchStr;
+      const svgElement = elem.firstElementChild as SVGElement;
+      patchRoot(this.hookedElem.firstElementChild as SVGElement, svgElement);
+    } else {
+      this.hookedElem.innerHTML = patchStr;
+    }
+    const t3 = performance.now();
+
+    return [t2, t3];
   }
 
   private processQueue(svgUpdateEvent: [string, string]) {
@@ -119,45 +206,51 @@ export class SvgDocument {
     let t1 = undefined;
     let t2 = undefined;
     let t3 = undefined;
-    switch (svgUpdateEvent[0]) {
+    const eventName = svgUpdateEvent[0];
+    switch (eventName) {
       case "new":
-        this.hookedElem.innerHTML = svgUpdateEvent[1];
-        t1 = t2 = performance.now();
-
-        this.grabSourceMappingElement(this.hookedElem);
-
-        t3 = performance.now();
-        break;
-      case "diff-v0":
-        /// although there is still a race condition, we try to avoid it
-        if (this.hookedElem.firstElementChild) {
-          removeSourceMappingHandler(
-            this.hookedElem.firstElementChild as SVGElement
-          );
+      case "diff-v1": {
+        if (eventName === "new") {
+          this.reset();
         }
+        this.kModule.merge_delta(svgUpdateEvent[1]);
 
-        const elem = document.createElement("div");
-        elem.innerHTML = svgUpdateEvent[1];
-        const svgElement = elem.firstElementChild as SVGElement;
         t1 = performance.now();
-        patchRoot(this.hookedElem.firstElementChild as SVGElement, svgElement);
-        this.grabSourceMappingElement(elem);
-        t2 = performance.now();
-
-        t3 = performance.now();
+        // todo: trigger viewport change once
+        const [_t2, _t3] = this.toggleViewportChange();
+        t2 = _t2;
+        t3 = _t3;
+        this.moduleInitialized = true;
         break;
+      }
+      case "viewport-change": {
+        if (!this.moduleInitialized) {
+          console.log("viewport-change before initialization");
+          t0 = t1 = t2 = t3 = performance.now();
+          break;
+        }
+        t1 = performance.now();
+        const [_t2, _t3] = this.toggleViewportChange();
+        t2 = _t2;
+        t3 = _t3;
+        break;
+      }
       default:
         console.log("svgUpdateEvent", svgUpdateEvent);
         t0 = t1 = t2 = t3 = performance.now();
         break;
     }
 
+    /// perf event
+    const d = (e: string, x: number, y: number) =>
+      `${e} ${(y - x).toFixed(2)} ms`;
     console.log(
-      `parse ${(t1 - t0).toFixed(2)} ms, replace ${(t2 - t1).toFixed(
-        2
-      )} ms, postprocess ${(t3 - t2).toFixed(2)} ms, total ${(t3 - t0).toFixed(
-        2
-      )} ms`
+      [
+        d("parse", t0, t1),
+        d("check-diff", t1, t2),
+        d("patch", t2, t3),
+        d("total", t0, t3),
+      ].join(", ")
     );
   }
 
@@ -168,6 +261,9 @@ export class SvgDocument {
 
     this.svgUpdating = true;
     const doSvgUpdate = () => {
+      this.cachedOffsetWidth = this.hookedElem.offsetWidth;
+      this.cachedBoundingRect = this.hookedElem.getBoundingClientRect();
+
       if (this.patchQueue.length === 0) {
         this.svgUpdating = false;
         this.postprocessChanges();
@@ -179,7 +275,10 @@ export class SvgDocument {
         }
 
         // to hide the rescale behavior at the first time
-        this.initScale();
+        const docRoot = this.hookedElem.firstElementChild as SVGElement;
+        if (docRoot) {
+          this.initScale();
+        }
 
         requestAnimationFrame(doSvgUpdate);
       } catch (e) {
@@ -191,11 +290,31 @@ export class SvgDocument {
     requestAnimationFrame(doSvgUpdate);
   }
 
+  private postprocessChanges() {
+    const docRoot = this.hookedElem.firstElementChild as SVGElement;
+    if (docRoot) {
+      window.initTypstSvg(docRoot);
+
+      this.initScale();
+    }
+  }
+
   addChangement(change: [string, string]) {
+    if (!this.partialRendering && change[0] === "viewport-change") {
+      return;
+    }
     if (change[0] === "new") {
       this.patchQueue.splice(0, this.patchQueue.length);
     }
     this.patchQueue.push(change);
     this.triggerSvgUpdate();
+  }
+
+  addViewportChange() {
+    this.addChangement(["viewport-change", ""]);
+  }
+
+  setPartialRendering(partialRendering: boolean) {
+    this.partialRendering = partialRendering;
   }
 }

@@ -1,51 +1,84 @@
 import "./typst.css";
 import { SvgDocument } from "./svg-doc";
+import {
+  rendererBuildInfo,
+  createTypstSvgRenderer,
+} from "@myriaddreamin/typst.ts";
+import renderModule from "@myriaddreamin/typst-ts-renderer/typst_ts_renderer_bg.wasm?url";
 
-window.onload = function () {
-  const hookedElem = document.getElementById("imageContainer");
-  const svgDoc = new SvgDocument(hookedElem);
+const enc = new TextEncoder("utf-8");
+const dec = new TextDecoder("utf-8");
+const NOT_AVAIABLE = "current not avalible";
+const COMMA = enc.encode(",");
+
+function createSvgDocument(hookedElem, wasmDocRef) {
+  const svgDoc = new SvgDocument(hookedElem, wasmDocRef);
 
   // drag (panal resizing) -> rescaling
-  window.onresize = () => svgDoc.rescale();
+  // window.onresize = () => svgDoc.rescale();
+  window.addEventListener("resize", () => svgDoc.addViewportChange());
+  window.addEventListener("scroll", () => svgDoc.addViewportChange());
 
-  let socketOpen = false;
+  return svgDoc;
+}
 
-  function setupSocket() {
+window.onload = function () {
+  function setupSocket(svgDoc) {
     window.typstWebsocket = new WebSocket("ws://127.0.0.1:23625");
     // socket.binaryType = "arraybuffer";
     window.typstWebsocket.addEventListener("open", () => {
-      socketOpen = true;
       console.log("WebSocket connection opened");
+      svgDoc.reset();
       window.typstWebsocket.send("current");
     });
 
     window.typstWebsocket.addEventListener("close", () => {
-      socketOpen = false;
-      setTimeout(setupSocket, 1000);
+      setTimeout(() => setupSocket(svgDoc), 1000);
     });
 
     // 当收到WebSocket数据时
     window.typstWebsocket.addEventListener("message", (event) => {
       const data = event.data;
-      if ("current not avalible" === data) {
-        return;
-      }
-
-      const message_idx = data.indexOf(",");
-      const message = [data.slice(0, message_idx), data.slice(message_idx + 1)];
-      console.log(message);
-
-      if (message[0] === "jump") {
-        const [page, x, y] = message[1].split(" ").map(Number);
-        const rootElem =
-          document.getElementById("imageContainer")?.firstElementChild;
-        if (rootElem) {
-          window.handleTypstLocation(rootElem, page, x, y);
+      if (!(data instanceof Blob)) {
+        if (data === NOT_AVAIABLE) {
+          return;
         }
+
+        console.error("WebSocket data is not a Blob", data);
         return;
       }
 
-      svgDoc.addChangement(message);
+      data.arrayBuffer().then((buffer) => {
+        const messageData = new Uint8Array(buffer);
+        console.log(messageData);
+
+        const message_idx = messageData.indexOf(COMMA[0]);
+        const message = [
+          dec.decode(messageData.slice(0, message_idx).buffer),
+          messageData.slice(message_idx + 1),
+        ];
+        console.log(message);
+
+        if (message[0] === "jump") {
+          const [page, x, y] = dec
+            .decode(message[1].buffer)
+            .split(" ")
+            .map(Number);
+          const rootElem =
+            document.getElementById("imageContainer")?.firstElementChild;
+          if (rootElem) {
+            /// Note: when it is really scrolled, it will trigger `svgDoc.addViewportChange`
+            /// via `window.onscroll` event
+            window.handleTypstLocation(rootElem, page, x, y);
+          }
+          return;
+        } else if (message[0] === "partial-rendering") {
+          console.log("Experimental feature: partial rendering enabled");
+          svgDoc.setPartialRendering(true);
+        }
+
+        svgDoc.addChangement(message);
+      });
     });
 
     // 当WebSocket连接关闭时
@@ -58,5 +91,20 @@ window.onload = function () {
       console.error("WebSocket Error: ", error);
     });
   }
-  setupSocket();
+
+  let plugin = createTypstSvgRenderer();
+  plugin
+    .init({
+      getModule: () => renderModule,
+    })
+    .then(() => plugin.createModule())
+    .then(async (kModule /* module kernel from wasm */) => {
+      console.log("plugin initialized, build info:", rendererBuildInfo());
+
+      const hookedElem = document.getElementById("imageContainer");
+      const svgDoc = createSvgDocument(hookedElem, kModule);
+
+      // todo: plugin init and setup socket at the same time
+      setupSocket(svgDoc);
+    });
 };

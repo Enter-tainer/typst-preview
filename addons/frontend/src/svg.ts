@@ -1,5 +1,4 @@
 import { triggerRipple } from "./svg-animation";
-import { parseSourceMappingNode, initSourceMapping } from "./svg-debug-info.ts";
 
 // debounce https://stackoverflow.com/questions/23181243/throttling-a-mousemove-event-to-fire-no-more-than-5-times-a-second
 // ignore fast events, good for capturing double click
@@ -94,10 +93,7 @@ function findAncestor(el: Element, cls: string) {
   return el;
 }
 
-window.initTypstSvg = function (
-  docRoot: SVGElement,
-  srcMapping?: HTMLDivElement
-) {
+window.initTypstSvg = function (docRoot: SVGElement) {
   /// initialize pseudo links
   var elements = docRoot.getElementsByClassName("pseudo-link");
   for (var i = 0; i < elements.length; i++) {
@@ -110,22 +106,6 @@ window.initTypstSvg = function (
   if (false) {
     setTimeout(() => {
       layoutText(docRoot);
-    }, 0);
-  }
-
-  /// initialize debug info (source mapping)
-  if (srcMapping) {
-    const dataPages = srcMapping
-      .getAttribute("data-pages")!
-      .split("|")
-      .map(parseSourceMappingNode);
-    const dataSourceMapping = srcMapping
-      .getAttribute("data-source-mapping")!
-      .split("|")
-      .map(parseSourceMappingNode);
-    srcMapping.remove();
-    setTimeout(() => {
-      initSourceMapping(docRoot, dataPages, dataSourceMapping);
     }, 0);
   }
 
@@ -166,7 +146,7 @@ window.initTypstSvg = function (
   }
 };
 
-function layoutText (svg: SVGElement) {
+function layoutText(svg: SVGElement) {
   const divs = svg.querySelectorAll<HTMLDivElement>(".tsel");
   const canvas = document.createElementNS(
     "http://www.w3.org/1999/xhtml",
@@ -205,7 +185,7 @@ function layoutText (svg: SVGElement) {
   }
 
   console.log(`layoutText used time ${performance.now() - layoutBegin} ms`);
-};
+}
 
 window.handleTypstLocation = function (
   elem: Element,
@@ -246,7 +226,6 @@ window.handleTypstLocation = function (
 
       // window.scrollTo(xOffset, yOffset);
       /// this would be better for preview svg
-      // x: basePos.left, y: yOffset, 
       window.scrollTo({ behavior: "smooth", left: basePos.left, top: yOffset });
 
       triggerRipple(

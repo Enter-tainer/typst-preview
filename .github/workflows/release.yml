@@ -60,9 +60,11 @@ jobs:
         with:
           node-version: 16
       - run: yarn
-        working-directory: ./addons/vscode
-      - run: yarn
         working-directory: ./addons/frontend
+      - run: |
+          yarn
+          yarn run compile
+        working-directory: ./addons/vscode
       - name: rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -80,7 +82,6 @@ jobs:
       - shell: pwsh
         run: |
           cargo build --release -p typst-ws --target ${{ matrix.rust-target }}
-          mkdir -p addons/vscode/out
           cp "target/${{ matrix.rust-target }}/release/typst-ws$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "addons/vscode/out/"
           cp "target/${{ matrix.rust-target }}/release/typst-ws$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "typst-ws-${{ env.target }}$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )"
       - shell: pwsh
@@ -113,16 +114,18 @@ jobs:
         uses: actions/checkout@v3
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.3
+      - run: yarn
+        working-directory: ./addons/frontend
+      - run: |
+          yarn
+          yarn run compile
+        working-directory: ./addons/vscode
       - name: build server binary
         run: |
           cargo build --release -p typst-ws --target $RUST_TARGET
           mkdir -p addons/vscode/out
           cp "target/$RUST_TARGET/release/typst-ws" "addons/vscode/out/"
           cp "target/$RUST_TARGET/release/typst-ws" "typst-ws-alpine-x64"
-      - run: yarn
-        working-directory: ./addons/vscode
-      - run: yarn
-        working-directory: ./addons/frontend
       - name: package extension
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
         working-directory: ./addons/vscode

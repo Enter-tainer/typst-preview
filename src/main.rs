@@ -5,6 +5,8 @@ use clap::Parser;
 use codespan_reporting::term::{self, termcolor};
 
 use futures::{SinkExt, StreamExt};
+use hyper::http::Error;
+use hyper::service::{make_service_fn, service_fn};
 use log::{error, info, warn};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use publisher::Publisher;
@@ -23,7 +25,7 @@ use std::time::Duration;
 use termcolor::{ColorChoice, StandardStream, WriteColor};
 use tokio::net::{TcpListener, TcpStream};
 use typst::doc::{Document, Frame, FrameItem, Position};
-use typst_ts_svg_exporter::IncrementalSvgExporter;
+use typst_ts_svg_exporter::IncrSvgDocServer;
 
 use crate::args::{CliArguments, Command, CompileCommand};
 use crate::publisher::PublisherImpl;
@@ -77,10 +79,7 @@ impl CompileSettings {
     /// Panics if the command is not a compile or watch command.
     pub fn with_arguments(args: CliArguments) -> Self {
         let _watch = matches!(args.command, Command::Watch(_));
-        let CompileCommand { input } = match args.command {
-            Command::Watch(command) => command,
-            _ => unreachable!(),
-        };
+        let Command::Watch(CompileCommand { input }) = args.command;
         Self::new(input, true, args.root, args.font_paths)
     }
 }
@@ -88,7 +87,7 @@ impl CompileSettings {
 struct Client {
     conn: Arc<Mutex<WebSocketStream<TcpStream>>>,
     publisher: Publisher<Document>,
-    renderer: Arc<Mutex<IncrementalSvgExporter>>,
+    doc_server: Arc<Mutex<IncrSvgDocServer>>,
 }
 
 impl Client {
@@ -179,16 +178,20 @@ enum ControlPlaneResponse {
     SyncEditorChanges(()),
 }
 
+const HTML: &str = include_str!("../addons/vscode/out/frontend/index.html");
+
 /// Entry point.
 #[tokio::main]
 async fn main() {
     let _ = env_logger::builder()
         .filter_module("typst_ws", log::LevelFilter::Info)
+        .filter_module("typst_ts", log::LevelFilter::Info)
         .try_init();
     let arguments = CliArguments::parse();
     info!("Arguments: {:#?}", arguments);
     let doc_publisher: Publisher<Document> = PublisherImpl::new().into();
     let command = CompileSettings::with_arguments(arguments.clone());
+    let enable_partial_rendering = arguments.enable_partial_rendering;
     let root = if let Some(root) = &command.root {
         root.clone()
     } else if let Some(dir) = command
@@ -224,7 +227,6 @@ async fn main() {
         tokio::spawn(async move {
             let res = match &arguments.command {
                 Command::Watch(_) => watch(world, publisher).await,
-                Command::Fonts(_) => todo!(), // fonts(FontsSettings::with_arguments(arguments)),
             };
 
             if let Err(msg) = res {
@@ -239,6 +241,7 @@ async fn main() {
         std::process::exit(0);
     });
 
+    let (data_plane_port_tx, data_plane_port_rx) = tokio::sync::oneshot::channel();
     let data_plane_addr = arguments
         .data_plane_host
         .unwrap_or_else(|| "127.0.0.1:23625".to_string());
@@ -256,93 +259,112 @@ async fn main() {
                 "Data plane server listening on: {}",
                 listener.local_addr().unwrap()
             );
-
+            let _ = data_plane_port_tx.send(listener.local_addr().unwrap().port());
             let active_client_count = Arc::new(AtomicUsize::new(0));
-            while let Ok((stream, _)) = listener.accept().await {
-                let conn = accept_connection(stream).await;
-                {
-                    let mut r = IncrementalSvgExporter::default();
-                    r.set_should_attach_debug_info(true);
-                    let client = Client {
-                        conn: Arc::new(Mutex::new(conn)),
-                        publisher: doc_publisher.clone(),
-                        renderer: Arc::new(Mutex::new(r)),
-                    };
-                    let active_client_count = active_client_count.clone();
-                    let doc_publisher = doc_publisher.clone();
-                    let world = world.clone();
-                    let jump_tx = doc_to_src_jump_tx.clone();
-                    let src_to_doc_jump_publisher = src_to_doc_jump_publisher.clone();
-                    tokio::spawn(async move {
-                        active_client_count.fetch_add(1, Ordering::SeqCst);
-                        loop {
-                            tokio::select! {
-                                msg = Client::poll_ws_events(client.conn.clone()) => {
-                                    if let Some(msg) = msg {
-                                        if msg == "current" {
-                                            let mut renderer = client.renderer.lock().await;
-                                            if let Some(res) = renderer.render_current() {
-                                                client.conn.lock().await.send(Message::Text(res)).await.unwrap();
-                                            } else {
-                                                let latest_doc = doc_publisher.latest().await;
-                                                if latest_doc.is_some() {
-                                                    let render_result = renderer.render(latest_doc.unwrap());
-                                                    client.conn.lock().await.send(Message::Text(render_result)).await.unwrap();
+            loop {
+                let listen_timeout =
+                    tokio::time::timeout(Duration::from_secs(10), listener.accept()).await;
+                if listen_timeout.is_err() {
+                    if active_client_count.load(Ordering::SeqCst) == 0 {
+                        info!("No active clients. Shutting down.");
+                        std::process::exit(0);
+                    }
+                    continue;
+                } else if let Ok(Ok((stream, _))) = listen_timeout {
+                    let conn = accept_connection(stream).await;
+                    {
+                        let mut r = IncrSvgDocServer::default();
+                        r.set_should_attach_debug_info(true);
+                        let client = Client {
+                            conn: Arc::new(Mutex::new(conn)),
+                            publisher: doc_publisher.clone(),
+                            doc_server: Arc::new(Mutex::new(r)),
+                        };
+                        let active_client_count = active_client_count.clone();
+                        let doc_publisher = doc_publisher.clone();
+                        let world = world.clone();
+                        let jump_tx = doc_to_src_jump_tx.clone();
+                        let src_to_doc_jump_publisher = src_to_doc_jump_publisher.clone();
+                        tokio::spawn(async move {
+                            active_client_count.fetch_add(1, Ordering::SeqCst);
+                            if enable_partial_rendering {
+                                client
+                                    .conn
+                                    .lock()
+                                    .await
+                                    .send(Message::Binary("partial-rendering,true".into()))
+                                    .await
+                                    .unwrap();
+                            }
+                            loop {
+                                tokio::select! {
+                                    msg = Client::poll_ws_events(client.conn.clone()) => {
+                                        if let Some(msg) = msg {
+                                            if msg == "current" {
+                                                let mut renderer = client.doc_server.lock().await;
+                                                if let Some(res) = renderer.pack_current() {
+                                                    client.conn.lock().await.send(Message::Binary(res)).await.unwrap();
                                                 } else {
-                                                    client.conn.lock().await.send(Message::Text("current not avalible".into())).await.unwrap();
+                                                    let latest_doc = doc_publisher.latest().await;
+                                                    if latest_doc.is_some() {
+                                                        let render_result = renderer.pack_delta(latest_doc.unwrap());
+                                                        client.conn.lock().await.send(Message::Binary(render_result)).await.unwrap();
+                                                    } else {
+                                                        client.conn.lock().await.send(Message::Binary("current not avalible".into())).await.unwrap();
+                                                    }
                                                 }
+                                            } else if msg.starts_with("srclocation") {
+                                                let location = msg.split(' ').nth(1).unwrap();
+                                                let id = u64::from_str_radix(location, 16).unwrap();
+                                                // get the high 16bits and the low 48bits
+                                                let (src_id, span_number) = (id >> 48, id & 0x0000FFFFFFFFFFFF);
+                                                let src_id = FileId::from_u16(src_id as u16);
+                                                if src_id == FileId::detached() || span_number <= 1 {
+                                                    continue;
+                                                }
+                                                let span = typst::syntax::Span::new(src_id, span_number);
+                                                let world = world.lock().await;
+                                                let source = world.world.source(src_id).unwrap();
+                                                let range = source.find(span).unwrap().range();
+                                                let file_path = world.world.path_for_id(src_id).unwrap();
+                                                let jump = JumpInfo::from_option (
+                                                    file_path.to_string_lossy().to_string(),
+                                                    (source.byte_to_line(range.start), source.byte_to_column(range.start)),
+                                                    (source.byte_to_line(range.end), source.byte_to_column(range.end))
+                                                );
+                                                let _ = jump_tx.send(jump).await;
+                                            } else {
+                                                client.conn.lock().await.send(Message::Binary(format!("unknown command {msg}").into())).await.unwrap();
                                             }
-                                        } else if msg.starts_with("srclocation") {
-                                            let location = msg.split(' ').nth(1).unwrap();
-                                            let id = u64::from_str_radix(location, 16).unwrap();
-                                            // get the high 16bits and the low 48bits
-                                            let (src_id, span_number) = (id >> 48, id & 0x0000FFFFFFFFFFFF);
-                                            let src_id = FileId::from_u16(src_id as u16);
-                                            if src_id == FileId::detached() || span_number <= 1 {
-                                                continue;
-                                            }
-                                            let span = typst::syntax::Span::new(src_id, span_number);
-                                            let world = world.lock().await;
-                                            let source = world.world.source(src_id).unwrap();
-                                            let range = source.find(span).unwrap().range();
-                                            let file_path = world.world.path_for_id(src_id).unwrap();
-                                            let jump = JumpInfo::from_option (
-                                                file_path.to_string_lossy().to_string(),
-                                                (source.byte_to_line(range.start), source.byte_to_column(range.start)),
-                                                (source.byte_to_line(range.end), source.byte_to_column(range.end))
-                                            );
-                                            let _ = jump_tx.send(jump).await;
                                         } else {
-                                            client.conn.lock().await.send(Message::Text(format!("unknown command {msg}"))).await.unwrap();
+                                            break;
                                         }
-                                    } else {
-                                        break;
+                                    },
+                                    doc = Client::poll_watch_events(client.publisher.clone()) => {
+                                        let svg = client.doc_server.lock().await.pack_delta(doc);
+                                        client.conn.lock().await.send(Message::Binary(svg)).await.unwrap();
+                                    },
+                                    // todo: bug, all of the clients will receive the same jump info
+                                    pos = src_to_doc_jump_publisher.wait() => {
+                                        let mut conn = client.conn.lock().await;
+                                        let jump_info = format!("jump,{} {} {}", pos.page, pos.point.x.to_pt(), pos.point.y.to_pt());
+                                        info!("sending src2doc jump info {}", jump_info);
+                                        conn.send(Message::Binary(jump_info.into_bytes())).await.unwrap();
                                     }
-                                },
-                                doc = Client::poll_watch_events(client.publisher.clone()) => {
-                                    let svg = client.renderer.lock().await.render(doc);
-                                    client.conn.lock().await.send(Message::Text(svg)).await.unwrap();
-                                },
-                                // todo: bug, all of the clients will receive the same jump info
-                                pos = src_to_doc_jump_publisher.wait() => {
-                                    let mut conn = client.conn.lock().await;
-                                    let jump_info = format!("jump,{} {} {}", pos.page, pos.point.x.to_pt(), pos.point.y.to_pt());
-                                    info!("sending src2doc jump info {}", jump_info);
-                                    conn.send(Message::Text(jump_info)).await.unwrap();
                                 }
                             }
-                        }
-                        info!("Peer closed WebSocket connection.");
-                        let prev = active_client_count.fetch_sub(1, Ordering::SeqCst);
-                        if prev == 1 {
-                            // There is no clients left. Wait 30s and shutdown if no new clients connect.
-                            tokio::time::sleep(Duration::from_secs(30)).await;
-                            if active_client_count.load(Ordering::SeqCst) == 0 {
-                                info!("No active clients. Shutting down.");
-                                std::process::exit(0);
+                            info!("Peer closed WebSocket connection.");
+                            let prev = active_client_count.fetch_sub(1, Ordering::SeqCst);
+                            if prev == 1 {
+                                // There is no clients left. Wait 10s and shutdown if no new clients connect.
+                                tokio::time::sleep(Duration::from_secs(10)).await;
+                                if active_client_count.load(Ordering::SeqCst) == 0 {
+                                    info!("No active clients. Shutting down.");
+                                    std::process::exit(0);
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
                 }
             }
         })
@@ -468,21 +490,39 @@ async fn main() {
     let static_file_addr = arguments
         .static_file_host
         .unwrap_or_else(|| "127.0.0.1:23267".to_string());
-    if let Some(path) = arguments.static_file_path {
-        let server = actix_web::HttpServer::new(move || {
-            actix_web::App::new()
-                .service(actix_files::Files::new("/", &path).index_file("index.html"))
-            // Enable the logger.
-            // .wrap(actix_web::middleware::Logger::default())
+    if arguments.serve_static_file {
+        let data_plane_port = data_plane_port_rx.await.unwrap();
+        let make_service = make_service_fn(|_| {
+            let data_plane_port = data_plane_port;
+            async move {
+                Ok::<_, hyper::http::Error>(service_fn(move |req| {
+                    async move {
+                        if req.uri().path() == "/" {
+                            let html = HTML.replace(
+                                "ws://127.0.0.1:23625",
+                                format!("ws://127.0.0.1:{data_plane_port}").as_str(),
+                            );
+                            Ok::<_, Error>(hyper::Response::new(hyper::Body::from(html)))
+                        } else {
+                            // jump to /
+                            let mut res = hyper::Response::new(hyper::Body::empty());
+                            *res.status_mut() = hyper::StatusCode::FOUND;
+                            res.headers_mut().insert(
+                                hyper::header::LOCATION,
+                                hyper::header::HeaderValue::from_static("/"),
+                            );
+                            Ok(res)
+                        }
+                    }
+                }))
+            }
         });
-        open::that_detached(format!("http://{}", static_file_addr)).unwrap();
-        server
-            .bind(&static_file_addr)
-            .unwrap()
-            .workers(1)
-            .run()
-            .await
-            .unwrap();
+        let server = hyper::Server::bind(&static_file_addr.parse().unwrap()).serve(make_service);
+        open::that_detached(format!("http://{}", server.local_addr())).unwrap();
+        info!("Static file server listening on: {}", server.local_addr());
+        if let Err(e) = server.await {
+            error!("Static file server error: {}", e);
+        }
     }
     let _ = tokio::join!(data_plane_handle, control_plane_handle);
 }
