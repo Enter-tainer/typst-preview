@@ -15,8 +15,8 @@ async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: stri
 	return fileContents;
 }
 
-export async function getTypstPreviewPath(extensionPath?: string): Promise<string> {
-	const state = getTypstPreviewPath as unknown as any;
+export async function getCliPath(extensionPath?: string): Promise<string> {
+	const state = getCliPath as unknown as any;
 	(!state.BINARY_NAME) && (state.BINARY_NAME = "typst-preview");
 	(!state.getConfig) && (state.getConfig = (
 		() => vscode.workspace.getConfiguration().get<string>('typst-preview.executable')));
@@ -25,7 +25,7 @@ export async function getTypstPreviewPath(extensionPath?: string): Promise<strin
 	const configPath = state.getConfig();
 
 	if (state.bundledPath === bundledPath && state.configPath === configPath) {
-		// console.log('getTypstPreviewPath cached', state.resolved);
+		// console.log('getCliPath cached', state.resolved);
 		return state.resolved;
 	}
 	state.bundledPath = bundledPath;
@@ -46,7 +46,7 @@ export async function getTypstPreviewPath(extensionPath?: string): Promise<strin
 	};
 
 	const resolvePath = async () => {
-		console.log('getTypstPreviewPath resolving', bundledPath, configPath);
+		console.log('getCliPath resolving', bundledPath, configPath);
 
 		if (configPath?.length) {
 			return configPath;
@@ -65,12 +65,12 @@ export async function getTypstPreviewPath(extensionPath?: string): Promise<strin
 	return (state.resolved = await resolvePath());
 }
 
-export function getTypstPreviewFontArgs(fontPaths?: string[]): string[] {
+export function getCliFontArgs(fontPaths?: string[]): string[] {
 	return (fontPaths ?? []).flatMap((fontPath) => ["--font-path", fontPath]);
 }
 
-export function codeGetTypstPreviewFontArgs(): string[] {
-	return getTypstPreviewFontArgs(vscode.workspace.getConfiguration().get<string[]>(
+export function codeGetCliFontArgs(): string[] {
+	return getCliFontArgs(vscode.workspace.getConfiguration().get<string[]>(
 		'typst-preview.fontPaths'));
 }
 
@@ -228,7 +228,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 	const scrollSyncMode = vscode.workspace.getConfiguration().get<ScrollSyncMode>('typst-preview.scrollSync') || "never";
 	const fontendPath = path.resolve(context.extensionPath, "out/frontend");
 	await watchEditorFiles();
-	const { serverProcess, controlPlanePort, dataPlanePort } = await launchTypstPreview(task.kind === 'browser');
+	const { serverProcess, controlPlanePort, dataPlanePort } = await launchCli(task.kind === 'browser');
 
 	const addonΠserver = new WebSocket(`ws://127.0.0.1:${controlPlanePort}`);
 	addonΠserver.addEventListener("message", async (message) => {
@@ -343,8 +343,8 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		}
 	};
 
-	async function launchTypstPreview(openInBrowser: boolean) {
-		const serverPath = await getTypstPreviewPath(context.extensionPath);
+	async function launchCli(openInBrowser: boolean) {
+		const serverPath = await getCliPath(context.extensionPath);
 		console.log(`Watching ${filePath} for changes`);
 		const projectRoot = getProjectRoot(filePath);
 		const rootArgs = projectRoot ? ["--root", projectRoot] : [];
@@ -356,7 +356,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 			...rootArgs,
 			...staticFileArgs,
 			...partialRenderingArgs,
-			...codeGetTypstPreviewFontArgs(),
+			...codeGetCliFontArgs(),
 			filePath,
 		], outputChannel);
 		console.log(`Launched server, data plane port:${dataPlanePort}, control plane port:${controlPlanePort}`);

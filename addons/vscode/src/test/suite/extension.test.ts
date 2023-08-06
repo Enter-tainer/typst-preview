@@ -19,36 +19,36 @@ suite('Extension Test Suite', () => {
 	test('Executable Configuration Test', async () => {
 		assert.strictEqual('', vscode.workspace.getConfiguration().get<string>('typst-preview.executable'), 'default path');
     
-    assert.notStrictEqual('', await ext.getTypstPreviewPath(), 'never resolve empty string');
-    assert.notStrictEqual(undefined, await ext.getTypstPreviewPath(), 'never resolve undefined');
+    assert.notStrictEqual('', await ext.getCliPath(), 'never resolve empty string');
+    assert.notStrictEqual(undefined, await ext.getCliPath(), 'never resolve undefined');
 
-    const state = ext.getTypstPreviewPath as unknown as any;
+    const state = ext.getCliPath as unknown as any;
     let resolved: string;
 
     const BINARY_NAME = state.BINARY_NAME;
     assert.strictEqual('typst-preview', BINARY_NAME, 'default binary path is typst-preview');
 
-    resolved = await ext.getTypstPreviewPath();
+    resolved = await ext.getCliPath();
     assert.strictEqual(state.bundledPath, resolved, 'the bundle path exists and detected');
 
     state.BINARY_NAME = 'bad-typst-preview';
-    assert.strictEqual('bad-typst-preview', await ext.getTypstPreviewPath(), 'fallback to binary name if not exists');
+    assert.strictEqual('bad-typst-preview', await ext.getCliPath(), 'fallback to binary name if not exists');
 
     const oldGetConfig = state.getConfig;
     state.getConfig = () => 'config-typst-preview';
-    assert.strictEqual('config-typst-preview', await ext.getTypstPreviewPath(), 'use config if set');
+    assert.strictEqual('config-typst-preview', await ext.getCliPath(), 'use config if set');
     
     state.BINARY_NAME = 'typst-preview';
     state.getConfig = oldGetConfig;
-    resolved = await ext.getTypstPreviewPath();
+    resolved = await ext.getCliPath();
     assert.strictEqual(state.bundledPath, resolved, 'reactive state');
 
-    resolved = await ext.getTypstPreviewPath();
+    resolved = await ext.getCliPath();
     assert.strictEqual(true, resolved.endsWith(state.BINARY_NAME), 'exact file suffix');
 
     /// fast path should hit
     for (let i = 0; i < 1000; i++) {
-      await ext.getTypstPreviewPath();
+      await ext.getCliPath();
     }
   });
 
@@ -61,16 +61,16 @@ suite('Extension Test Suite', () => {
     );
 
     jsonIs(assert.strictEqual)(
-      [], ext.getTypstPreviewFontArgs(undefined));
+      [], ext.getCliFontArgs(undefined));
 
     jsonIs(assert.strictEqual)(
-      [], ext.getTypstPreviewFontArgs([]));
+      [], ext.getCliFontArgs([]));
 
     jsonIs(assert.strictEqual)(
-      [], ext.codeGetTypstPreviewFontArgs());
+      [], ext.codeGetCliFontArgs());
 
     jsonIs(assert.strictEqual)(
       ["--font-path", "/path/to/font1", "--font-path", "/path/to/font2"], 
-      ext.getTypstPreviewFontArgs(["/path/to/font1", "/path/to/font2"]));
+      ext.getCliFontArgs(["/path/to/font1", "/path/to/font2"]));
   });
 });
