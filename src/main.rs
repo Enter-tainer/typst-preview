@@ -27,7 +27,7 @@ use tokio::net::{TcpListener, TcpStream};
 use typst::doc::{Document, Frame, FrameItem, Position};
 use typst_ts_svg_exporter::IncrSvgDocServer;
 
-use crate::args::{CliArguments, Command, CompileCommand};
+use crate::args::CliArguments;
 use crate::publisher::PublisherImpl;
 use tokio::sync::Mutex;
 use tokio_tungstenite::tungstenite::Message;
@@ -78,9 +78,7 @@ impl CompileSettings {
     /// # Panics
     /// Panics if the command is not a compile or watch command.
     pub fn with_arguments(args: CliArguments) -> Self {
-        let _watch = matches!(args.command, Command::Watch(_));
-        let Command::Watch(CompileCommand { input }) = args.command;
-        Self::new(input, true, args.root, args.font_paths)
+        Self::new(args.input, true, args.root, args.font_paths)
     }
 }
 
@@ -184,7 +182,7 @@ const HTML: &str = include_str!("../addons/vscode/out/frontend/index.html");
 #[tokio::main]
 async fn main() {
     let _ = env_logger::builder()
-        .filter_module("typst_ws", log::LevelFilter::Info)
+        .filter_module("typst_preview", log::LevelFilter::Info)
         .filter_module("typst_ts", log::LevelFilter::Info)
         .try_init();
     let arguments = CliArguments::parse();
@@ -192,20 +190,24 @@ async fn main() {
     let doc_publisher: Publisher<Document> = PublisherImpl::new().into();
     let command = CompileSettings::with_arguments(arguments.clone());
     let enable_partial_rendering = arguments.enable_partial_rendering;
-    let root = if let Some(root) = &command.root {
-        root.clone()
-    } else if let Some(dir) = command
-        .input
-        .canonicalize()
-        .ok()
-        .as_ref()
-        .and_then(|path| path.parent())
-    {
-        dir.into()
+    let entry = if command.input.is_absolute() {
+        command.input.clone()
     } else {
-        PathBuf::new()
+        std::env::current_dir().unwrap().join(command.input)
     };
-
+    let root = if let Some(root) = &command.root {
+        if root.is_absolute() {
+            root.clone()
+        } else {
+            std::env::current_dir().unwrap().join(root)
+        }
+    } else {
+        std::env::current_dir().unwrap()
+    };
+    if !entry.starts_with(&root) {
+        error!("entry file must be in the root directory");
+        std::process::exit(1);
+    }
     let compile_driver = {
         let world = TypstSystemWorld::new(CompileOpts {
             root_dir: root.clone(),
@@ -215,19 +217,16 @@ async fn main() {
         })
         .expect("incorrect options");
 
-        CompileDriver::new(world).with_entry_file(command.input.clone())
+        CompileDriver::new(world).with_entry_file(entry)
     };
 
     // Create the world that serves sources, fonts and files.
     let world = Arc::new(Mutex::new(compile_driver));
     {
-        let arguments = arguments.clone();
         let publisher = doc_publisher.clone();
         let world = world.clone();
         tokio::spawn(async move {
-            let res = match &arguments.command {
-                Command::Watch(_) => watch(world, publisher).await,
-            };
+            let res = watch(world, publisher).await;
 
             if let Err(msg) = res {
                 print_error(&msg).expect("failed to print error");
@@ -242,9 +241,7 @@ async fn main() {
     });
 
     let (data_plane_port_tx, data_plane_port_rx) = tokio::sync::oneshot::channel();
-    let data_plane_addr = arguments
-        .data_plane_host
-        .unwrap_or_else(|| "127.0.0.1:23625".to_string());
+    let data_plane_addr = arguments.data_plane_host;
     let (doc_to_src_jump_tx, mut doc_to_src_jump_rx) = tokio::sync::mpsc::channel(8);
     let src_to_doc_jump_publisher: Publisher<typst::doc::Position> = PublisherImpl::new().into();
     let data_plane_handle = {
@@ -488,9 +485,9 @@ async fn main() {
         }
     });
     let static_file_addr = arguments
-        .static_file_host
+        .open_in_browser_host
         .unwrap_or_else(|| "127.0.0.1:23267".to_string());
-    if arguments.serve_static_file {
+    if arguments.open_in_browser {
         let data_plane_port = data_plane_port_rx.await.unwrap();
         let make_service = make_service_fn(|_| {
             let data_plane_port = data_plane_port;

@@ -30,13 +30,13 @@
       {
         "command": "typst-preview.preview",
         "title": "Typst Preview: Preview current file",
-        "description": "Launch typst-ws server",
+        "description": "Launch typst-preview server",
         "icon": "$(open-preview)"
       },
       {
         "command": "typst-preview.browser",
         "title": "Typst Preview: Preview current file in browser",
-        "description": "Launch typst-ws server and open the preview in your browser",
+        "description": "Launch typst-preview server and open the preview in your browser",
         "icon": "$(open-preview)"
       },
       {
@@ -60,7 +60,7 @@
         "typst-preview.executable": {
           "type": "string",
           "default": "",
-          "description": "Path to typst-ws executable. If not set, the extension will use bundled typst-ws. If bundled binary is not found, it will use typst-ws installed in PATH"
+          "description": "Path to typst-preview executable. If not set, the extension will use bundled typst-preview. If bundled binary is not found, it will use typst-preview installed in PATH"
         },
         "typst-preview.fontPaths": {
           "type": "array",
@@ -70,7 +70,7 @@
             "description": "Absolute path to a directory or file containing font assets."
           },
           "default": [],
-          "description": "List of *additional* paths to font assets used by typst-ws."
+          "description": "List of *additional* paths to font assets used by typst-preview."
         },
         "typst-preview.refresh": {
           "title": "Refresh preview",

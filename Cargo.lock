@@ -3231,6 +3231,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "typst-preview"
+version = "0.6.3"
+dependencies = [
+ "chrono",
+ "clap",
+ "clap_complete",
+ "clap_mangen",
+ "codespan-reporting",
+ "comemo",
+ "dirs",
+ "elsa",
+ "env_logger",
+ "futures",
+ "hyper",
+ "log",
+ "memmap2 0.5.10",
+ "notify",
+ "once_cell",
+ "open",
+ "same-file",
+ "serde",
+ "serde_json",
+ "siphasher",
+ "tiny-skia",
+ "tokio",
+ "tokio-tungstenite",
+ "typst",
+ "typst-library",
+ "typst-ts-compiler",
+ "typst-ts-core",
+ "typst-ts-svg-exporter",
+ "walkdir",
+]
+
+[[package]]
 name = "typst-ts-compiler"
 version = "0.3.0"
 source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=c4d68fe97433e20d9dadaa638b91f988f705842e#c4d68fe97433e20d9dadaa638b91f988f705842e"
@@ -3308,41 +3343,6 @@ dependencies = [
  "tiny-skia",
  "typst",
  "typst-ts-core",
-]
-
-[[package]]
-name = "typst-ws"
-version = "0.6.3"
-dependencies = [
- "chrono",
- "clap",
- "clap_complete",
- "clap_mangen",
- "codespan-reporting",
- "comemo",
- "dirs",
- "elsa",
- "env_logger",
- "futures",
- "hyper",
- "log",
- "memmap2 0.5.10",
- "notify",
- "once_cell",
- "open",
- "same-file",
- "serde",
- "serde_json",
- "siphasher",
- "tiny-skia",
- "tokio",
- "tokio-tungstenite",
- "typst",
- "typst-library",
- "typst-ts-compiler",
- "typst-ts-core",
- "typst-ts-svg-exporter",
- "walkdir",
 ]
 
 [[package]]

@@ -15,9 +15,9 @@ async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: stri
 	return fileContents;
 }
 
-export async function getTypstWsPath(extensionPath?: string): Promise<string> {
-	const state = getTypstWsPath as unknown as any;
-	(!state.BINARY_NAME) && (state.BINARY_NAME = "typst-ws");
+export async function getCliPath(extensionPath?: string): Promise<string> {
+	const state = getCliPath as unknown as any;
+	(!state.BINARY_NAME) && (state.BINARY_NAME = "typst-preview");
 	(!state.getConfig) && (state.getConfig = (
 		() => vscode.workspace.getConfiguration().get<string>('typst-preview.executable')));
 
@@ -25,7 +25,7 @@ export async function getTypstWsPath(extensionPath?: string): Promise<string> {
 	const configPath = state.getConfig();
 
 	if (state.bundledPath === bundledPath && state.configPath === configPath) {
-		// console.log('getTypstWsPath cached', state.resolved);
+		// console.log('getCliPath cached', state.resolved);
 		return state.resolved;
 	}
 	state.bundledPath = bundledPath;
@@ -46,7 +46,7 @@ export async function getTypstWsPath(extensionPath?: string): Promise<string> {
 	};
 
 	const resolvePath = async () => {
-		console.log('getTypstWsPath resolving', bundledPath, configPath);
+		console.log('getCliPath resolving', bundledPath, configPath);
 
 		if (configPath?.length) {
 			return configPath;
@@ -65,12 +65,12 @@ export async function getTypstWsPath(extensionPath?: string): Promise<string> {
 	return (state.resolved = await resolvePath());
 }
 
-export function getTypstWsFontArgs(fontPaths?: string[]): string[] {
+export function getCliFontArgs(fontPaths?: string[]): string[] {
 	return (fontPaths ?? []).flatMap((fontPath) => ["--font-path", fontPath]);
 }
 
-export function codeGetTypstWsFontArgs(): string[] {
-	return getTypstWsFontArgs(vscode.workspace.getConfiguration().get<string[]>(
+export function codeGetCliFontArgs(): string[] {
+	return getCliFontArgs(vscode.workspace.getConfiguration().get<string[]>(
 		'typst-preview.fontPaths'));
 }
 
@@ -109,7 +109,7 @@ const panelScrollTo = async (bindDocument: vscode.TextDocument, activeEditor: vs
 interface TaskControlBlock {
 	/// related panel
 	panel?: vscode.WebviewPanel;
-	/// channel to communicate with typst-ws
+	/// channel to communicate with typst-preview
 	addonΠserver: WebSocket;
 }
 
@@ -160,7 +160,7 @@ function runServer(command: string, args: string[], outputChannel: vscode.Output
 	});
 	serverProcess.on('error', (err: any) => {
 		console.error('Failed to start server process');
-		vscode.window.showErrorMessage(`Failed to start typst-ws(${command}) process: ${err}`);
+		vscode.window.showErrorMessage(`Failed to start typst-preview(${command}) process: ${err}`);
 	});
 	serverProcess.stdout.on('data', (data: Buffer) => {
 		outputChannel.append(data.toString());
@@ -170,7 +170,7 @@ function runServer(command: string, args: string[], outputChannel: vscode.Output
 	});
 	serverProcess.on('exit', (code: any) => {
 		if (code !== null && code !== 0) {
-			vscode.window.showErrorMessage(`typst-ws process exited with code ${code}`);
+			vscode.window.showErrorMessage(`typst-preview process exited with code ${code}`);
 		}
 		console.log(`child process exited with code ${code}`);
 	});
@@ -228,7 +228,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 	const scrollSyncMode = vscode.workspace.getConfiguration().get<ScrollSyncMode>('typst-preview.scrollSync') || "never";
 	const fontendPath = path.resolve(context.extensionPath, "out/frontend");
 	await watchEditorFiles();
-	const { serverProcess, controlPlanePort, dataPlanePort } = await launchTypstWs(task.kind === 'browser');
+	const { serverProcess, controlPlanePort, dataPlanePort } = await launchCli(task.kind === 'browser');
 
 	const addonΠserver = new WebSocket(`ws://127.0.0.1:${controlPlanePort}`);
 	addonΠserver.addEventListener("message", async (message) => {
@@ -284,7 +284,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		const basename = path.basename(activeEditor.document.fileName);
 		// Create and show a new WebView
 		const panel = vscode.window.createWebviewPanel(
-			'typst-ws-preview', // 标识符
+			'typst-preview', // 标识符
 			`${basename} (Preview)`, // 面板标题
 			vscode.ViewColumn.Beside, // 显示在编辑器的哪一侧
 			{
@@ -343,12 +343,12 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		}
 	};
 
-	async function launchTypstWs(serveStaticFile: boolean) {
-		const serverPath = await getTypstWsPath(context.extensionPath);
+	async function launchCli(openInBrowser: boolean) {
+		const serverPath = await getCliPath(context.extensionPath);
 		console.log(`Watching ${filePath} for changes`);
 		const projectRoot = getProjectRoot(filePath);
 		const rootArgs = projectRoot ? ["--root", projectRoot] : [];
-		const staticFileArgs = serveStaticFile ? ["--serve-static-file"] : [];
+		const staticFileArgs = openInBrowser ? ["--open-in-browser", "--open-in-browser-host", "127.0.0.1:0"] : [];
 		const partialRenderingArgs = vscode.workspace.getConfiguration().get<boolean>('typst-preview.partialRendering') ? ["--partial-rendering"] : [];
 		const [dataPlanePort, controlPlanePort, serverProcess] = await runServer(serverPath, [
 			"--data-plane-host", "127.0.0.1:0",
@@ -356,8 +356,8 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 			...rootArgs,
 			...staticFileArgs,
 			...partialRenderingArgs,
-			...codeGetTypstWsFontArgs(),
-			"watch", filePath,
+			...codeGetCliFontArgs(),
+			filePath,
 		], outputChannel);
 		console.log(`Launched server, data plane port:${dataPlanePort}, control plane port:${controlPlanePort}`);
 		// window.typstWebsocket.send("current");

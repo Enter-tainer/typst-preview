@@ -1,11 +1,11 @@
 [package]
-name = "typst-ws"
+name = "typst-preview"
 version = "0.6.3"
 authors = ["The Typst Project Developers"]
 edition = "2021"
 
 [[bin]]
-name = "typst-ws"
+name = "typst-preview"
 path = "src/main.rs"
 test = false
 doctest = false
