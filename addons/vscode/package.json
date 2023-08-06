@@ -6,9 +6,9 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Enter-tainer/typst-preview-vscode"
+    "url": "https://github.com/Enter-tainer/typst-preview"
   },
-  "version": "0.6.3",
+  "version": "0.6.4",
   "engines": {
     "vscode": "^1.77.0"
   },
