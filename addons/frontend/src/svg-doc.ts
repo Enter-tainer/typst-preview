@@ -161,8 +161,8 @@ export class SvgDocument {
         top + height * 2 + 1
       );
     } else {
-      console.log("render_in_window with partial rendering disabled", 0, 0, 3.40282347E+38, 3.40282347E+38)
-      patchStr = this.kModule.render_in_window(0, 0, 3.40282347E+38, 3.40282347E+38);
+      console.log("render_in_window with partial rendering disabled", 0, 0, 1e33, 1e33)
+      patchStr = this.kModule.render_in_window(0, 0, 1e33, 1e33);
     }
 
     const t2 = performance.now();
