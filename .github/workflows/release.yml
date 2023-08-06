@@ -82,7 +82,6 @@ jobs:
       - shell: pwsh
         run: |
           cargo build --release -p typst-ws --target ${{ matrix.rust-target }}
-          mkdir -p addons/vscode/out
           cp "target/${{ matrix.rust-target }}/release/typst-ws$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "addons/vscode/out/"
           cp "target/${{ matrix.rust-target }}/release/typst-ws$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "typst-ws-${{ env.target }}$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )"
       - shell: pwsh
