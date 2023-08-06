@@ -46,7 +46,7 @@ export class SvgDocument {
     this.currentRealScale = 1;
     this.currentContainerWidth = hookedElem.offsetWidth;
     this.patchQueue = [];
-    this.partialRendering = true;
+    this.partialRendering = false;
     this.currentScaleRatio = 1;
 
     /// for ctrl-wheel rescaling
