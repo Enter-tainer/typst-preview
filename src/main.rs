@@ -307,7 +307,7 @@ async fn main() {
                                                         let render_result = renderer.pack_delta(latest_doc.unwrap());
                                                         client.conn.lock().await.send(Message::Binary(render_result)).await.unwrap();
                                                     } else {
-                                                        client.conn.lock().await.send(Message::Binary("current not avalible".into())).await.unwrap();
+                                                        client.conn.lock().await.send(Message::Text("current not avalible".into())).await.unwrap();
                                                     }
                                                 }
                                             } else if msg.starts_with("srclocation") {
