@@ -75,6 +75,7 @@ window.onload = function () {
         } else if (message[0] === "partial-rendering") {
           console.log("Experimental feature: partial rendering enabled");
           svgDoc.setPartialRendering(true);
+          return;
         }
 
         svgDoc.addChangement(message);
