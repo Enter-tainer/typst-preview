@@ -74,14 +74,15 @@ export function codeGetCliFontArgs(): string[] {
 		'typst-preview.fontPaths'));
 }
 
-function getProjectRoot(currentPath: string): string | null {
+function getProjectRoot(currentPath: string): string {
 	const checkIfPathContains = (base: string, target: string) => {
 		const relativePath = path.relative(base, target);
 		return !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
 	};
 	const paths = vscode.workspace.workspaceFolders?.map(folder => folder.uri.fsPath).filter(folder => checkIfPathContains(folder, currentPath));
 	if (!paths || paths.length === 0) {
-		return null;
+		// return path's parent folder
+		return path.dirname(currentPath);
 	} else {
 		return paths[0];
 	}
@@ -347,7 +348,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		const serverPath = await getCliPath(context.extensionPath);
 		console.log(`Watching ${filePath} for changes`);
 		const projectRoot = getProjectRoot(filePath);
-		const rootArgs = projectRoot ? ["--root", projectRoot] : [];
+		const rootArgs = ["--root", projectRoot];
 		const staticFileArgs = openInBrowser ? ["--open-in-browser", "--open-in-browser-host", "127.0.0.1:0"] : [];
 		const partialRenderingArgs = vscode.workspace.getConfiguration().get<boolean>('typst-preview.partialRendering') ? ["--partial-rendering"] : [];
 		const [dataPlanePort, controlPlanePort, serverProcess] = await runServer(serverPath, [
