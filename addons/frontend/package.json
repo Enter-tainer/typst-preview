@@ -12,8 +12,8 @@
     "link:local": "yarn link @myriaddreamin/typst.ts @myriaddreamin/typst-ts-renderer"
   },
   "dependencies": {
-    "@myriaddreamin/typst.ts": "0.3.1",
-    "@myriaddreamin/typst-ts-renderer": "0.3.1"
+    "@myriaddreamin/typst.ts": "0.3.2-rc2",
+    "@myriaddreamin/typst-ts-renderer": "0.3.2-rc2"
   },
   "devDependencies": {
     "typescript": "^5.0.2",
