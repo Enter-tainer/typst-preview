@@ -510,7 +510,9 @@ async fn main() {
             }
         });
         let server = hyper::Server::bind(&static_file_addr.parse().unwrap()).serve(make_service);
-        open::that_detached(format!("http://{}", server.local_addr())).unwrap();
+        if let Err(e) = open::that_detached(format!("http://{}", server.local_addr())) {
+            error!("failed to open browser: {}", e);
+        };
         info!("Static file server listening on: {}", server.local_addr());
         if let Err(e) = server.await {
             error!("Static file server error: {}", e);
