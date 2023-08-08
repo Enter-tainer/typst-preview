@@ -14,15 +14,27 @@ pub struct CliArguments {
     pub root: Option<PathBuf>,
 
     /// Data plane server will bind to this address
-    #[clap(long = "data-plane-host", default_value = "127.0.0.1:23625", value_name = "HOST")]
+    #[clap(
+        long = "data-plane-host",
+        default_value = "127.0.0.1:23625",
+        value_name = "HOST"
+    )]
     pub data_plane_host: String,
 
     /// Control plane server will bind to this address
-    #[clap(long = "control-plane-host", default_value = "127.0.0.1:23626", value_name = "HOST")]
+    #[clap(
+        long = "control-plane-host",
+        default_value = "127.0.0.1:23626",
+        value_name = "HOST"
+    )]
     pub control_plane_host: Option<String>,
 
     /// Host to open the preview in the browser.
-    #[clap(long = "open-in-browser-host", value_name = "HOST", default_value = "127.0.0.1:23267")]
+    #[clap(
+        long = "open-in-browser-host",
+        value_name = "HOST",
+        default_value = "127.0.0.1:23267"
+    )]
     pub open_in_browser_host: Option<String>,
 
     /// Open the preview in the browser after compilation.
@@ -32,7 +44,6 @@ pub struct CliArguments {
     /// Only render visible part of the document. This can improve performance but still being experimental.
     #[clap(long = "partial-rendering")]
     pub enable_partial_rendering: bool,
-    
+
     pub input: PathBuf,
 }
-

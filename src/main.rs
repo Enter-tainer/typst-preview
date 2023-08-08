@@ -33,8 +33,8 @@ use tokio::sync::Mutex;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 use typst::diag::StrResult;
+use typst_library::prelude::FileId;
 
-use typst::file::FileId;
 use typst::syntax::{LinkedNode, Source, Span, SyntaxKind};
 use typst::World;
 use typst_ts_compiler::service::CompileDriver;

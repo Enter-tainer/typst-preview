@@ -1166,9 +1166,9 @@ dependencies = [
 
 [[package]]
 name = "hypher"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0cf92443ef10ecfc1b8b4b65a93e31d983f020a355699d83874b12a7c797ac3"
+checksum = "927f74d31cdbfd8de201340c0bc474c52c9145193ccd8885fcede14005591aad"
 
 [[package]]
 name = "iana-time-zone"
@@ -1537,6 +1537,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7012b1bbb0719e1097c47611d3898568c546d597c2e74d66f6087edd5233ff4"
 
 [[package]]
+name = "line-wrap"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f30344350a2a51da54c1d53be93fade8a237e545dbcc4bdbe635413f2117cab9"
+dependencies = [
+ "safemem",
+]
+
+[[package]]
 name = "linked-hash-map"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1764,6 +1773,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e25be21376a772d15f97ae789845340a9651d3c4246ff5ebb6a2b35f9c37bd31"
 
 [[package]]
+name = "oklab"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "467e40ada50d13bab19019e3707862b5076ca15841f31ee1474c40397c1b9f11"
+dependencies = [
+ "rgb",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1873,9 +1891,9 @@ checksum = "8835116a5c179084a830efb3adc117ab007512b535bc1a21c991d3b32a6b44dd"
 
 [[package]]
 name = "pdf-writer"
-version = "0.7.1"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30900f178ea696fc5d9637171f98aaa93d5aae54f0726726df68fc3e32810db6"
+checksum = "86af2eb3faa4614bc7fda8bd578c25e76a17ff3b1577be034b81e0c20527e204"
 dependencies = [
  "bitflags 1.3.2",
  "itoa",
@@ -1960,6 +1978,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "26072860ba924cbfa98ea39c8c19b4dd6a4a25423dbdf219c1eca91aa0cf6964"
 
 [[package]]
+name = "plist"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bdc0001cfea3db57a2e24bc0d818e9e20e554b5f97fabb9bc231dc240269ae06"
+dependencies = [
+ "base64 0.21.2",
+ "indexmap 1.9.3",
+ "line-wrap",
+ "quick-xml",
+ "serde",
+ "time",
+]
+
+[[package]]
 name = "png"
 version = "0.17.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2033,6 +2065,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f6d64c71eb498fe9eae14ce4ec935c555749aef511cca85b5568910d6e48001"
 dependencies = [
  "bytemuck",
+]
+
+[[package]]
+name = "quick-xml"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81b9228215d82c7b61490fec1de287136b5de6f5700f6e58ea9ad61a7964ca51"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]
@@ -2218,8 +2259,11 @@ version = "0.32.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "142e83d8ae8c8c639f304698a5567b229ba65caba867bf4387bbc0ae158827cf"
 dependencies = [
+ "gif",
+ "jpeg-decoder",
  "log",
  "pico-args",
+ "png",
  "rgb",
  "svgtypes",
  "tiny-skia",
@@ -2384,6 +2428,12 @@ name = "ryu"
 version = "1.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f91339c0467de62360649f8d3e185ca8de4224ff281f66000de5eb2a77a79041"
+
+[[package]]
+name = "safemem"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef703b7cb59335eae2eb93ceb664c0eb7ea6bf567079d843e09420219668e072"
 
 [[package]]
 name = "same-file"
@@ -2711,8 +2761,9 @@ checksum = "09eab8a83bff89ba2200bd4c59be45c7c787f988431b936099a5a266c957f2f9"
 
 [[package]]
 name = "svg2pdf"
-version = "0.5.0"
-source = "git+https://github.com/typst/svg2pdf#14eb3eb5be2f70d6735c88661387fddf0e110871"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c966e59fd4afd959edcc226687f751a7d05c94d0477cca1a4c2b15a7220f2b24"
 dependencies = [
  "image",
  "miniz_oxide",
@@ -2777,12 +2828,14 @@ dependencies = [
  "fnv",
  "lazy_static",
  "once_cell",
+ "plist",
  "regex-syntax 0.6.29",
  "serde",
  "serde_derive",
  "serde_json",
  "thiserror",
  "walkdir",
+ "yaml-rust",
 ]
 
 [[package]]
@@ -3139,8 +3192,8 @@ checksum = "497961ef93d974e23eb6f433eb5fe1b7930b659f06d12dec6fc44a8f554c0bba"
 
 [[package]]
 name = "typst"
-version = "0.6.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=5a2a2a2f24a80a2b8bb211862348c29b92f97736#5a2a2a2f24a80a2b8bb211862348c29b92f97736"
+version = "0.7.0"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=706d64f9ab77073a31e39653b1ed5bbbbaf204ea#706d64f9ab77073a31e39653b1ed5bbbbaf204ea"
 dependencies = [
  "bitflags 2.3.0",
  "bytemuck",
@@ -3153,6 +3206,7 @@ dependencies = [
  "indexmap 1.9.3",
  "log",
  "miniz_oxide",
+ "oklab",
  "once_cell",
  "pdf-writer",
  "pixglyph",
@@ -3171,6 +3225,7 @@ dependencies = [
  "tracing",
  "ttf-parser",
  "typst-macros",
+ "typst-syntax",
  "unicode-general-category",
  "unicode-ident",
  "unicode-math-class",
@@ -3182,8 +3237,8 @@ dependencies = [
 
 [[package]]
 name = "typst-library"
-version = "0.6.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=5a2a2a2f24a80a2b8bb211862348c29b92f97736#5a2a2a2f24a80a2b8bb211862348c29b92f97736"
+version = "0.7.0"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=706d64f9ab77073a31e39653b1ed5bbbbaf204ea#706d64f9ab77073a31e39653b1ed5bbbbaf204ea"
 dependencies = [
  "az",
  "chinese-number",
@@ -3221,8 +3276,8 @@ dependencies = [
 
 [[package]]
 name = "typst-macros"
-version = "0.6.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=5a2a2a2f24a80a2b8bb211862348c29b92f97736#5a2a2a2f24a80a2b8bb211862348c29b92f97736"
+version = "0.7.0"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=706d64f9ab77073a31e39653b1ed5bbbbaf204ea#706d64f9ab77073a31e39653b1ed5bbbbaf204ea"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -3232,7 +3287,7 @@ dependencies = [
 
 [[package]]
 name = "typst-preview"
-version = "0.6.4"
+version = "0.7.0"
 dependencies = [
  "chrono",
  "clap",
@@ -3266,9 +3321,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "typst-syntax"
+version = "0.7.0"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=706d64f9ab77073a31e39653b1ed5bbbbaf204ea#706d64f9ab77073a31e39653b1ed5bbbbaf204ea"
+dependencies = [
+ "comemo",
+ "ecow",
+ "once_cell",
+ "serde",
+ "tracing",
+ "unicode-ident",
+ "unicode-math-class",
+ "unicode-segmentation",
+ "unscanny",
+]
+
+[[package]]
 name = "typst-ts-compiler"
-version = "0.3.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=c4d68fe97433e20d9dadaa638b91f988f705842e#c4d68fe97433e20d9dadaa638b91f988f705842e"
+version = "0.3.1"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=1d32f95b6ac0ec814fbd567cd4aa256a705286ad#1d32f95b6ac0ec814fbd567cd4aa256a705286ad"
 dependencies = [
  "append-only-vec",
  "base64 0.21.2",
@@ -3303,8 +3374,8 @@ dependencies = [
 
 [[package]]
 name = "typst-ts-core"
-version = "0.3.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=c4d68fe97433e20d9dadaa638b91f988f705842e#c4d68fe97433e20d9dadaa638b91f988f705842e"
+version = "0.3.1"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=1d32f95b6ac0ec814fbd567cd4aa256a705286ad#1d32f95b6ac0ec814fbd567cd4aa256a705286ad"
 dependencies = [
  "base64 0.21.2",
  "base64-serde",
@@ -3335,11 +3406,12 @@ dependencies = [
 
 [[package]]
 name = "typst-ts-svg-exporter"
-version = "0.3.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=c4d68fe97433e20d9dadaa638b91f988f705842e#c4d68fe97433e20d9dadaa638b91f988f705842e"
+version = "0.3.1"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=1d32f95b6ac0ec814fbd567cd4aa256a705286ad#1d32f95b6ac0ec814fbd567cd4aa256a705286ad"
 dependencies = [
  "base64 0.21.2",
  "comemo",
+ "log",
  "tiny-skia",
  "typst",
  "typst-ts-core",
