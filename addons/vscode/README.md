@@ -128,4 +128,6 @@ Add preview button
 ### v0.7.0
 
 - Upgrade to typst v0.7.0
-- Tiny bug fixes
+- Bug fixes
+  - #77 #75: Previously arm64 devices will see a blank preview. This is now fixed.
+  - #74: Previously when you open a file without opening in folder, the preview will not work. This is now fixed.
