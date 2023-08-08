@@ -27,15 +27,15 @@ pub struct CliArguments {
         default_value = "127.0.0.1:23626",
         value_name = "HOST"
     )]
-    pub control_plane_host: Option<String>,
+    pub control_plane_host: String,
 
     /// Host to open the preview in the browser.
     #[clap(
         long = "open-in-browser-host",
         value_name = "HOST",
-        default_value = "127.0.0.1:23267"
+        default_value = "127.0.0.1:23627"
     )]
-    pub open_in_browser_host: Option<String>,
+    pub open_in_browser_host: String,
 
     /// Open the preview in the browser after compilation.
     #[clap(long = "open-in-browser")]

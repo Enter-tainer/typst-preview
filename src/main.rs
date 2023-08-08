@@ -367,9 +367,7 @@ async fn main() {
         })
     };
 
-    let control_plane_addr = arguments
-        .control_plane_host
-        .unwrap_or_else(|| "127.0.0.1:23626".to_string());
+    let control_plane_addr = arguments.control_plane_host;
     let control_plane_handle = tokio::spawn(async move {
         let doc_publisher = doc_publisher.clone();
         let try_socket = TcpListener::bind(&control_plane_addr).await;
@@ -484,9 +482,7 @@ async fn main() {
             }
         }
     });
-    let static_file_addr = arguments
-        .open_in_browser_host
-        .unwrap_or_else(|| "127.0.0.1:23267".to_string());
+    let static_file_addr = arguments.open_in_browser_host;
     if arguments.open_in_browser {
         let data_plane_port = data_plane_port_rx.await.unwrap();
         let make_service = make_service_fn(|_| {
