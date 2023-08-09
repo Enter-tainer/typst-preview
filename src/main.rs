@@ -34,8 +34,7 @@ use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 use typst::diag::StrResult;
 
-use typst::file::FileId;
-use typst::syntax::{LinkedNode, Source, Span, SyntaxKind};
+use typst::syntax::{FileId, LinkedNode, Source, Span, SyntaxKind};
 use typst::World;
 use typst_ts_compiler::service::CompileDriver;
 use typst_ts_compiler::TypstSystemWorld;
@@ -367,9 +366,7 @@ async fn main() {
         })
     };
 
-    let control_plane_addr = arguments
-        .control_plane_host
-        .unwrap_or_else(|| "127.0.0.1:23626".to_string());
+    let control_plane_addr = arguments.control_plane_host;
     let control_plane_handle = tokio::spawn(async move {
         let doc_publisher = doc_publisher.clone();
         let try_socket = TcpListener::bind(&control_plane_addr).await;
@@ -484,9 +481,7 @@ async fn main() {
             }
         }
     });
-    let static_file_addr = arguments
-        .open_in_browser_host
-        .unwrap_or_else(|| "127.0.0.1:23267".to_string());
+    let static_file_addr = arguments.open_in_browser_host;
     if arguments.open_in_browser {
         let data_plane_port = data_plane_port_rx.await.unwrap();
         let make_service = make_service_fn(|_| {
@@ -515,7 +510,9 @@ async fn main() {
             }
         });
         let server = hyper::Server::bind(&static_file_addr.parse().unwrap()).serve(make_service);
-        open::that_detached(format!("http://{}", server.local_addr())).unwrap();
+        if let Err(e) = open::that_detached(format!("http://{}", server.local_addr())) {
+            error!("failed to open browser: {}", e);
+        };
         info!("Static file server listening on: {}", server.local_addr());
         if let Err(e) = server.await {
             error!("Static file server error: {}", e);

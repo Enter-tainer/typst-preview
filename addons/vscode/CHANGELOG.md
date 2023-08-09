@@ -101,3 +101,10 @@ Add preview button
 - Add page level partial rendering. This should improve performance on long document. This is an experimental feature and is disabled by default. You can enable it by setting `typst-preview.partialRendering` to `true`.
 - The binary `typst-preview` now can be used as a standalone typst server. You can use it to preview your document in browser. For example: `typst-preview ./assets/demo/main.typ --open-in-browser --partial-rendering`
 - Fix #70: now you can launch many preview instances at the same time.
+
+## v0.7.0
+
+- Upgrade to typst v0.7.0
+- Bug fixes
+  - #77 #75: Previously arm64 devices will see a blank preview. This is now fixed.
+  - #74: Previously when you open a file without opening in folder, the preview will not work. This is now fixed.
