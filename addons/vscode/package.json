@@ -17,15 +17,15 @@
   ],
   "activationEvents": [],
   "main": "./out/extension.js",
-  "languages": [
-    {
-      "id": "typst",
-      "extensions": [
-        ".typ"
-      ]
-    }
-  ],
   "contributes": {
+    "languages": [
+      {
+        "id": "typst",
+        "extensions": [
+          ".typ"
+        ]
+      }
+    ],
     "commands": [
       {
         "command": "typst-preview.preview",
