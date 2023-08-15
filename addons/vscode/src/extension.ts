@@ -57,8 +57,9 @@ export async function getCliPath(extensionPath?: string): Promise<string> {
 		}
 
 		vscode.window.showWarningMessage(
-			`Failed to find ${state.BINARY_NAME} executable at ${bundledPath},` +
-			`maybe we didn't ship it for your platform? Using ${state.BINARY_NAME} from PATH`);
+			`${state.BINARY_NAME} executable at ${bundledPath} not working,` +
+			`maybe we didn't ship it for your platform or it cannot run due to library issues?` +
+			`In this case you need compile and add ${state.BINARY_NAME} to your PATH.`);
 		return state.BINARY_NAME;
 	};
 
@@ -310,6 +311,9 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 				.toString()}/typst-webview-assets`
 		);
 		panel.webview.html = html.replace("ws://127.0.0.1:23625", `ws://127.0.0.1:${dataPlanePort}`);
+		// 虽然配置的是 http，但是如果是桌面客户端，任何 tcp 连接都支持，这也就包括了 ws
+		// https://code.visualstudio.com/api/advanced-topics/remote-extensions#forwarding-localhost
+		await vscode.env.asExternalUri(vscode.Uri.parse(`http://127.0.0.1:${dataPlanePort}`));
 		activeTask.set(bindDocument, {
 			panel,
 			addonΠserver,
