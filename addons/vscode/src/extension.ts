@@ -57,8 +57,9 @@ export async function getCliPath(extensionPath?: string): Promise<string> {
 		}
 
 		vscode.window.showWarningMessage(
-			`Failed to find ${state.BINARY_NAME} executable at ${bundledPath},` +
-			`maybe we didn't ship it for your platform? Using ${state.BINARY_NAME} from PATH`);
+			`${state.BINARY_NAME} executable at ${bundledPath} not working,` +
+			`maybe we didn't ship it for your platform or it cannot run due to library issues?` +
+			`In this case you need compile and add ${state.BINARY_NAME} to your PATH.`);
 		return state.BINARY_NAME;
 	};
 
