@@ -311,7 +311,9 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 				.toString()}/typst-webview-assets`
 		);
 		panel.webview.html = html.replace("ws://127.0.0.1:23625", `ws://127.0.0.1:${dataPlanePort}`);
-		await vscode.env.asExternalUri(vscode.Uri.parse(`ws://127.0.0.1:${dataPlanePort}`));
+		// 虽然配置的是 http，但是如果是桌面客户端，任何 tcp 连接都支持，这也就包括了 ws
+		// https://code.visualstudio.com/api/advanced-topics/remote-extensions#forwarding-localhost
+		await vscode.env.asExternalUri(vscode.Uri.parse(`http://127.0.0.1:${dataPlanePort}`));
 		activeTask.set(bindDocument, {
 			panel,
 			addonΠserver,
