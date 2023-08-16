@@ -131,3 +131,10 @@ Add preview button
 - Bug fixes
   - #77 #75: Previously arm64 devices will see a blank preview. This is now fixed.
   - #74: Previously when you open a file without opening in folder, the preview will not work. This is now fixed.
+
+### v0.7.1
+
+- Bug fixes:
+  - fix #41. It is now possible to use Typst Preview in VSCode Remote.
+  - fix #82. You can have preview button even when typst-lsp is not installed.
+- Misc: We downgrade the ci image for Linux to Ubuntu 20.04. This should fix the problem where the extension cannot be installed on some old Linux distros.
