@@ -152,7 +152,14 @@ function syncEditorChanges(addonΠserver: WebSocket) {
 	}));
 }
 
-function runServer(command: string, args: string[], outputChannel: vscode.OutputChannel): Promise<[string, string, ChildProcessWithoutNullStreams]> {
+interface LaunchCliResult {
+	serverProcess: ChildProcessWithoutNullStreams,
+	controlPlanePort: string,
+	dataPlanePort: string,
+	staticFilePort?: string,
+}
+
+function runServer(command: string, args: string[], outputChannel: vscode.OutputChannel, openInBrowser: boolean): Promise<LaunchCliResult> {
 	const serverProcess = spawn(command, args, {
 		env: {
 			...process.env,
@@ -181,19 +188,30 @@ function runServer(command: string, args: string[], outputChannel: vscode.Output
 	return new Promise((resolve, reject) => {
 		let dataPlanePort: string | undefined = undefined;
 		let controlPlanePort: string | undefined = undefined;
+		let staticFilePort: string | undefined = undefined;
 		serverProcess.stderr.on('data', (data: Buffer) => {
 			if (data.toString().includes("listening on")) {
 				console.log(data.toString());
 				let ctrlPort = data.toString().match(/Control plane server listening on: 127\.0\.0\.1:(\d+)/)?.[1];
 				let dataPort = data.toString().match(/Data plane server listening on: 127\.0\.0\.1:(\d+)/)?.[1];
+				let staticPort = data.toString().match(/Static file server listening on: 127\.0\.0\.1:(\d+)/)?.[1];
 				if (ctrlPort !== undefined) {
 					controlPlanePort = ctrlPort;
 				}
 				if (dataPort !== undefined) {
 					dataPlanePort = dataPort;
 				}
+				if (staticPort !== undefined) {
+					staticFilePort = staticPort;
+				}
 				if (dataPlanePort !== undefined && controlPlanePort !== undefined) {
-					resolve([dataPlanePort, controlPlanePort, serverProcess]);
+					if (openInBrowser) {
+						if (staticFilePort !== undefined) {
+							resolve({ dataPlanePort, controlPlanePort, staticFilePort, serverProcess });
+						}
+					} else {
+						resolve({ dataPlanePort, controlPlanePort, serverProcess });
+					}
 				}
 			}
 		});
@@ -353,9 +371,9 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		console.log(`Watching ${filePath} for changes`);
 		const projectRoot = getProjectRoot(filePath);
 		const rootArgs = ["--root", projectRoot];
-		const staticFileArgs = openInBrowser ? ["--open-in-browser", "--open-in-browser-host", "127.0.0.1:0"] : [];
+		const staticFileArgs = openInBrowser ? ["--server-static-file", "--static-file-host", "127.0.0.1:0"] : [];
 		const partialRenderingArgs = vscode.workspace.getConfiguration().get<boolean>('typst-preview.partialRendering') ? ["--partial-rendering"] : [];
-		const [dataPlanePort, controlPlanePort, serverProcess] = await runServer(serverPath, [
+		const { dataPlanePort, controlPlanePort, staticFilePort, serverProcess } = await runServer(serverPath, [
 			"--data-plane-host", "127.0.0.1:0",
 			"--control-plane-host", "127.0.0.1:0",
 			...rootArgs,
@@ -363,8 +381,11 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 			...partialRenderingArgs,
 			...codeGetCliFontArgs(),
 			filePath,
-		], outputChannel);
+		], outputChannel, openInBrowser);
 		console.log(`Launched server, data plane port:${dataPlanePort}, control plane port:${controlPlanePort}`);
+		if (openInBrowser) {
+			vscode.env.openExternal(vscode.Uri.parse(`http://127.0.0.1:${staticFilePort}`));
+		}
 		// window.typstWebsocket.send("current");
 		return {
 			serverProcess, dataPlanePort, controlPlanePort

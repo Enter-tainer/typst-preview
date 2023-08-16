@@ -481,8 +481,8 @@ async fn main() {
             }
         }
     });
-    let static_file_addr = arguments.open_in_browser_host;
-    if arguments.open_in_browser {
+    let static_file_addr = arguments.static_file_host;
+    if arguments.server_static_file || arguments.open_in_browser {
         let data_plane_port = data_plane_port_rx.await.unwrap();
         let make_service = make_service_fn(|_| {
             let data_plane_port = data_plane_port;
@@ -510,9 +510,11 @@ async fn main() {
             }
         });
         let server = hyper::Server::bind(&static_file_addr.parse().unwrap()).serve(make_service);
-        if let Err(e) = open::that_detached(format!("http://{}", server.local_addr())) {
-            error!("failed to open browser: {}", e);
-        };
+        if arguments.open_in_browser {
+            if let Err(e) = open::that_detached(format!("http://{}", server.local_addr())) {
+                error!("failed to open browser: {}", e);
+            };
+        }
         info!("Static file server listening on: {}", server.local_addr());
         if let Err(e) = server.await {
             error!("Static file server error: {}", e);

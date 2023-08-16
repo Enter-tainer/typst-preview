@@ -31,15 +31,19 @@ pub struct CliArguments {
 
     /// Host to open the preview in the browser.
     #[clap(
-        long = "open-in-browser-host",
+        long = "static-file-host",
         value_name = "HOST",
         default_value = "127.0.0.1:23627"
     )]
-    pub open_in_browser_host: String,
+    pub static_file_host: String,
 
     /// Open the preview in the browser after compilation.
     #[clap(long = "open-in-browser")]
     pub open_in_browser: bool,
+    
+    /// Serve html for preview in the browser.
+    #[clap(long = "server-static-file")]
+    pub server_static_file: bool,
 
     /// Only render visible part of the document. This can improve performance but still being experimental.
     #[clap(long = "partial-rendering")]
