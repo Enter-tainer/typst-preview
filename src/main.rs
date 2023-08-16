@@ -1,6 +1,6 @@
 mod args;
 mod publisher;
-
+mod actor;
 use clap::Parser;
 use codespan_reporting::term::{self, termcolor};
 
