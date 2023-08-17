@@ -3,10 +3,16 @@ use log::info;
 use tokio::{net::TcpStream, sync::mpsc};
 use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
 
-use super::render::RenderActorRequest;
+use super::{render::RenderActorRequest, world::WorldActorRequest};
+
+pub struct SrcToDocJumpInfo {
+    pub page_no: usize,
+    pub x: f64,
+    pub y: f64,
+}
 
 pub enum WebviewActorRequest {
-    SrcToDocJumpRequest { page_no: usize, x: f64, y: f64 },
+    SrcToDocJump(SrcToDocJumpInfo),
 }
 
 fn src_to_doc_jump_to_string(page_no: usize, x: f64, y: f64) -> String {
@@ -18,7 +24,7 @@ pub struct WebviewActor {
     svg_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
     mailbox: mpsc::UnboundedReceiver<WebviewActorRequest>,
 
-    // doc_to_src_sender: mpsc::UnboundedSender<DocToSrcJumpRequest>,
+    doc_to_src_sender: mpsc::UnboundedSender<WorldActorRequest>,
     render_full_latest_sender: mpsc::UnboundedSender<RenderActorRequest>,
 }
 
@@ -27,12 +33,14 @@ impl WebviewActor {
         websocket_conn: WebSocketStream<TcpStream>,
         svg_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
         mailbox: mpsc::UnboundedReceiver<WebviewActorRequest>,
+        doc_to_src_sender: mpsc::UnboundedSender<WorldActorRequest>,
         render_full_latest_sender: mpsc::UnboundedSender<RenderActorRequest>,
     ) -> Self {
         Self {
             websocket_conn,
             svg_receiver,
             mailbox,
+            doc_to_src_sender,
             render_full_latest_sender,
         }
     }
@@ -42,7 +50,8 @@ impl WebviewActor {
             tokio::select! {
                 Some(msg) = self.mailbox.recv() => {
                     match msg {
-                        WebviewActorRequest::SrcToDocJumpRequest { page_no, x, y } => {
+                        WebviewActorRequest::SrcToDocJump(jump_info) => {
+                            let SrcToDocJumpInfo { page_no, x, y } = jump_info;
                             let msg = src_to_doc_jump_to_string(page_no, x, y);
                             self.websocket_conn.send(Message::Text(msg)).await.unwrap();
                         }
@@ -66,7 +75,10 @@ impl WebviewActor {
                     } else if msg.starts_with("src_location") {
                         let location = msg.split(' ').nth(1).unwrap();
                         let id = u64::from_str_radix(location, 16).unwrap();
-                        // doc_to_src_sender.send(DocToSrcJumpRequest { id }).unwrap();
+                        let Ok(_) = self.doc_to_src_sender.send(WorldActorRequest::DocToSrcJumpResolve(id)) else {
+                            info!("WebviewActor: failed to send DocToSrcJumpResolve message to WorldActor");
+                            break;
+                        };
                     } else {
                         info!("WebviewActor: received unknown message from websocket: {}", msg);
                         self.websocket_conn.send(Message::Text(format!("error, received unknown message: {}", msg))).await.unwrap();

@@ -1,6 +1,6 @@
+mod actor;
 mod args;
 mod publisher;
-mod actor;
 use clap::Parser;
 use codespan_reporting::term::{self, termcolor};
 
@@ -102,13 +102,13 @@ impl Client {
 }
 
 #[derive(Debug, Serialize)]
-struct JumpInfo {
+pub struct DocToSrcJumpInfo {
     filepath: String,
     start: Option<(usize, usize)>, // row, column
     end: Option<(usize, usize)>,
 }
 
-impl JumpInfo {
+impl DocToSrcJumpInfo {
     pub fn from_option(
         filepath: String,
         start: (Option<usize>, Option<usize>),
@@ -129,7 +129,7 @@ impl JumpInfo {
 // 		'character': activeEditor.selection.active.character,
 // 	})
 #[derive(Debug, Deserialize)]
-struct SrcToDocJumpRequest {
+pub struct SrcToDocJumpRequest {
     filepath: String,
     line: usize,
     /// fixme: character is 0-based, UTF-16 code unit.
@@ -144,12 +144,12 @@ impl SrcToDocJumpRequest {
 }
 
 #[derive(Debug, Deserialize)]
-struct MemoryFiles {
+pub struct MemoryFiles {
     files: HashMap<String, String>,
 }
 
 #[derive(Debug, Deserialize)]
-struct MemoryFilesShort {
+pub struct MemoryFilesShort {
     files: Vec<String>,
 }
 
@@ -170,7 +170,7 @@ enum ControlPlaneMessage {
 #[serde(tag = "event")]
 enum ControlPlaneResponse {
     #[serde(rename = "editorScrollTo")]
-    EditorScrollTo(JumpInfo),
+    EditorScrollTo(DocToSrcJumpInfo),
     #[serde(rename = "syncEditorChanges")]
     SyncEditorChanges(()),
 }
@@ -323,7 +323,7 @@ async fn main() {
                                                 let source = world.world.source(src_id).unwrap();
                                                 let range = source.find(span).unwrap().range();
                                                 let file_path = world.world.path_for_id(src_id).unwrap();
-                                                let jump = JumpInfo::from_option (
+                                                let jump = DocToSrcJumpInfo::from_option (
                                                     file_path.to_string_lossy().to_string(),
                                                     (source.byte_to_line(range.start), source.byte_to_column(range.start)),
                                                     (source.byte_to_line(range.end), source.byte_to_column(range.end))

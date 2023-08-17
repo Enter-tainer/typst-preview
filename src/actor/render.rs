@@ -45,7 +45,7 @@ impl RenderActor {
             let mut has_full_render = false;
             let Some(msg) = self.mailbox.blocking_recv() else {
                 info!("RenderActor: no more messages");
-                return;
+                break;
             };
             has_full_render |= msg.is_full_render();
             // read the queue to empty
@@ -66,8 +66,9 @@ impl RenderActor {
             };
             let Ok(_) = self.svg_sender.send(data) else {
                 info!("RenderActor: svg_sender is dropped");
-                return;
+                break;
             };
         }
+        info!("RenderActor: exiting")
     }
 }
