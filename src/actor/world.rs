@@ -29,7 +29,7 @@ pub enum WorldActorRequest {
 
 pub struct WorldActor {
     world: CompileDriver,
-    fs_watcher: RecommendedWatcher,
+    _fs_watcher: RecommendedWatcher,
     mailbox: mpsc::UnboundedReceiver<WorldActorRequest>,
 
     doc_sender: watch::Sender<Option<Arc<Document>>>,
@@ -101,7 +101,7 @@ impl WorldActor {
         };
         Self {
             world,
-            fs_watcher,
+            _fs_watcher: fs_watcher,
             mailbox,
             doc_sender,
             renderer_sender,
@@ -154,7 +154,8 @@ impl WorldActor {
                     .with_compile_diag::<true, _>(CompileDriver::compile)
                 {
                     let _ = self.doc_sender.send(Some(Arc::new(doc))); // it is ok to ignore the error here
-                    self.renderer_sender
+                    let _ = self
+                        .renderer_sender
                         .send(RenderActorRequest::RenderIncremental);
                     comemo::evict(30);
                 }

@@ -33,7 +33,24 @@ pub struct WebviewActor {
     render_full_latest_sender: mpsc::UnboundedSender<RenderActorRequest>,
 }
 
+pub struct Channels {
+    pub svg: (
+        mpsc::UnboundedSender<Vec<u8>>,
+        mpsc::UnboundedReceiver<Vec<u8>>,
+    ),
+    pub render_full: (
+        mpsc::UnboundedSender<RenderActorRequest>,
+        mpsc::UnboundedReceiver<RenderActorRequest>,
+    ),
+}
+
 impl WebviewActor {
+    pub fn set_up_channels() -> Channels {
+        Channels {
+            svg: mpsc::unbounded_channel(),
+            render_full: mpsc::unbounded_channel(),
+        }
+    }
     pub fn new(
         websocket_conn: WebSocketStream<TcpStream>,
         svg_receiver: mpsc::UnboundedReceiver<Vec<u8>>,

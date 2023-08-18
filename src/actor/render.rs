@@ -23,20 +23,19 @@ pub struct RenderActor {
     mailbox: broadcast::Receiver<RenderActorRequest>,
     document: watch::Receiver<Option<Arc<Document>>>,
     renderer: IncrSvgDocServer,
-    svg_sender: mpsc::UnboundedSender<Arc<Vec<u8>>>,
+    svg_sender: mpsc::UnboundedSender<Vec<u8>>,
 }
 
 impl RenderActor {
     pub fn new(
         mailbox: broadcast::Receiver<RenderActorRequest>,
         document: watch::Receiver<Option<Arc<Document>>>,
-        renderer: IncrSvgDocServer,
-        svg_sender: mpsc::UnboundedSender<Arc<Vec<u8>>>,
+        svg_sender: mpsc::UnboundedSender<Vec<u8>>,
     ) -> Self {
         Self {
             mailbox,
             document,
-            renderer,
+            renderer: IncrSvgDocServer::default(),
             svg_sender,
         }
     }
@@ -69,7 +68,7 @@ impl RenderActor {
             } else {
                 self.renderer.pack_delta(document)
             };
-            let Ok(_) = self.svg_sender.send(data.into()) else {
+            let Ok(_) = self.svg_sender.send(data) else {
                 info!("RenderActor: svg_sender is dropped");
                 break;
             };

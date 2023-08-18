@@ -3,11 +3,9 @@ mod args;
 use clap::Parser;
 use codespan_reporting::term::{self, termcolor};
 
-use futures::{SinkExt, StreamExt};
 use hyper::http::Error;
 use hyper::service::{make_service_fn, service_fn};
-use log::{error, info, warn};
-use notify::{RecommendedWatcher, RecursiveMode, Watcher};
+use log::{error, info};
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -15,25 +13,20 @@ use std::io::{self, Write};
 use typst::geom::Point;
 
 use std::num::NonZeroUsize;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
 use termcolor::{ColorChoice, StandardStream, WriteColor};
 use tokio::net::{TcpListener, TcpStream};
-use typst::doc::{Document, Frame, FrameItem, Position};
-use typst_ts_svg_exporter::IncrSvgDocServer;
+use typst::doc::{Frame, FrameItem, Position};
 
+use crate::actor::editor::EditorActor;
+use crate::actor::world::WorldActor;
 use crate::args::CliArguments;
-use crate::publisher::PublisherImpl;
-use tokio::sync::Mutex;
-use tokio_tungstenite::tungstenite::Message;
-use tokio_tungstenite::WebSocketStream;
-use typst::diag::StrResult;
 
-use typst::syntax::{FileId, LinkedNode, Source, Span, SyntaxKind};
-use typst::World;
+use tokio_tungstenite::WebSocketStream;
+
+use typst::syntax::{LinkedNode, Source, Span, SyntaxKind};
+
 use typst_ts_compiler::service::CompileDriver;
 use typst_ts_compiler::TypstSystemWorld;
 use typst_ts_core::config::CompileOpts;
@@ -131,28 +124,6 @@ pub struct MemoryFilesShort {
     files: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(tag = "event")]
-enum ControlPlaneMessage {
-    #[serde(rename = "panelScrollTo")]
-    SrcToDocJump(SrcToDocJumpRequest),
-    #[serde(rename = "syncMemoryFiles")]
-    SyncMemoryFiles(MemoryFiles),
-    #[serde(rename = "updateMemoryFiles")]
-    UpdateMemoryFiles(MemoryFiles),
-    #[serde(rename = "removeMemoryFiles")]
-    RemoveMemoryFiles(MemoryFilesShort),
-}
-
-#[derive(Debug, Serialize)]
-#[serde(tag = "event")]
-enum ControlPlaneResponse {
-    #[serde(rename = "editorScrollTo")]
-    EditorScrollTo(DocToSrcJumpInfo),
-    #[serde(rename = "syncEditorChanges")]
-    SyncEditorChanges(()),
-}
-
 const HTML: &str = include_str!("../addons/vscode/out/frontend/index.html");
 
 /// Entry point.
@@ -165,7 +136,7 @@ async fn main() {
     let arguments = CliArguments::parse();
     info!("Arguments: {:#?}", arguments);
     let command = CompileSettings::with_arguments(arguments.clone());
-    let enable_partial_rendering = arguments.enable_partial_rendering;
+    let _enable_partial_rendering = arguments.enable_partial_rendering;
     let entry = if command.input.is_absolute() {
         command.input.clone()
     } else {
@@ -203,16 +174,33 @@ async fn main() {
     });
 
     // Create the world that serves sources, fonts and files.
-    let world = Arc::new(Mutex::new(compile_driver));
-    {
-        let world = world.clone();
-        tokio::spawn(async move {});
-    }
+    let world = compile_driver;
+    let actor::world::Channels {
+        world_mailbox,
+        doc_watch,
+        renderer_mailbox,
+        doc_to_src_jump,
+        src_to_doc_jump,
+    } = WorldActor::set_up_channels();
+    let world_actor = WorldActor::new(
+        world,
+        world_mailbox.1,
+        world_mailbox.0.clone(),
+        doc_watch.0,
+        renderer_mailbox.0.clone(),
+        doc_to_src_jump.0,
+        src_to_doc_jump.0.clone(),
+    );
+
+    std::thread::spawn(move || {
+        world_actor.run();
+    });
 
     let (data_plane_port_tx, data_plane_port_rx) = tokio::sync::oneshot::channel();
     let data_plane_addr = arguments.data_plane_host;
     let data_plane_handle = {
-        let world = world.clone();
+        let world_tx = world_mailbox.0.clone();
+        let doc_watch_rx = doc_watch.1.clone();
         tokio::spawn(async move {
             // Create the event loop and TCP listener we'll accept connections on.
             let try_socket = TcpListener::bind(&data_plane_addr).await;
@@ -222,21 +210,50 @@ async fn main() {
                 listener.local_addr().unwrap()
             );
             let _ = data_plane_port_tx.send(listener.local_addr().unwrap().port());
-            let active_client_count = Arc::new(AtomicUsize::new(0));
+            while let Ok((stream, _)) = listener.accept().await {
+                let src_to_doc_rx = src_to_doc_jump.0.subscribe();
+                let renderer_rx = renderer_mailbox.0.subscribe();
+                let world_tx = world_tx.clone();
+                let doc_watch_rx = doc_watch_rx.clone();
+                let conn = accept_connection(stream).await;
+                let actor::webview::Channels { svg, render_full } =
+                    actor::webview::WebviewActor::set_up_channels();
+                let webview_actor = actor::webview::WebviewActor::new(
+                    conn,
+                    svg.1,
+                    src_to_doc_rx,
+                    world_tx,
+                    render_full.0,
+                );
+                tokio::spawn(async move {
+                    webview_actor.run().await;
+                });
+                let render_actor =
+                    actor::render::RenderActor::new(renderer_rx, doc_watch_rx, svg.0);
+                std::thread::spawn(move || {
+                    render_actor.run();
+                });
+            }
         })
     };
 
     let control_plane_addr = arguments.control_plane_host;
-    let control_plane_handle = tokio::spawn(async move {
-        let try_socket = TcpListener::bind(&control_plane_addr).await;
-        let listener = try_socket.expect("Failed to bind");
-        info!(
-            "Control plane server listening on: {}",
-            listener.local_addr().unwrap()
-        );
-        let (stream, _) = listener.accept().await.unwrap();
-        let conn = accept_connection(stream).await;
-    });
+    let control_plane_handle = {
+        let world_tx = world_mailbox.0.clone();
+        let editor_rx = doc_to_src_jump.1;
+        tokio::spawn(async move {
+            let try_socket = TcpListener::bind(&control_plane_addr).await;
+            let listener = try_socket.expect("Failed to bind");
+            info!(
+                "Control plane server listening on: {}",
+                listener.local_addr().unwrap()
+            );
+            let (stream, _) = listener.accept().await.unwrap();
+            let conn = accept_connection(stream).await;
+            let editor_actor = EditorActor::new(editor_rx, conn, world_tx);
+            editor_actor.run().await;
+        })
+    };
     let static_file_addr = arguments.static_file_host;
     if arguments.server_static_file || arguments.open_in_browser {
         let data_plane_port = data_plane_port_rx.await.unwrap();
@@ -291,18 +308,6 @@ async fn accept_connection(stream: TcpStream) -> WebSocketStream<TcpStream> {
 
     info!("New WebSocket connection: {}", addr);
     ws_stream
-}
-
-/// Print an application-level error (independent from a source file).
-fn print_error(msg: &str) -> io::Result<()> {
-    let mut w = StandardStream::stderr(ColorChoice::Auto);
-    let styles = term::Styles::default();
-
-    w.set_color(&styles.header_error)?;
-    write!(w, "error")?;
-
-    w.reset()?;
-    writeln!(w, ": {msg}.")
 }
 
 use std::borrow::Cow;
