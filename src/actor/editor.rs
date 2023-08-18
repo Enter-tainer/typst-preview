@@ -1,5 +1,105 @@
-use crate::DocToSrcJumpInfo;
+use futures::{SinkExt, StreamExt};
+use log::{info, warn};
+use serde::{Deserialize, Serialize};
+use tokio::net::TcpStream;
+use tokio::sync::mpsc;
+use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
+
+use crate::{
+    actor::world::WorldActorRequest, DocToSrcJumpInfo, MemoryFiles, MemoryFilesShort,
+    SrcToDocJumpRequest,
+};
 
 pub enum EditorActorRequest {
     DocToSrcJump(DocToSrcJumpInfo),
+}
+
+pub struct EditorActor {
+    mailbox: mpsc::UnboundedReceiver<EditorActorRequest>,
+    editor_websocket_conn: WebSocketStream<TcpStream>,
+
+    world_sender: mpsc::UnboundedSender<WorldActorRequest>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "event")]
+enum ControlPlaneMessage {
+    #[serde(rename = "panelScrollTo")]
+    SrcToDocJump(SrcToDocJumpRequest),
+    #[serde(rename = "syncMemoryFiles")]
+    SyncMemoryFiles(MemoryFiles),
+    #[serde(rename = "updateMemoryFiles")]
+    UpdateMemoryFiles(MemoryFiles),
+    #[serde(rename = "removeMemoryFiles")]
+    RemoveMemoryFiles(MemoryFilesShort),
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "event")]
+enum ControlPlaneResponse {
+    #[serde(rename = "editorScrollTo")]
+    EditorScrollTo(DocToSrcJumpInfo),
+    #[serde(rename = "syncEditorChanges")]
+    SyncEditorChanges(()),
+}
+
+impl EditorActor {
+    pub fn new(
+        mailbox: mpsc::UnboundedReceiver<EditorActorRequest>,
+        editor_websocket_conn: WebSocketStream<TcpStream>,
+        world_sender: mpsc::UnboundedSender<WorldActorRequest>,
+    ) -> Self {
+        Self {
+            mailbox,
+            editor_websocket_conn,
+            world_sender,
+        }
+    }
+
+    pub async fn run(mut self) {
+        self.editor_websocket_conn
+            .send(Message::Text(
+                serde_json::to_string(&ControlPlaneResponse::SyncEditorChanges(())).unwrap(),
+            ))
+            .await
+            .unwrap();
+        loop {
+            tokio::select! {
+                Some(msg) = self.mailbox.recv() => {
+                    match msg {
+                        EditorActorRequest::DocToSrcJump(jump_info) => {
+                            let Ok(_) = self.editor_websocket_conn.send(Message::Text(
+                                serde_json::to_string(&ControlPlaneResponse::EditorScrollTo(jump_info)).unwrap(),
+                            )).await else {
+                                warn!("EditorActor: failed to send DocToSrcJump message to editor");
+                                break;
+                            };
+                        }
+                    }
+                }
+                Some(Ok(Message::Text(msg))) = self.editor_websocket_conn.next() => {
+                    let Ok(msg) = serde_json::from_str::<ControlPlaneMessage>(&msg) else {
+                        warn!("failed to parse jump request: {:?}", msg);
+                        continue;
+                    };
+                    match msg {
+                        ControlPlaneMessage::SrcToDocJump(jump_info) => {
+                            self.world_sender.send(WorldActorRequest::SrcToDocJumpResolve(jump_info))
+                        }
+                        ControlPlaneMessage::SyncMemoryFiles(memory_files) => {
+                            self.world_sender.send(WorldActorRequest::SyncMemoryFiles(memory_files))
+                        }
+                        ControlPlaneMessage::UpdateMemoryFiles(memory_files) => {
+                            self.world_sender.send(WorldActorRequest::UpdateMemoryFiles(memory_files))
+                        }
+                        ControlPlaneMessage::RemoveMemoryFiles(memory_files) => {
+                            self.world_sender.send(WorldActorRequest::RemoveMemoryFiles(memory_files))
+                        }
+                    }.unwrap();
+                }
+            }
+        }
+        info!("EditorActor: ws disconnected, shutting down whole program");
+        std::process::exit(0);
+    }
 }

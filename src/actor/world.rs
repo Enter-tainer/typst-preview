@@ -4,6 +4,7 @@ use crate::{
     jump_from_cursor, DocToSrcJumpInfo, MemoryFiles, MemoryFilesShort, SrcToDocJumpRequest,
 };
 use log::{error, info};
+use notify::{RecommendedWatcher, Watcher};
 use tokio::sync::{mpsc, watch};
 use typst::syntax::FileId;
 use typst::{doc::Document, World};
@@ -27,7 +28,7 @@ pub enum WorldActorRequest {
 
 pub struct WorldActor {
     world: CompileDriver,
-
+    fs_watcher: RecommendedWatcher,
     mailbox: mpsc::UnboundedReceiver<WorldActorRequest>,
     doc_sender: watch::Sender<Arc<Document>>,
     doc_to_src_jump_sender: mpsc::UnboundedSender<EditorActorRequest>,
@@ -38,12 +39,28 @@ impl WorldActor {
     pub fn new(
         world: CompileDriver,
         mailbox: mpsc::UnboundedReceiver<WorldActorRequest>,
+        mailbox_sender: mpsc::UnboundedSender<WorldActorRequest>,
         doc_sender: watch::Sender<Arc<Document>>,
         doc_to_src_jump_sender: mpsc::UnboundedSender<EditorActorRequest>,
         src_to_doc_jump_sender: mpsc::UnboundedSender<WebviewActorRequest>,
     ) -> Self {
+        let Ok(fs_watcher) = RecommendedWatcher::new(
+            move |res: Result<notify::Event, _>| match res {
+                Ok(e) => {
+                    mailbox_sender
+                        .send(WorldActorRequest::FilesystemEvent(e))
+                        .unwrap();
+                }
+                Err(e) => error!("watch error: {:#}", e),
+            },
+            notify::Config::default(),
+        ) else {
+            error!("WorldActor: failed to create filesystem watcher");
+            panic!();
+        };
         Self {
             world,
+            fs_watcher,
             mailbox,
             doc_sender,
             doc_to_src_jump_sender,

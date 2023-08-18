@@ -20,7 +20,7 @@ fn src_to_doc_jump_to_string(page_no: usize, x: f64, y: f64) -> String {
 }
 
 pub struct WebviewActor {
-    websocket_conn: WebSocketStream<TcpStream>,
+    webview_websocket_conn: WebSocketStream<TcpStream>,
     svg_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
     mailbox: mpsc::UnboundedReceiver<WebviewActorRequest>,
 
@@ -37,7 +37,7 @@ impl WebviewActor {
         render_full_latest_sender: mpsc::UnboundedSender<RenderActorRequest>,
     ) -> Self {
         Self {
-            websocket_conn,
+            webview_websocket_conn: websocket_conn,
             svg_receiver,
             mailbox,
             doc_to_src_sender,
@@ -53,21 +53,21 @@ impl WebviewActor {
                         WebviewActorRequest::SrcToDocJump(jump_info) => {
                             let SrcToDocJumpInfo { page_no, x, y } = jump_info;
                             let msg = src_to_doc_jump_to_string(page_no, x, y);
-                            self.websocket_conn.send(Message::Text(msg)).await.unwrap();
+                            self.webview_websocket_conn.send(Message::Text(msg)).await.unwrap();
                         }
                     }
                 }
                 Some(svg) = self.svg_receiver.recv() => {
-                    self.websocket_conn.send(Message::Binary(svg)).await.unwrap();
+                    self.webview_websocket_conn.send(Message::Binary(svg)).await.unwrap();
                 }
-                Some(msg) = self.websocket_conn.next() => {
+                Some(msg) = self.webview_websocket_conn.next() => {
                     let Ok(msg) = msg else {
                         info!("WebviewActor: no more messages from websocket: {}", msg.unwrap_err());
                       break;
                     };
                     let Message::Text(msg) = msg else {
                         info!("WebviewActor: received non-text message from websocket: {:?}", msg);
-                        self.websocket_conn.send(Message::Text(format!("error, received non-text message: {}", msg))).await.unwrap();
+                        self.webview_websocket_conn.send(Message::Text(format!("error, received non-text message: {}", msg))).await.unwrap();
                         break;
                     };
                     if msg == "current" {
@@ -81,7 +81,7 @@ impl WebviewActor {
                         };
                     } else {
                         info!("WebviewActor: received unknown message from websocket: {}", msg);
-                        self.websocket_conn.send(Message::Text(format!("error, received unknown message: {}", msg))).await.unwrap();
+                        self.webview_websocket_conn.send(Message::Text(format!("error, received unknown message: {}", msg))).await.unwrap();
                         break;
                     }
                 }
