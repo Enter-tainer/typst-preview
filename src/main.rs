@@ -210,12 +210,12 @@ async fn main() {
             let _ = data_plane_port_tx.send(listener.local_addr().unwrap().port());
             while let Ok((stream, _)) = listener.accept().await {
                 let src_to_doc_rx = src_to_doc_jump.0.subscribe();
-                let renderer_rx = renderer_mailbox.0.subscribe();
                 let world_tx = world_tx.clone();
                 let doc_watch_rx = doc_watch_rx.clone();
                 let conn = accept_connection(stream).await;
                 let actor::webview::Channels { svg, render_full } =
                     actor::webview::WebviewActor::set_up_channels();
+                let render_tx = render_full.0.clone();
                 let webview_actor = actor::webview::WebviewActor::new(
                     conn,
                     svg.1,
@@ -226,14 +226,18 @@ async fn main() {
                 tokio::spawn(async move {
                     webview_actor.run().await;
                 });
-                let render_actor = actor::render::RenderActor::new(
-                    render_full.1,
-                    renderer_rx,
-                    doc_watch_rx,
-                    svg.0,
-                );
+                let render_actor =
+                    actor::render::RenderActor::new(render_full.1, doc_watch_rx, svg.0);
                 std::thread::spawn(move || {
                     render_actor.run();
+                });
+                let mut renderer_rx = renderer_mailbox.0.subscribe();
+                tokio::spawn(async move {
+                    while let Ok(msg) = renderer_rx.recv().await {
+                        let Ok(_) = render_tx.send(msg) else {
+                            break;
+                        };
+                    }
                 });
             }
         })
