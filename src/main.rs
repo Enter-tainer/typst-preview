@@ -226,8 +226,12 @@ async fn main() {
                 tokio::spawn(async move {
                     webview_actor.run().await;
                 });
-                let render_actor =
-                    actor::render::RenderActor::new(renderer_rx, doc_watch_rx, svg.0);
+                let render_actor = actor::render::RenderActor::new(
+                    render_full.1,
+                    renderer_rx,
+                    doc_watch_rx,
+                    svg.0,
+                );
                 std::thread::spawn(move || {
                     render_actor.run();
                 });

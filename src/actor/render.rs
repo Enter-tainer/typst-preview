@@ -20,7 +20,8 @@ impl RenderActorRequest {
 }
 
 pub struct RenderActor {
-    mailbox: broadcast::Receiver<RenderActorRequest>,
+    mailbox: mpsc::UnboundedReceiver<RenderActorRequest>,
+    doc_update: broadcast::Receiver<RenderActorRequest>,
     document: watch::Receiver<Option<Arc<Document>>>,
     renderer: IncrSvgDocServer,
     svg_sender: mpsc::UnboundedSender<Vec<u8>>,
@@ -28,12 +29,14 @@ pub struct RenderActor {
 
 impl RenderActor {
     pub fn new(
-        mailbox: broadcast::Receiver<RenderActorRequest>,
+        mailbox: mpsc::UnboundedReceiver<RenderActorRequest>,
+        doc_update: broadcast::Receiver<RenderActorRequest>,
         document: watch::Receiver<Option<Arc<Document>>>,
         svg_sender: mpsc::UnboundedSender<Vec<u8>>,
     ) -> Self {
         Self {
             mailbox,
+            doc_update,
             document,
             renderer: IncrSvgDocServer::default(),
             svg_sender,
@@ -43,7 +46,16 @@ impl RenderActor {
     pub fn run(mut self) {
         loop {
             let mut has_full_render = false;
-            let Ok(msg) = self.mailbox.blocking_recv() else {
+            let Ok(msg) = self.doc_update.blocking_recv() else {
+                info!("RenderActor: no more messages");
+                break;
+            };
+            has_full_render |= msg.is_full_render();
+            // read the queue to empty
+            while let Ok(msg) = self.doc_update.try_recv() {
+                has_full_render |= msg.is_full_render();
+            }
+            let Ok(msg) = self.mailbox.try_recv() else {
                 info!("RenderActor: no more messages");
                 break;
             };

@@ -89,7 +89,7 @@ impl WebviewActor {
                     };
                     let Message::Text(msg) = msg else {
                         info!("WebviewActor: received non-text message from websocket: {:?}", msg);
-                        self.webview_websocket_conn.send(Message::Text(format!("error, received non-text message: {}", msg))).await.unwrap();
+                        let _ = self.webview_websocket_conn.send(Message::Text(format!("error, received non-text message: {}", msg))).await;
                         break;
                     };
                     if msg == "current" {
