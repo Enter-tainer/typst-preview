@@ -1,7 +1,6 @@
 mod actor;
 mod args;
 use clap::Parser;
-use codespan_reporting::term::{self, termcolor};
 
 use hyper::http::Error;
 use hyper::service::{make_service_fn, service_fn};
@@ -9,13 +8,12 @@ use log::{error, info};
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::io::{self, Write};
+
 use typst::geom::Point;
 
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
 
-use termcolor::{ColorChoice, StandardStream, WriteColor};
 use tokio::net::{TcpListener, TcpStream};
 use typst::doc::{Frame, FrameItem, Position};
 
