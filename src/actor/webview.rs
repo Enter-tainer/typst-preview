@@ -1,16 +1,21 @@
 use futures::{SinkExt, StreamExt};
 use log::info;
-use tokio::{net::TcpStream, sync::mpsc};
+use tokio::{
+    net::TcpStream,
+    sync::{broadcast, mpsc},
+};
 use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
 
 use super::{render::RenderActorRequest, world::WorldActorRequest};
 
+#[derive(Debug, Clone, Copy)]
 pub struct SrcToDocJumpInfo {
     pub page_no: usize,
     pub x: f64,
     pub y: f64,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum WebviewActorRequest {
     SrcToDocJump(SrcToDocJumpInfo),
 }
@@ -22,7 +27,7 @@ fn src_to_doc_jump_to_string(page_no: usize, x: f64, y: f64) -> String {
 pub struct WebviewActor {
     webview_websocket_conn: WebSocketStream<TcpStream>,
     svg_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
-    mailbox: mpsc::UnboundedReceiver<WebviewActorRequest>,
+    mailbox: broadcast::Receiver<WebviewActorRequest>,
 
     doc_to_src_sender: mpsc::UnboundedSender<WorldActorRequest>,
     render_full_latest_sender: mpsc::UnboundedSender<RenderActorRequest>,
@@ -32,7 +37,7 @@ impl WebviewActor {
     pub fn new(
         websocket_conn: WebSocketStream<TcpStream>,
         svg_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
-        mailbox: mpsc::UnboundedReceiver<WebviewActorRequest>,
+        mailbox: broadcast::Receiver<WebviewActorRequest>,
         doc_to_src_sender: mpsc::UnboundedSender<WorldActorRequest>,
         render_full_latest_sender: mpsc::UnboundedSender<RenderActorRequest>,
     ) -> Self {
@@ -48,7 +53,7 @@ impl WebviewActor {
     pub async fn run(mut self) {
         loop {
             tokio::select! {
-                Some(msg) = self.mailbox.recv() => {
+                Ok(msg) = self.mailbox.recv() => {
                     match msg {
                         WebviewActorRequest::SrcToDocJump(jump_info) => {
                             let SrcToDocJumpInfo { page_no, x, y } = jump_info;

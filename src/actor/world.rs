@@ -5,11 +5,12 @@ use crate::{
 };
 use log::{error, info};
 use notify::{RecommendedWatcher, Watcher};
-use tokio::sync::{mpsc, watch};
+use tokio::sync::{broadcast, mpsc, watch};
 use typst::syntax::FileId;
 use typst::{doc::Document, World};
 use typst_ts_compiler::service::CompileDriver;
 
+use super::render::RenderActorRequest;
 use super::{
     editor::EditorActorRequest,
     webview::{SrcToDocJumpInfo, WebviewActorRequest},
@@ -30,19 +31,59 @@ pub struct WorldActor {
     world: CompileDriver,
     fs_watcher: RecommendedWatcher,
     mailbox: mpsc::UnboundedReceiver<WorldActorRequest>,
-    doc_sender: watch::Sender<Arc<Document>>,
+
+    doc_sender: watch::Sender<Option<Arc<Document>>>,
+    renderer_sender: broadcast::Sender<RenderActorRequest>,
     doc_to_src_jump_sender: mpsc::UnboundedSender<EditorActorRequest>,
-    src_to_doc_jump_sender: mpsc::UnboundedSender<WebviewActorRequest>,
+    src_to_doc_jump_sender: broadcast::Sender<WebviewActorRequest>,
+}
+
+pub struct Channels {
+    pub world_mailbox: (
+        mpsc::UnboundedSender<WorldActorRequest>,
+        mpsc::UnboundedReceiver<WorldActorRequest>,
+    ),
+    pub doc_watch: (
+        watch::Sender<Option<Arc<Document>>>,
+        watch::Receiver<Option<Arc<Document>>>,
+    ),
+    pub renderer_mailbox: (
+        broadcast::Sender<RenderActorRequest>,
+        broadcast::Receiver<RenderActorRequest>,
+    ),
+    pub doc_to_src_jump: (
+        mpsc::UnboundedSender<EditorActorRequest>,
+        mpsc::UnboundedReceiver<EditorActorRequest>,
+    ),
+    pub src_to_doc_jump: (
+        broadcast::Sender<WebviewActorRequest>,
+        broadcast::Receiver<WebviewActorRequest>,
+    ),
 }
 
 impl WorldActor {
+    pub fn set_up_channels() -> Channels {
+        let world_mailbox = mpsc::unbounded_channel();
+        let doc_watch = watch::channel(None);
+        let renderer_mailbox = broadcast::channel(32);
+        let doc_to_src_jump = mpsc::unbounded_channel();
+        let src_to_doc_jump = broadcast::channel(32);
+        Channels {
+            world_mailbox,
+            doc_watch,
+            renderer_mailbox,
+            doc_to_src_jump,
+            src_to_doc_jump,
+        }
+    }
     pub fn new(
         world: CompileDriver,
         mailbox: mpsc::UnboundedReceiver<WorldActorRequest>,
         mailbox_sender: mpsc::UnboundedSender<WorldActorRequest>,
-        doc_sender: watch::Sender<Arc<Document>>,
+        doc_sender: watch::Sender<Option<Arc<Document>>>,
+        renderer_sender: broadcast::Sender<RenderActorRequest>,
         doc_to_src_jump_sender: mpsc::UnboundedSender<EditorActorRequest>,
-        src_to_doc_jump_sender: mpsc::UnboundedSender<WebviewActorRequest>,
+        src_to_doc_jump_sender: broadcast::Sender<WebviewActorRequest>,
     ) -> Self {
         let Ok(fs_watcher) = RecommendedWatcher::new(
             move |res: Result<notify::Event, _>| match res {
@@ -63,6 +104,7 @@ impl WorldActor {
             fs_watcher,
             mailbox,
             doc_sender,
+            renderer_sender,
             doc_to_src_jump_sender,
             src_to_doc_jump_sender,
         }
@@ -111,7 +153,9 @@ impl WorldActor {
                     .world
                     .with_compile_diag::<true, _>(CompileDriver::compile)
                 {
-                    let _ = self.doc_sender.send(Arc::new(doc)); // it is ok to ignore the error here
+                    let _ = self.doc_sender.send(Some(Arc::new(doc))); // it is ok to ignore the error here
+                    self.renderer_sender
+                        .send(RenderActorRequest::RenderIncremental);
                     comemo::evict(30);
                 }
             }
@@ -157,7 +201,7 @@ impl WorldActor {
         let source_id = FileId::new(None, &Path::new("/").join(relative_path));
         let source = world.source(source_id).ok()?;
         let cursor = req.to_byte_offset(&source)?;
-        let doc = self.doc_sender.borrow();
+        let doc = self.doc_sender.borrow().clone()?;
         let jump_pos = jump_from_cursor(&doc.pages, &source, cursor)?;
         Some(SrcToDocJumpInfo {
             page_no: jump_pos.page.into(),
