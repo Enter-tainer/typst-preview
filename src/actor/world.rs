@@ -4,7 +4,7 @@ use crate::{
     jump_from_cursor, DocToSrcJumpInfo, MemoryFiles, MemoryFilesShort, SrcToDocJumpRequest,
 };
 use log::{error, info};
-use notify::{RecommendedWatcher, Watcher};
+use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::sync::{broadcast, mpsc, watch};
 use typst::syntax::FileId;
 use typst::{doc::Document, World};
@@ -29,7 +29,7 @@ pub enum WorldActorRequest {
 
 pub struct WorldActor {
     world: CompileDriver,
-    _fs_watcher: RecommendedWatcher,
+    fs_watcher: RecommendedWatcher,
     mailbox: mpsc::UnboundedReceiver<WorldActorRequest>,
 
     doc_sender: watch::Sender<Option<Arc<Document>>>,
@@ -88,6 +88,7 @@ impl WorldActor {
         let Ok(fs_watcher) = RecommendedWatcher::new(
             move |res: Result<notify::Event, _>| match res {
                 Ok(e) => {
+                    info!("WorldActor: filesystem event: {:?}", e);
                     mailbox_sender
                         .send(WorldActorRequest::FilesystemEvent(e))
                         .unwrap();
@@ -101,7 +102,7 @@ impl WorldActor {
         };
         Self {
             world,
-            _fs_watcher: fs_watcher,
+            fs_watcher,
             mailbox,
             doc_sender,
             renderer_sender,
@@ -110,6 +111,11 @@ impl WorldActor {
         }
     }
     pub fn run(mut self) {
+        self.compile();
+        let Ok(_) = self.fs_watcher.watch(&self.world.world.root, RecursiveMode::Recursive) else {
+            error!("WorldActor: failed to watch filesystem events");
+            panic!();
+        };
         loop {
             let mut recompile = false;
             let Some(mail) = self.mailbox.blocking_recv() else {
@@ -148,20 +154,24 @@ impl WorldActor {
                 }
             }
             if recompile {
-                self.world.world.reset();
-                if let Some(doc) = self
-                    .world
-                    .with_compile_diag::<true, _>(CompileDriver::compile)
-                {
-                    let _ = self.doc_sender.send(Some(Arc::new(doc))); // it is ok to ignore the error here
-                    let _ = self
-                        .renderer_sender
-                        .send(RenderActorRequest::RenderIncremental);
-                    comemo::evict(30);
-                }
+                self.compile();
             }
         }
         info!("WorldActor: exiting");
+    }
+
+    fn compile(&mut self) {
+        self.world.world.reset();
+        if let Some(doc) = self
+            .world
+            .with_compile_diag::<true, _>(CompileDriver::compile)
+        {
+            let _ = self.doc_sender.send(Some(Arc::new(doc))); // it is ok to ignore the error here
+            let _ = self
+                .renderer_sender
+                .send(RenderActorRequest::RenderIncremental);
+            comemo::evict(30);
+        }
     }
 
     fn need_recompile(&self, mail: &WorldActorRequest) -> bool {
