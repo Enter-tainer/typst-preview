@@ -40,7 +40,7 @@ pub struct CliArguments {
     /// Open the preview in the browser after compilation.
     #[clap(long = "open-in-browser")]
     pub open_in_browser: bool,
-    
+
     /// Serve html for preview in the browser.
     #[clap(long = "server-static-file")]
     pub server_static_file: bool,
