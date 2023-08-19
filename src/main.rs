@@ -2,12 +2,14 @@ mod actor;
 mod args;
 use clap::Parser;
 
+use futures::SinkExt;
 use hyper::http::Error;
 use hyper::service::{make_service_fn, service_fn};
 use log::{error, info};
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tokio_tungstenite::tungstenite::Message;
 
 use typst::geom::Point;
 
@@ -135,7 +137,7 @@ async fn main() {
     let arguments = CliArguments::parse();
     info!("Arguments: {:#?}", arguments);
     let command = CompileSettings::with_arguments(arguments.clone());
-    let _enable_partial_rendering = arguments.enable_partial_rendering;
+    let enable_partial_rendering = arguments.enable_partial_rendering;
     let entry = if command.input.is_absolute() {
         command.input.clone()
     } else {
@@ -213,7 +215,12 @@ async fn main() {
                 let src_to_doc_rx = src_to_doc_jump.0.subscribe();
                 let world_tx = world_tx.clone();
                 let doc_watch_rx = doc_watch_rx.clone();
-                let conn = accept_connection(stream).await;
+                let mut conn = accept_connection(stream).await;
+                if enable_partial_rendering {
+                    conn.send(Message::Binary("partial-rendering,true".into()))
+                        .await
+                        .unwrap();
+                }
                 let actor::webview::Channels { svg, render_full } =
                     actor::webview::WebviewActor::set_up_channels();
                 let render_tx = render_full.0.clone();
