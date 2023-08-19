@@ -6,7 +6,7 @@ use tokio::sync::mpsc;
 use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
 
 use crate::{
-    actor::world::WorldActorRequest, DocToSrcJumpInfo, MemoryFiles, MemoryFilesShort,
+    actor::typst::TypstActorRequest, DocToSrcJumpInfo, MemoryFiles, MemoryFilesShort,
     SrcToDocJumpRequest,
 };
 
@@ -19,7 +19,7 @@ pub struct EditorActor {
     mailbox: mpsc::UnboundedReceiver<EditorActorRequest>,
     editor_websocket_conn: WebSocketStream<TcpStream>,
 
-    world_sender: mpsc::UnboundedSender<WorldActorRequest>,
+    world_sender: mpsc::UnboundedSender<TypstActorRequest>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -48,7 +48,7 @@ impl EditorActor {
     pub fn new(
         mailbox: mpsc::UnboundedReceiver<EditorActorRequest>,
         editor_websocket_conn: WebSocketStream<TcpStream>,
-        world_sender: mpsc::UnboundedSender<WorldActorRequest>,
+        world_sender: mpsc::UnboundedSender<TypstActorRequest>,
     ) -> Self {
         Self {
             mailbox,
@@ -87,19 +87,19 @@ impl EditorActor {
                     match msg {
                         ControlPlaneMessage::SrcToDocJump(jump_info) => {
                             debug!("EditorActor: received message from editor: {:?}", jump_info);
-                            self.world_sender.send(WorldActorRequest::SrcToDocJumpResolve(jump_info))
+                            self.world_sender.send(TypstActorRequest::SrcToDocJumpResolve(jump_info))
                         }
                         ControlPlaneMessage::SyncMemoryFiles(memory_files) => {
                             debug!("EditorActor: received message from editor: SyncMemoryFiles {:?}", memory_files.files.keys().collect::<Vec<_>>());
-                            self.world_sender.send(WorldActorRequest::SyncMemoryFiles(memory_files))
+                            self.world_sender.send(TypstActorRequest::SyncMemoryFiles(memory_files))
                         }
                         ControlPlaneMessage::UpdateMemoryFiles(memory_files) => {
                             debug!("EditorActor: received message from editor: UpdateMemoryFiles {:?}", memory_files.files.keys().collect::<Vec<_>>());
-                            self.world_sender.send(WorldActorRequest::UpdateMemoryFiles(memory_files))
+                            self.world_sender.send(TypstActorRequest::UpdateMemoryFiles(memory_files))
                         }
                         ControlPlaneMessage::RemoveMemoryFiles(memory_files) => {
                             debug!("EditorActor: received message from editor: RemoveMemoryFiles {:?}", &memory_files.files);
-                            self.world_sender.send(WorldActorRequest::RemoveMemoryFiles(memory_files))
+                            self.world_sender.send(TypstActorRequest::RemoveMemoryFiles(memory_files))
                         }
                     }.unwrap();
                 }

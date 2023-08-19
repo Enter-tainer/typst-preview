@@ -20,7 +20,7 @@ use tokio::net::{TcpListener, TcpStream};
 use typst::doc::{Frame, FrameItem, Position};
 
 use crate::actor::editor::EditorActor;
-use crate::actor::world::WorldActor;
+use crate::actor::typst::TypstActor;
 use crate::args::CliArguments;
 
 use tokio_tungstenite::WebSocketStream;
@@ -156,7 +156,7 @@ async fn main() {
         error!("entry file must be in the root directory");
         std::process::exit(1);
     }
-    let compile_driver = {
+    let compiler_driver = {
         let world = TypstSystemWorld::new(CompileOpts {
             root_dir: root.clone(),
             font_paths: arguments.font_paths.clone(),
@@ -175,18 +175,17 @@ async fn main() {
     });
 
     // Create the world that serves sources, fonts and files.
-    let world = compile_driver;
-    let actor::world::Channels {
-        world_mailbox,
+    let actor::typst::Channels {
+        typst_mailbox,
         doc_watch,
         renderer_mailbox,
         doc_to_src_jump,
         src_to_doc_jump,
-    } = WorldActor::set_up_channels();
-    let world_actor = WorldActor::new(
-        world,
-        world_mailbox.1,
-        world_mailbox.0.clone(),
+    } = TypstActor::set_up_channels();
+    let typst_actor = TypstActor::new(
+        compiler_driver,
+        typst_mailbox.1,
+        typst_mailbox.0.clone(),
         doc_watch.0,
         renderer_mailbox.0.clone(),
         doc_to_src_jump.0,
@@ -194,13 +193,13 @@ async fn main() {
     );
 
     std::thread::spawn(move || {
-        world_actor.run();
+        typst_actor.run();
     });
 
     let (data_plane_port_tx, data_plane_port_rx) = tokio::sync::oneshot::channel();
     let data_plane_addr = arguments.data_plane_host;
     let data_plane_handle = {
-        let world_tx = world_mailbox.0.clone();
+        let typst_tx = typst_mailbox.0.clone();
         let doc_watch_rx = doc_watch.1.clone();
         tokio::spawn(async move {
             // Create the event loop and TCP listener we'll accept connections on.
@@ -213,7 +212,7 @@ async fn main() {
             let _ = data_plane_port_tx.send(listener.local_addr().unwrap().port());
             while let Ok((stream, _)) = listener.accept().await {
                 let src_to_doc_rx = src_to_doc_jump.0.subscribe();
-                let world_tx = world_tx.clone();
+                let typst_tx = typst_tx.clone();
                 let doc_watch_rx = doc_watch_rx.clone();
                 let mut conn = accept_connection(stream).await;
                 if enable_partial_rendering {
@@ -228,7 +227,7 @@ async fn main() {
                     conn,
                     svg.1,
                     src_to_doc_rx,
-                    world_tx,
+                    typst_tx,
                     render_full.0,
                 );
                 tokio::spawn(async move {
@@ -253,7 +252,7 @@ async fn main() {
 
     let control_plane_addr = arguments.control_plane_host;
     let control_plane_handle = {
-        let world_tx = world_mailbox.0.clone();
+        let typst_tx = typst_mailbox.0.clone();
         let editor_rx = doc_to_src_jump.1;
         tokio::spawn(async move {
             let try_socket = TcpListener::bind(&control_plane_addr).await;
@@ -264,7 +263,7 @@ async fn main() {
             );
             let (stream, _) = listener.accept().await.unwrap();
             let conn = accept_connection(stream).await;
-            let editor_actor = EditorActor::new(editor_rx, conn, world_tx);
+            let editor_actor = EditorActor::new(editor_rx, conn, typst_tx);
             editor_actor.run().await;
         })
     };

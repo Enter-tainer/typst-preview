@@ -6,7 +6,7 @@ use tokio::{
 };
 use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
 
-use super::{render::RenderActorRequest, world::WorldActorRequest};
+use super::{render::RenderActorRequest, typst::TypstActorRequest};
 
 #[derive(Debug, Clone, Copy)]
 pub struct SrcToDocJumpInfo {
@@ -29,7 +29,7 @@ pub struct WebviewActor {
     svg_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
     mailbox: broadcast::Receiver<WebviewActorRequest>,
 
-    doc_to_src_sender: mpsc::UnboundedSender<WorldActorRequest>,
+    doc_to_src_sender: mpsc::UnboundedSender<TypstActorRequest>,
     render_full_latest_sender: mpsc::UnboundedSender<RenderActorRequest>,
 }
 
@@ -55,7 +55,7 @@ impl WebviewActor {
         websocket_conn: WebSocketStream<TcpStream>,
         svg_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
         mailbox: broadcast::Receiver<WebviewActorRequest>,
-        doc_to_src_sender: mpsc::UnboundedSender<WorldActorRequest>,
+        doc_to_src_sender: mpsc::UnboundedSender<TypstActorRequest>,
         render_full_latest_sender: mpsc::UnboundedSender<RenderActorRequest>,
     ) -> Self {
         Self {
@@ -100,8 +100,8 @@ impl WebviewActor {
                     } else if msg.starts_with("srclocation") {
                         let location = msg.split(' ').nth(1).unwrap();
                         let id = u64::from_str_radix(location, 16).unwrap();
-                        let Ok(_) = self.doc_to_src_sender.send(WorldActorRequest::DocToSrcJumpResolve(id)) else {
-                            info!("WebviewActor: failed to send DocToSrcJumpResolve message to WorldActor");
+                        let Ok(_) = self.doc_to_src_sender.send(TypstActorRequest::DocToSrcJumpResolve(id)) else {
+                            info!("WebviewActor: failed to send DocToSrcJumpResolve message to TypstActor");
                             break;
                         };
                     } else {
