@@ -31,25 +31,28 @@
         "command": "typst-preview.preview",
         "title": "Typst Preview: Preview current file",
         "description": "Launch typst-preview server",
-        "icon": "$(open-preview)"
+        "icon": "$(open-preview)",
+        "when": "resourceLangId == typst && editorTextFocus"
       },
       {
         "command": "typst-preview.browser",
         "title": "Typst Preview: Preview current file in browser",
         "description": "Launch typst-preview server and open the preview in your browser",
-        "icon": "$(open-preview)"
+        "icon": "$(open-preview)",
+        "when": "resourceLangId == typst && editorTextFocus"
       },
       {
         "command": "typst-preview.sync",
         "title": "Typst Preview: Sync preview with current cursor",
-        "icon": "$(sync)"
+        "icon": "$(sync)",
+        "when": "resourceLangId == typst && editorTextFocus"
       }
     ],
     "menus": {
       "editor/title": [
         {
           "command": "typst-preview.preview",
-          "when": "resourceLangId == typst",
+          "when": "resourceLangId == typst && editorTextFocus",
           "group": "navigation"
         }
       ]
