@@ -72,6 +72,7 @@ impl RenderActor {
             } else {
                 self.renderer.pack_delta(document)
             };
+            comemo::evict(30);
             let Ok(_) = self.svg_sender.send(data) else {
                 info!("RenderActor: svg_sender is dropped");
                 break;
