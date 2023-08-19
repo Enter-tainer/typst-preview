@@ -76,7 +76,7 @@ impl WebviewActor {
                         WebviewActorRequest::SrcToDocJump(jump_info) => {
                             let SrcToDocJumpInfo { page_no, x, y } = jump_info;
                             let msg = src_to_doc_jump_to_string(page_no, x, y);
-                            self.webview_websocket_conn.send(Message::Text(msg)).await.unwrap();
+                            self.webview_websocket_conn.send(Message::Binary(msg.into_bytes())).await.unwrap();
                         }
                     }
                 }
@@ -92,12 +92,12 @@ impl WebviewActor {
                     };
                     let Message::Text(msg) = msg else {
                         info!("WebviewActor: received non-text message from websocket: {:?}", msg);
-                        let _ = self.webview_websocket_conn.send(Message::Text(format!("error, received non-text message: {}", msg))).await;
+                        let _ = self.webview_websocket_conn.send(Message::Text(format!("Webview Actor: error, received non-text message: {}", msg))).await;
                         break;
                     };
                     if msg == "current" {
                         self.render_full_latest_sender.send(RenderActorRequest::RenderFullLatest).unwrap();
-                    } else if msg.starts_with("src_location") {
+                    } else if msg.starts_with("srclocation") {
                         let location = msg.split(' ').nth(1).unwrap();
                         let id = u64::from_str_radix(location, 16).unwrap();
                         let Ok(_) = self.doc_to_src_sender.send(WorldActorRequest::DocToSrcJumpResolve(id)) else {

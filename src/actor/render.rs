@@ -32,12 +32,14 @@ impl RenderActor {
         document: watch::Receiver<Option<Arc<Document>>>,
         svg_sender: mpsc::UnboundedSender<Vec<u8>>,
     ) -> Self {
-        Self {
+        let mut res = Self {
             mailbox,
             document,
             renderer: IncrSvgDocServer::default(),
             svg_sender,
-        }
+        };
+        res.renderer.set_should_attach_debug_info(true);
+        res
     }
 
     pub fn run(mut self) {

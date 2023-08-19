@@ -128,7 +128,6 @@ impl WorldActor {
             self.process_mail(mail);
             // read the queue to empty
             while let Ok(mail) = self.mailbox.try_recv() {
-                debug!("WorldActor: receive message: {:?}", mail);
                 recompile |= self.need_recompile(&mail);
                 self.process_mail(mail);
             }
@@ -142,6 +141,7 @@ impl WorldActor {
     fn process_mail(&mut self, mail: WorldActorRequest) {
         match &mail {
             WorldActorRequest::DocToSrcJumpResolve(id) => {
+                debug!("WorldActor: processing message: {:?}", mail);
                 if let Some(info) = self.resolve_doc_to_src_jump(*id) {
                     let _ = self
                         .doc_to_src_jump_sender
@@ -149,6 +149,7 @@ impl WorldActor {
                 }
             }
             WorldActorRequest::SrcToDocJumpResolve(req) => {
+                debug!("WorldActor: processing message: {:?}", mail);
                 if let Some(info) = self.resolve_src_to_doc_jump(req) {
                     let _ = self
                         .src_to_doc_jump_sender
@@ -156,12 +157,21 @@ impl WorldActor {
                 }
             }
             WorldActorRequest::SyncMemoryFiles(m) => {
+                debug!(
+                    "WorldActor: processing SYNC memory files: {:?}",
+                    m.files.keys().collect::<Vec<_>>()
+                );
                 self.update_memory_files(m, true);
             }
             WorldActorRequest::UpdateMemoryFiles(m) => {
+                debug!(
+                    "WorldActor: processing UPDATE memory files: {:?}",
+                    m.files.keys().collect::<Vec<_>>()
+                );
                 self.update_memory_files(m, false);
             }
             WorldActorRequest::RemoveMemoryFiles(m) => {
+                debug!("WorldActor: processing REMOVE memory files: {:?}", m.files);
                 self.remove_shadow_files(m);
             }
             WorldActorRequest::FilesystemEvent(_e) => {}

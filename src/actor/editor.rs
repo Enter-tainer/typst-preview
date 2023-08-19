@@ -84,18 +84,21 @@ impl EditorActor {
                         warn!("failed to parse jump request: {:?}", msg);
                         continue;
                     };
-                    debug!("EditorActor: received message from editor: {:?}", msg);
                     match msg {
                         ControlPlaneMessage::SrcToDocJump(jump_info) => {
+                            debug!("EditorActor: received message from editor: {:?}", jump_info);
                             self.world_sender.send(WorldActorRequest::SrcToDocJumpResolve(jump_info))
                         }
                         ControlPlaneMessage::SyncMemoryFiles(memory_files) => {
+                            debug!("EditorActor: received message from editor: SyncMemoryFiles {:?}", memory_files.files.keys().collect::<Vec<_>>());
                             self.world_sender.send(WorldActorRequest::SyncMemoryFiles(memory_files))
                         }
                         ControlPlaneMessage::UpdateMemoryFiles(memory_files) => {
+                            debug!("EditorActor: received message from editor: UpdateMemoryFiles {:?}", memory_files.files.keys().collect::<Vec<_>>());
                             self.world_sender.send(WorldActorRequest::UpdateMemoryFiles(memory_files))
                         }
                         ControlPlaneMessage::RemoveMemoryFiles(memory_files) => {
+                            debug!("EditorActor: received message from editor: RemoveMemoryFiles {:?}", &memory_files.files);
                             self.world_sender.send(WorldActorRequest::RemoveMemoryFiles(memory_files))
                         }
                     }.unwrap();

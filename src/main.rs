@@ -128,7 +128,8 @@ const HTML: &str = include_str!("../addons/vscode/out/frontend/index.html");
 #[tokio::main]
 async fn main() {
     let _ = env_logger::builder()
-        .filter_module("typst_preview", log::LevelFilter::Info)
+        // TODO: set this back to Info
+        .filter_module("typst_preview", log::LevelFilter::Debug)
         .filter_module("typst_ts", log::LevelFilter::Info)
         .try_init();
     let arguments = CliArguments::parse();
