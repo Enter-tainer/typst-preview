@@ -1,5 +1,5 @@
 use futures::{SinkExt, StreamExt};
-use log::info;
+use log::{debug, info};
 use tokio::{
     net::TcpStream,
     sync::{broadcast, mpsc},
@@ -71,6 +71,7 @@ impl WebviewActor {
         loop {
             tokio::select! {
                 Ok(msg) = self.mailbox.recv() => {
+                    debug!("WebviewActor: received message from mailbox: {:?}", msg);
                     match msg {
                         WebviewActorRequest::SrcToDocJump(jump_info) => {
                             let SrcToDocJumpInfo { page_no, x, y } = jump_info;
@@ -80,9 +81,11 @@ impl WebviewActor {
                     }
                 }
                 Some(svg) = self.svg_receiver.recv() => {
+                    debug!("WebviewActor: received svg from renderer");
                     self.webview_websocket_conn.send(Message::Binary(svg)).await.unwrap();
                 }
                 Some(msg) = self.webview_websocket_conn.next() => {
+                    debug!("WebviewActor: received message from websocket: {:?}", msg);
                     let Ok(msg) = msg else {
                         info!("WebviewActor: no more messages from websocket: {}", msg.unwrap_err());
                       break;

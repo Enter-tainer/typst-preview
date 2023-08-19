@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use log::info;
+use log::{debug, info};
 use tokio::sync::{mpsc, watch};
 use typst::doc::Document;
 use typst_ts_svg_exporter::IncrSvgDocServer;
@@ -43,6 +43,7 @@ impl RenderActor {
     pub fn run(mut self) {
         loop {
             let mut has_full_render = false;
+            debug!("RenderActor: waiting for message");
             let Some(msg) = self.mailbox.blocking_recv() else {
                 info!("RenderActor: no more messages");
                 break;
@@ -55,6 +56,7 @@ impl RenderActor {
             // if a full render is requested, we render the latest document
             // otherwise, we render the incremental changes for only once
             let has_full_render = has_full_render;
+            debug!("RenderActor: has_full_render: {}", has_full_render);
             let Some(document) = self.document.borrow().clone() else {
                 info!("RenderActor: document is not ready");
                 continue;

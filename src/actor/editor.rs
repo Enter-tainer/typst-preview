@@ -1,5 +1,5 @@
 use futures::{SinkExt, StreamExt};
-use log::{info, warn};
+use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
@@ -10,6 +10,7 @@ use crate::{
     SrcToDocJumpRequest,
 };
 
+#[derive(Debug)]
 pub enum EditorActorRequest {
     DocToSrcJump(DocToSrcJumpInfo),
 }
@@ -66,6 +67,7 @@ impl EditorActor {
         loop {
             tokio::select! {
                 Some(msg) = self.mailbox.recv() => {
+                    debug!("EditorActor: received message from mailbox: {:?}", msg);
                     match msg {
                         EditorActorRequest::DocToSrcJump(jump_info) => {
                             let Ok(_) = self.editor_websocket_conn.send(Message::Text(
@@ -82,6 +84,7 @@ impl EditorActor {
                         warn!("failed to parse jump request: {:?}", msg);
                         continue;
                     };
+                    debug!("EditorActor: received message from editor: {:?}", msg);
                     match msg {
                         ControlPlaneMessage::SrcToDocJump(jump_info) => {
                             self.world_sender.send(WorldActorRequest::SrcToDocJumpResolve(jump_info))

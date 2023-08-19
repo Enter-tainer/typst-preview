@@ -3,7 +3,7 @@ use std::{path::Path, sync::Arc};
 use crate::{
     jump_from_cursor, DocToSrcJumpInfo, MemoryFiles, MemoryFilesShort, SrcToDocJumpRequest,
 };
-use log::{error, info};
+use log::{debug, error, info};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::sync::{broadcast, mpsc, watch};
 use typst::syntax::FileId;
@@ -16,6 +16,7 @@ use super::{
     webview::{SrcToDocJumpInfo, WebviewActorRequest},
 };
 
+#[derive(Debug)]
 pub enum WorldActorRequest {
     DocToSrcJumpResolve(u64),
     SrcToDocJumpResolve(SrcToDocJumpRequest),
@@ -118,46 +119,53 @@ impl WorldActor {
         };
         loop {
             let mut recompile = false;
+            debug!("WorldActor: waiting for message");
             let Some(mail) = self.mailbox.blocking_recv() else {
                 info!("WorldActor: no more messages");
                 break;
             };
             recompile |= self.need_recompile(&mail);
+            self.process_mail(mail);
             // read the queue to empty
             while let Ok(mail) = self.mailbox.try_recv() {
+                debug!("WorldActor: receive message: {:?}", mail);
                 recompile |= self.need_recompile(&mail);
-                match &mail {
-                    WorldActorRequest::DocToSrcJumpResolve(id) => {
-                        if let Some(info) = self.resolve_doc_to_src_jump(*id) {
-                            let _ = self
-                                .doc_to_src_jump_sender
-                                .send(EditorActorRequest::DocToSrcJump(info));
-                        }
-                    }
-                    WorldActorRequest::SrcToDocJumpResolve(req) => {
-                        if let Some(info) = self.resolve_src_to_doc_jump(req) {
-                            let _ = self
-                                .src_to_doc_jump_sender
-                                .send(WebviewActorRequest::SrcToDocJump(info));
-                        }
-                    }
-                    WorldActorRequest::SyncMemoryFiles(m) => {
-                        self.update_memory_files(m, true);
-                    }
-                    WorldActorRequest::UpdateMemoryFiles(m) => {
-                        self.update_memory_files(m, false);
-                    }
-                    WorldActorRequest::RemoveMemoryFiles(m) => {
-                        self.remove_shadow_files(m);
-                    }
-                    WorldActorRequest::FilesystemEvent(_e) => {}
-                }
+                self.process_mail(mail);
             }
             if recompile {
                 self.compile();
             }
         }
         info!("WorldActor: exiting");
+    }
+
+    fn process_mail(&mut self, mail: WorldActorRequest) {
+        match &mail {
+            WorldActorRequest::DocToSrcJumpResolve(id) => {
+                if let Some(info) = self.resolve_doc_to_src_jump(*id) {
+                    let _ = self
+                        .doc_to_src_jump_sender
+                        .send(EditorActorRequest::DocToSrcJump(info));
+                }
+            }
+            WorldActorRequest::SrcToDocJumpResolve(req) => {
+                if let Some(info) = self.resolve_src_to_doc_jump(req) {
+                    let _ = self
+                        .src_to_doc_jump_sender
+                        .send(WebviewActorRequest::SrcToDocJump(info));
+                }
+            }
+            WorldActorRequest::SyncMemoryFiles(m) => {
+                self.update_memory_files(m, true);
+            }
+            WorldActorRequest::UpdateMemoryFiles(m) => {
+                self.update_memory_files(m, false);
+            }
+            WorldActorRequest::RemoveMemoryFiles(m) => {
+                self.remove_shadow_files(m);
+            }
+            WorldActorRequest::FilesystemEvent(_e) => {}
+        }
     }
 
     fn compile(&mut self) {
