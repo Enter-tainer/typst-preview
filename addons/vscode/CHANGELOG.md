@@ -115,3 +115,11 @@ Add preview button
   - fix #41. It is now possible to use Typst Preview in VSCode Remote.
   - fix #82. You can have preview button even when typst-lsp is not installed.
 - Misc: We downgrade the ci image for Linux to Ubuntu 20.04. This should fix the problem where the extension cannot be installed on some old Linux distros.
+
+## v0.7.2
+
+- Bug fixes:
+  - #79: We now put typst compiler and renderer in a dedicate thread. Therefore we should get more stable performance. 
+  - #78: Currently only the latest compile/render request is processed. This should fix the problem where the preview request will queue up when you type too fast and the doc takes a lot of time to compile.
+  - #81: We now use a more robust way to detect the whether to kill stale server process. This should fix the problem where the when preview tab will become blank when it becomes inactive for a while.
+  - #87: Add enum description for `typst-preview.scrollSync`. Previously the description is missing.
