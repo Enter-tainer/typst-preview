@@ -8,7 +8,10 @@ use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::sync::{broadcast, mpsc, watch};
 use typst::syntax::FileId;
 use typst::{doc::Document, World};
-use typst_ts_compiler::service::CompileDriver;
+use typst_ts_compiler::{
+    service::{CompileDriver, Compiler, DiagObserver},
+    ShadowApi,
+};
 
 use super::render::RenderActorRequest;
 use super::{
@@ -39,27 +42,16 @@ pub struct TypstActor {
     src_to_doc_jump_sender: broadcast::Sender<WebviewActorRequest>,
 }
 
+type MpScChannel<T> = (mpsc::UnboundedSender<T>, mpsc::UnboundedReceiver<T>);
+type WatchChannel<T> = (watch::Sender<T>, watch::Receiver<T>);
+type BroadcastChannel<T> = (broadcast::Sender<T>, broadcast::Receiver<T>);
+
 pub struct Channels {
-    pub typst_mailbox: (
-        mpsc::UnboundedSender<TypstActorRequest>,
-        mpsc::UnboundedReceiver<TypstActorRequest>,
-    ),
-    pub doc_watch: (
-        watch::Sender<Option<Arc<Document>>>,
-        watch::Receiver<Option<Arc<Document>>>,
-    ),
-    pub renderer_mailbox: (
-        broadcast::Sender<RenderActorRequest>,
-        broadcast::Receiver<RenderActorRequest>,
-    ),
-    pub doc_to_src_jump: (
-        mpsc::UnboundedSender<EditorActorRequest>,
-        mpsc::UnboundedReceiver<EditorActorRequest>,
-    ),
-    pub src_to_doc_jump: (
-        broadcast::Sender<WebviewActorRequest>,
-        broadcast::Receiver<WebviewActorRequest>,
-    ),
+    pub typst_mailbox: MpScChannel<TypstActorRequest>,
+    pub doc_watch: WatchChannel<Option<Arc<Document>>>,
+    pub renderer_mailbox: BroadcastChannel<RenderActorRequest>,
+    pub doc_to_src_jump: MpScChannel<EditorActorRequest>,
+    pub src_to_doc_jump: BroadcastChannel<WebviewActorRequest>,
 }
 
 impl TypstActor {
@@ -182,7 +174,7 @@ impl TypstActor {
         self.compiler_driver.world.reset();
         if let Some(doc) = self
             .compiler_driver
-            .with_compile_diag::<true, _>(CompileDriver::compile)
+            .with_compile_diag::<true, _>(Compiler::compile)
         {
             let _ = self.doc_sender.send(Some(Arc::new(doc))); // it is ok to ignore the error here
             let _ = self
@@ -209,8 +201,8 @@ impl TypstActor {
         }
         for (path, content) in files.files.iter() {
             let path = Path::new(path).to_owned();
-            let id = self.compiler_driver.id_for_path(path.clone());
-            let Ok(_) = self.compiler_driver.world.resolve_with(&path, id, content) else {
+            // todo: is it safe to believe that the path is normalized?
+            let Ok(_) = self.compiler_driver.world.map_shadow(&path, content) else {
                 error!("TypstActor: failed to resolve file: {}", path.display());
                 return;
             };
@@ -220,7 +212,8 @@ impl TypstActor {
     fn remove_shadow_files(&mut self, files: &MemoryFilesShort) {
         for path in files.files.iter() {
             let path = Path::new(path);
-            self.compiler_driver.world.remove_shadow(path);
+            // todo: ignoring the error here
+            let _ = self.compiler_driver.world.unmap_shadow(path);
         }
     }
 
