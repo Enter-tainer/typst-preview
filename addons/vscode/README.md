@@ -146,3 +146,7 @@ Add preview button
   - #78: Currently only the latest compile/render request is processed. This should fix the problem where the preview request will queue up when you type too fast and the doc takes a lot of time to compile.
   - #81: We now use a more robust way to detect the whether to kill stale server process. This should fix the problem where the when preview tab will become blank when it becomes inactive for a while.
   - #87: Add enum description for `typst-preview.scrollSync`. Previously the description is missing.
+
+### v0.7.3
+
+- Bugfix: fix a subtle rendering issue, [typst.ts#306](https://github.com/Myriad-Dreamin/typst.ts/pull/306).
