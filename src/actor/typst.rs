@@ -212,7 +212,6 @@ impl TypstActor {
         }
         for (path, content) in files.files.iter() {
             let path = Path::new(path).to_owned();
-            let id = self.compiler_driver.id_for_path(path.clone());
             // todo: is it safe to believe that the path is normalized?
             let Ok(_) = self.compiler_driver.world.map_shadow(&path, content) else {
                 error!("TypstActor: failed to resolve file: {}", path.display());
