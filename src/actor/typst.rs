@@ -42,27 +42,16 @@ pub struct TypstActor {
     src_to_doc_jump_sender: broadcast::Sender<WebviewActorRequest>,
 }
 
+type MpScChannel<T> = (mpsc::UnboundedSender<T>, mpsc::UnboundedReceiver<T>);
+type WatchChannel<T> = (watch::Sender<T>, watch::Receiver<T>);
+type BroadcastChannel<T> = (broadcast::Sender<T>, broadcast::Receiver<T>);
+
 pub struct Channels {
-    pub typst_mailbox: (
-        mpsc::UnboundedSender<TypstActorRequest>,
-        mpsc::UnboundedReceiver<TypstActorRequest>,
-    ),
-    pub doc_watch: (
-        watch::Sender<Option<Arc<Document>>>,
-        watch::Receiver<Option<Arc<Document>>>,
-    ),
-    pub renderer_mailbox: (
-        broadcast::Sender<RenderActorRequest>,
-        broadcast::Receiver<RenderActorRequest>,
-    ),
-    pub doc_to_src_jump: (
-        mpsc::UnboundedSender<EditorActorRequest>,
-        mpsc::UnboundedReceiver<EditorActorRequest>,
-    ),
-    pub src_to_doc_jump: (
-        broadcast::Sender<WebviewActorRequest>,
-        broadcast::Receiver<WebviewActorRequest>,
-    ),
+    pub typst_mailbox: MpScChannel<TypstActorRequest>,
+    pub doc_watch: WatchChannel<Option<Arc<Document>>>,
+    pub renderer_mailbox: BroadcastChannel<RenderActorRequest>,
+    pub doc_to_src_jump: MpScChannel<EditorActorRequest>,
+    pub src_to_doc_jump: BroadcastChannel<WebviewActorRequest>,
 }
 
 impl TypstActor {
