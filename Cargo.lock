@@ -3369,7 +3369,7 @@ dependencies = [
 [[package]]
 name = "typst-ts-compiler"
 version = "0.3.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=4d3f9e68651589694f2e0f07d86a483b3001e90e#4d3f9e68651589694f2e0f07d86a483b3001e90e"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=dadcfdd0185246e96a532c6fb78faf553aa82fe5#dadcfdd0185246e96a532c6fb78faf553aa82fe5"
 dependencies = [
  "append-only-vec",
  "base64 0.21.2",
@@ -3395,6 +3395,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "tar",
+ "tokio",
  "typst",
  "typst-library",
  "typst-ts-core",
@@ -3405,7 +3406,7 @@ dependencies = [
 [[package]]
 name = "typst-ts-core"
 version = "0.3.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=4d3f9e68651589694f2e0f07d86a483b3001e90e#4d3f9e68651589694f2e0f07d86a483b3001e90e"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=dadcfdd0185246e96a532c6fb78faf553aa82fe5#dadcfdd0185246e96a532c6fb78faf553aa82fe5"
 dependencies = [
  "base64 0.21.2",
  "base64-serde",
@@ -3437,7 +3438,7 @@ dependencies = [
 [[package]]
 name = "typst-ts-svg-exporter"
 version = "0.3.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=4d3f9e68651589694f2e0f07d86a483b3001e90e#4d3f9e68651589694f2e0f07d86a483b3001e90e"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=dadcfdd0185246e96a532c6fb78faf553aa82fe5#dadcfdd0185246e96a532c6fb78faf553aa82fe5"
 dependencies = [
  "base64 0.21.2",
  "comemo",

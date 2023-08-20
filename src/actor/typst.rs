@@ -8,7 +8,10 @@ use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::sync::{broadcast, mpsc, watch};
 use typst::syntax::FileId;
 use typst::{doc::Document, World};
-use typst_ts_compiler::service::CompileDriver;
+use typst_ts_compiler::{
+    service::{CompileDriver, Compiler, DiagObserver},
+    ShadowApi,
+};
 
 use super::render::RenderActorRequest;
 use super::{
@@ -182,7 +185,7 @@ impl TypstActor {
         self.compiler_driver.world.reset();
         if let Some(doc) = self
             .compiler_driver
-            .with_compile_diag::<true, _>(CompileDriver::compile)
+            .with_compile_diag::<true, _>(Compiler::compile)
         {
             let _ = self.doc_sender.send(Some(Arc::new(doc))); // it is ok to ignore the error here
             let _ = self
@@ -210,7 +213,8 @@ impl TypstActor {
         for (path, content) in files.files.iter() {
             let path = Path::new(path).to_owned();
             let id = self.compiler_driver.id_for_path(path.clone());
-            let Ok(_) = self.compiler_driver.world.resolve_with(&path, id, content) else {
+            // todo: is it safe to believe that the path is normalized?
+            let Ok(_) = self.compiler_driver.world.map_shadow(&path, content) else {
                 error!("TypstActor: failed to resolve file: {}", path.display());
                 return;
             };
@@ -220,7 +224,8 @@ impl TypstActor {
     fn remove_shadow_files(&mut self, files: &MemoryFilesShort) {
         for path in files.files.iter() {
             let path = Path::new(path);
-            self.compiler_driver.world.remove_shadow(path);
+            // todo: ignoring the error here
+            let _ = self.compiler_driver.world.unmap_shadow(path);
         }
     }
 
