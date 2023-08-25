@@ -78,7 +78,7 @@ impl TypstActor {
         doc_to_src_jump_sender: mpsc::UnboundedSender<EditorActorRequest>,
         src_to_doc_jump_sender: broadcast::Sender<WebviewActorRequest>,
     ) -> Self {
-        let Ok(fs_watcher) = RecommendedWatcher::new(
+        let fs_watcher = RecommendedWatcher::new(
             move |res: Result<notify::Event, _>| match res {
                 Ok(e) => {
                     info!("TypstActor: filesystem event: {:?}", e);
@@ -89,10 +89,15 @@ impl TypstActor {
                 Err(e) => error!("watch error: {:#}", e),
             },
             notify::Config::default(),
-        ) else {
-            error!("TypstActor: failed to create filesystem watcher");
-            panic!();
+        );
+        let fs_watcher = match fs_watcher {
+            Ok(w) => w,
+            Err(e) => {
+                error!("TypstActor: failed to create filesystem watcher: {:#}", e);
+                panic!();
+            }
         };
+
         Self {
             compiler_driver,
             fs_watcher,
@@ -202,9 +207,15 @@ impl TypstActor {
         for (path, content) in files.files.iter() {
             let path = Path::new(path).to_owned();
             // todo: is it safe to believe that the path is normalized?
-            let Ok(_) = self.compiler_driver.world.map_shadow(&path, content) else {
-                error!("TypstActor: failed to resolve file: {}", path.display());
-                return;
+            match self.compiler_driver.world.map_shadow(&path, content) {
+                Ok(_) => {}
+                Err(e) => {
+                    error!(
+                        "TypstActor: failed to resolve file: {}, error: {e}",
+                        path.display()
+                    );
+                    return;
+                }
             };
         }
     }
