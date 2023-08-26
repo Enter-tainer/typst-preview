@@ -268,43 +268,41 @@ async fn main() {
         })
     };
     let static_file_addr = arguments.static_file_host;
-    if arguments.server_static_file || arguments.open_in_browser {
-        let data_plane_port = data_plane_port_rx.await.unwrap();
-        let make_service = make_service_fn(|_| {
-            let data_plane_port = data_plane_port;
-            async move {
-                Ok::<_, hyper::http::Error>(service_fn(move |req| {
-                    async move {
-                        if req.uri().path() == "/" {
-                            let html = HTML.replace(
-                                "ws://127.0.0.1:23625",
-                                format!("ws://127.0.0.1:{data_plane_port}").as_str(),
-                            );
-                            Ok::<_, Error>(hyper::Response::new(hyper::Body::from(html)))
-                        } else {
-                            // jump to /
-                            let mut res = hyper::Response::new(hyper::Body::empty());
-                            *res.status_mut() = hyper::StatusCode::FOUND;
-                            res.headers_mut().insert(
-                                hyper::header::LOCATION,
-                                hyper::header::HeaderValue::from_static("/"),
-                            );
-                            Ok(res)
-                        }
+    let data_plane_port = data_plane_port_rx.await.unwrap();
+    let make_service = make_service_fn(|_| {
+        let data_plane_port = data_plane_port;
+        async move {
+            Ok::<_, hyper::http::Error>(service_fn(move |req| {
+                async move {
+                    if req.uri().path() == "/" {
+                        let html = HTML.replace(
+                            "ws://127.0.0.1:23625",
+                            format!("ws://127.0.0.1:{data_plane_port}").as_str(),
+                        );
+                        Ok::<_, Error>(hyper::Response::new(hyper::Body::from(html)))
+                    } else {
+                        // jump to /
+                        let mut res = hyper::Response::new(hyper::Body::empty());
+                        *res.status_mut() = hyper::StatusCode::FOUND;
+                        res.headers_mut().insert(
+                            hyper::header::LOCATION,
+                            hyper::header::HeaderValue::from_static("/"),
+                        );
+                        Ok(res)
                     }
-                }))
-            }
-        });
-        let server = hyper::Server::bind(&static_file_addr.parse().unwrap()).serve(make_service);
-        if arguments.open_in_browser {
-            if let Err(e) = open::that_detached(format!("http://{}", server.local_addr())) {
-                error!("failed to open browser: {}", e);
-            };
+                }
+            }))
         }
-        info!("Static file server listening on: {}", server.local_addr());
-        if let Err(e) = server.await {
-            error!("Static file server error: {}", e);
-        }
+    });
+    let server = hyper::Server::bind(&static_file_addr.parse().unwrap()).serve(make_service);
+    if arguments.open_in_browser {
+        if let Err(e) = open::that_detached(format!("http://{}", server.local_addr())) {
+            error!("failed to open browser: {}", e);
+        };
+    }
+    info!("Static file server listening on: {}", server.local_addr());
+    if let Err(e) = server.await {
+        error!("Static file server error: {}", e);
     }
     let _ = tokio::join!(data_plane_handle, control_plane_handle);
 }
