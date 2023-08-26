@@ -4,7 +4,7 @@ import {
   rendererBuildInfo,
   createTypstSvgRenderer,
 } from "@myriaddreamin/typst.ts";
-import renderModule from "@myriaddreamin/typst-ts-renderer/typst_ts_renderer_bg.wasm?url";
+import renderModule from "@myriaddreamin/typst-ts-renderer/pkg/typst_ts_renderer_bg.wasm?url";
 
 const enc = new TextEncoder("utf-8");
 const dec = new TextDecoder("utf-8");
