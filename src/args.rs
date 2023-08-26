@@ -41,10 +41,6 @@ pub struct CliArguments {
     #[clap(long = "open-in-browser")]
     pub open_in_browser: bool,
 
-    /// Serve html for preview in the browser.
-    #[clap(long = "server-static-file")]
-    pub server_static_file: bool,
-
     /// Only render visible part of the document. This can improve performance but still being experimental.
     #[clap(long = "partial-rendering")]
     pub enable_partial_rendering: bool,
