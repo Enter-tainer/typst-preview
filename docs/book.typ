@@ -15,7 +15,7 @@
     - #chapter(none, section: "1")[Usage]
       - #chapter(none, section: "1.1")[Use In VScode]
       - #chapter(none, section: "1.2")[Standalone]
-    - #chapter(none, section: "2")[Configuration]
+    - #chapter("config.typ", section: "2")[Configuration]
     - #chapter(none, section: "3")[Report Bug]
     = Developer Guide
     - #chapter(none, section: "4")[Set Up Development Environment]
