@@ -110,7 +110,10 @@ impl TypstActor {
     }
     pub fn run(mut self) {
         self.compile();
-        let Ok(_) = self.fs_watcher.watch(&self.compiler_driver.world.root, RecursiveMode::Recursive) else {
+        let Ok(_) = self
+            .fs_watcher
+            .watch(&self.compiler_driver.world.root, RecursiveMode::Recursive)
+        else {
             error!("TypstActor: failed to watch filesystem events");
             panic!();
         };

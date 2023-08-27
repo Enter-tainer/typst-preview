@@ -24,7 +24,7 @@ With all these techniques, we can achieve instant preview on type.
 
 ## Use without VSCode
 
-You can use the binary `typst-preview` as a standalone typst preview server. It can be used to preview your document in browser. For example: `typst-preview ./assets/demo/main.typ --open-in-browser --partial-rendering`. This should be useful if you don't use VSCode but still want to experience the low latency preview.
+You can use the binary `typst-preview` as a standalone typst preview server. It can be used to preview your document in browser. For example: `typst-preview ./assets/demo/main.typ --partial-rendering`. This should be useful if you don't use VSCode but still want to experience the low latency preview.
 
 ## Acknowledgements
 

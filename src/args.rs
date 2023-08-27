@@ -6,7 +6,7 @@ use clap::{ArgAction, Parser};
 #[clap(name = "typst-preview", author)]
 pub struct CliArguments {
     /// Add additional directories to search for fonts
-    #[clap(long = "font-path", value_name = "DIR", action = ArgAction::Append)]
+    #[clap(long = "font-path", value_name = "DIR", action = ArgAction::Append, env = "TYPST_FONT_PATHS")]
     pub font_paths: Vec<PathBuf>,
 
     /// Root directory for your project
@@ -17,7 +17,8 @@ pub struct CliArguments {
     #[clap(
         long = "data-plane-host",
         default_value = "127.0.0.1:23625",
-        value_name = "HOST"
+        value_name = "HOST",
+        hide(true)
     )]
     pub data_plane_host: String,
 
@@ -25,21 +26,23 @@ pub struct CliArguments {
     #[clap(
         long = "control-plane-host",
         default_value = "127.0.0.1:23626",
-        value_name = "HOST"
+        value_name = "HOST",
+        hide(true)
     )]
     pub control_plane_host: String,
 
-    /// Host to open the preview in the browser.
+    /// Host for the preview server
     #[clap(
-        long = "static-file-host",
+        long = "host",
         value_name = "HOST",
-        default_value = "127.0.0.1:23627"
+        default_value = "127.0.0.1:23627",
+        alias = "static-file-host"
     )]
     pub static_file_host: String,
 
-    /// Open the preview in the browser after compilation.
-    #[clap(long = "open-in-browser")]
-    pub open_in_browser: bool,
+    /// Don't open the preview in the browser after compilation.
+    #[clap(long = "no-open")]
+    pub dont_open_in_browser: bool,
 
     /// Only render visible part of the document. This can improve performance but still being experimental.
     #[clap(long = "partial-rendering")]
