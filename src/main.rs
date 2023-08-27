@@ -295,7 +295,7 @@ async fn main() {
         }
     });
     let server = hyper::Server::bind(&static_file_addr.parse().unwrap()).serve(make_service);
-    if arguments.open_in_browser {
+    if !arguments.dont_open_in_browser {
         if let Err(e) = open::that_detached(format!("http://{}", server.local_addr())) {
             error!("failed to open browser: {}", e);
         };
