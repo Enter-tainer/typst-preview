@@ -4,9 +4,13 @@
 #show: book
 
 #book-meta(
-  title: "typst-book",
+  title: "typst-preview",
+  description: "typst preview document",
+  authors: ("Enter-tainer", "Myriad-Dreamin"),
+  language: "en",
+  repository: "https://github.com/Enter-tainer/typst-preview",
   summary: [
-    #prefix-chapter("sample-page.typ")[Hello, typst]
+    #prefix-chapter("intro.typ")[Get Started],
   ]
 )
 

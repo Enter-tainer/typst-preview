@@ -95,7 +95,7 @@
   ) if is-web-target;
 
   // set text style
-  set text(font: main-font, size: 16pt, fill: main-color, lang: "en")
+  set text(font: main-font, size: 18pt, fill: main-color, lang: "en")
 
   // render a dash to hint headings instead of bolding it.
   show heading : set text(weight: "regular") if is-web-target
