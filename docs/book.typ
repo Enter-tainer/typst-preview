@@ -18,8 +18,8 @@
     - #chapter("config.typ", section: "2")[Configuration]
     - #chapter(none, section: "3")[Report Bug]
     = Developer Guide
-    - #chapter(none, section: "4")[Set Up Development Environment]
-    - #chapter(none, section: "5")[Typst-Preview Architecture]
+    - #chapter("arch.typ", section: "4")[Typst-Preview Architecture]
+    - #chapter(none, section: "5")[Set Up Development Environment]
   ]
 )
 
