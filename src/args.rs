@@ -6,7 +6,7 @@ use clap::{ArgAction, Parser};
 #[clap(name = "typst-preview", author)]
 pub struct CliArguments {
     /// Add additional directories to search for fonts
-    #[clap(long = "font-path", value_name = "DIR", action = ArgAction::Append)]
+    #[clap(long = "font-path", value_name = "DIR", action = ArgAction::Append, env = "TYPST_FONT_PATHS")]
     pub font_paths: Vec<PathBuf>,
 
     /// Root directory for your project
