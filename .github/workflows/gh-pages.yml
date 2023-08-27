@@ -28,21 +28,24 @@ jobs:
       - name: Download font assets
         run: |
           curl -L https://github.com/Myriad-Dreamin/typst-book/releases/download/v0.1.1-nightly1/charter-font-assets.tar.gz | tar -xvz -C assets/fonts
+          curl -L https://use.fontawesome.com/releases/v6.4.2/fontawesome-free-6.4.2-desktop.zip -o fontawesome-free-6.4.2-desktop.zip
+          unzip fontawesome-free-6.4.2-desktop.zip
+          cp -v -r fontawesome-free-6.4.2-desktop/otfs/* assets/fonts/
       - name: Download & install typst-book
         run: |
-          curl -L https://github.com/Myriad-Dreamin/typst-book/releases/download/v0.1.1-nightly1/typst-book-x86_64-unknown-linux-gnu.tar.gz | tar -xvz -C assets/typst-book
-          chmod +x assets/typst-book/typst-book-x86_64-unknown-linux-gnu/bin/typst-book
-          cp assets/typst-book/typst-book-x86_64-unknown-linux-gnu/bin/typst-book /usr/bin/typst-book
+          curl -L https://github.com/Myriad-Dreamin/typst-book/releases/download/v0.1.1-nightly1/typst-book-x86_64-unknown-linux-gnu.tar.gz | tar -xvz
+          chmod +x typst-book-x86_64-unknown-linux-gnu/bin/typst-book
+          sudo cp typst-book-x86_64-unknown-linux-gnu/bin/typst-book /usr/bin/typst-book
       - name: Build Book
         run: |
-          typst-book build --path-to-root /typst-preview/ -w . -d ./dist docs
+          typst-book build --font-path assets/fonts --path-to-root /typst-preview/ -w docs -d ./dist docs 
       - name: Setup Pages
         uses: actions/configure-pages@v3
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
           # Upload `/github-pages` sub directory
-          path: './dist'
+          path: './docs/dist'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v2
