@@ -1,7 +1,7 @@
 #import "/book.typ": book-page
+#import "/templates/page.typ": page-width, is-dark-theme
 #import "@preview/fontawesome:0.1.0": *
 #import "@preview/colorful-boxes:1.1.0": *
-#import "@preview/book:0.2.2": get-page-width
 
 #show: book-page.with(title: "Introduction")
 #show link: underline
@@ -46,22 +46,31 @@ Download the `typst-preview` binary for your platform from #link("https://github
 )
 
 #let pros_and_cons(p, c) = {
-  let page-width = get-page-width()
   let columns = if page-width <= 450pt {
     (1fr)
   } else {
     (1fr, 1fr)
+  }
+  let (pros_fill, pros_text) = if not is-dark-theme {
+    (green.lighten(90%), black)
+  } else {
+    (black.lighten(10%), green.darken(10%))
+  }
+  let (cons_fill, cons_text) = if not is-dark-theme {
+    (red.lighten(90%), black)
+  } else {
+    (black.lighten(10%), red.darken(10%))
   }
   table(
     columns: columns,
     inset: 10pt,
     align: horizon,
     stroke: none,
-    cell(fill: green.lighten(90%))[
-      #fa-check() *Pros*: #p
+    cell(fill: pros_fill)[
+      #text(fill: pros_text)[#fa-check() *Pros*: #p]
     ],
-    cell(fill: red.lighten(90%))[
-      #fa-times() *Cons*: #c
+    cell(fill: cons_fill)[
+      #text(fill: cons_text)[#fa-times() *Cons*: #c]
     ]
   )
 }
