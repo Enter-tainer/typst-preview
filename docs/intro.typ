@@ -8,15 +8,6 @@
 
 = Get Started
 
-#align(center)[
-  #stickybox(
-  rotation: 3deg,
-  width: 7cm,
-  )[
-    This book is written in typst, and compiled to HTML using #link("https://github.com/Myriad-Dreamin/typst-book/")[typst book]
-  ]
-]
-
 == Use in VSCode
 
 Install the extension from #link("https://marketplace.visualstudio.com/items?itemName=mgt19937.typst-preview")[VSCode Marketplace].
@@ -104,3 +95,6 @@ Download the `typst-preview` binary for your platform from #link("https://github
   [It is super fast and responsive. It supports cross jump between code and preview. It also supports local fonts.],
   [It is not supported by the official typst team. It may also introduce some bugs because it have a different rendering backend from the official typst web app.]
 )
+
+== Acknowledgement
+This book is written in typst, and compiled to HTML using #link("https://github.com/Myriad-Dreamin/typst-book/")[typst book]
