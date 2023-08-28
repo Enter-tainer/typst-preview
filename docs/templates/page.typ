@@ -95,7 +95,8 @@
   ) if is-web-target;
 
   // set text style
-  set text(font: main-font, size: 18pt, fill: main-color, lang: "en")
+  let text_size = if is-pdf-target { 12pt } else { 18pt }
+  set text(font: main-font, size: text_size, fill: main-color, lang: "en")
 
   // render a dash to hint headings instead of bolding it.
   show heading : set text(weight: "regular") if is-web-target
