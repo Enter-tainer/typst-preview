@@ -8,6 +8,15 @@
 
 = Get Started
 
+#align(center)[
+  #stickybox(
+  rotation: 3deg,
+  width: 7cm,
+  )[
+    This book is written in typst, and compiled to HTML using #link("https://github.com/Myriad-Dreamin/typst-book/")[typst book]
+  ]
+]
+
 == Use in VSCode
 
 Install the extension from #link("https://marketplace.visualstudio.com/items?itemName=mgt19937.typst-preview")[VSCode Marketplace].

@@ -12,14 +12,12 @@
   summary: [
     #prefix-chapter("intro.typ")[Get Started],
     = User Guide
-    - #chapter(none, section: "1")[Usage]
-      - #chapter(none, section: "1.1")[Use In VScode]
-      - #chapter("standalone.typ", section: "1.2")[Standalone]
-    - #chapter("config.typ", section: "2")[Configuration]
-    - #chapter(none, section: "3")[Report Bug]
+    - #chapter("vscode.typ", section: "1")[Use In VScode]
+      - #chapter("config.typ", section: "1.1")[Configuration]
+    - #chapter("standalone.typ", section: "2")[Standalone]
     = Developer Guide
-    - #chapter("arch.typ", section: "4")[Typst-Preview Architecture]
-    - #chapter(none, section: "5")[Set Up Development Environment]
+    - #chapter("arch.typ", section: "3")[Typst-Preview Architecture]
+    - #chapter("dev.typ", section: "4")[Set Up Development Environment]
   ]
 )
 

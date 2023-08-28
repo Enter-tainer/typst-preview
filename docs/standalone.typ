@@ -20,6 +20,8 @@ Download `typst-preview` binary for your platform from #link("https://github.com
 
 Let's assume that you have a document `my-super-cool-doc.typ` in your current directory. You can use `typst-preview` to preview it.
 
+Note that if you have extensions like dark-reader installed in your browser, you should *disable* them because the preview has a transparent background. If the background is set to black, you won't be able to see anything.
+
 1. Use `typst-preview` to preview your document with partial rendering enabled. _*This is what you should do most of the time.*_
 
 ```bash 

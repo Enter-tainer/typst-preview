@@ -44,6 +44,7 @@
       {
         "command": "typst-preview.sync",
         "title": "Typst Preview: Sync preview with current cursor",
+        "description": "Scroll preview to current cursor position",
         "icon": "$(sync)",
         "when": "resourceLangId == typst && editorTextFocus"
       }
