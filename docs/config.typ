@@ -1,5 +1,5 @@
-#import "/book.typ": book-page
-#import "/templates/page.typ": page-width, is-dark-theme
+#import "./book.typ": book-page
+#import "./templates/page.typ": page-width, is-dark-theme
 #import "@preview/fontawesome:0.1.0": *
 #import "@preview/colorful-boxes:1.1.0": *
 
@@ -10,33 +10,35 @@
 
 The following are the available options for configuring the typst-preview extension:
 
-1. *`typst-preview.executable`*: 
-   - Type: `string` (path)
-   - Description: The path to the executable of `typst-preview`, which should be installed locally. Usually, it is not necessary to modify this as `typst-preview` is bundled within the extension for all major platforms.
-   - Default: Not provided
+#let pkg_json = json("../addons/vscode/package.json")
 
-2. *`typst-preview.fontPaths`*:
-   - Type: `Array<String>`
-   - Description: List of additional paths to font assets used by typst-preview.
-   - Items:
-     - Type: `string`
-     - Title: Font path
-     - Description: Absolute path to a directory or file containing font assets.
-   - Default: `[]`
+#let config_item(key, cfg) = [
+   + *#raw(key)*:
+      - Type: #raw(cfg.type)
+         #if cfg.type == "array" [
+            - Items: #raw(cfg.items.type)
+            - Description: #eval(cfg.items.description, mode: "markup")
+         ]
+      - Description: #eval(cfg.description, mode: "markup")
+      #if cfg.at("enum", default: none) != none [
+         - Valid values: #for (i, item) in cfg.enum.enumerate() [
+            - #raw(item): #eval(cfg.enumDescriptions.at(i), mode: "markup")
+         ] 
+      ]
+      #if type(cfg.default) == "string" {
+         if cfg.default != "" [
+            - Default: #raw(cfg.default)
+         ] else [
+            - Default: `""`
+         ]
+      } else if type(cfg.default) == "array" [
+         - Default: [#cfg.default.join(",")]
+      ] else [
+         - Default: #cfg.default
+      ]
+]
 
-3. *`typst-preview.refresh`*:
-   - Type: `string`
-   - Description: Refresh preview when the document is saved or when the document is changed. Choose between refreshing on save or on type.
-   - Enum: `["onSave", "onType"]`
-   - Default: `"onType"`
 
-4. *`typst-preview.scrollSync`*:
-   - Type: `string`
-   - Description: Configure scroll sync mode. Disable automatic scroll sync or synchronize the preview with the cursor position when the selection changes.
-   - Enum: `["never", "onSelectionChange"]`
-   - Default: `onSelectionChange`
-
-5. *`typst-preview.partialRendering`*:
-   - Type: `boolean`
-   - Description: Only render the visible part of the document. Improves performance but is still experimental. Useful for improving performance on large documents.
-   - Default: `false`
+#for (key, cfg) in pkg_json.contributes.configuration.properties {
+   config_item(key, cfg)
+}

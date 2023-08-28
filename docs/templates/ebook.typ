@@ -1,5 +1,5 @@
 #import "@preview/book:0.2.2": *
-#import "/templates/page.typ": project, part-style
+#import "./page.typ": project, part-style
 
 #let _page-project = project
 
