@@ -2,10 +2,20 @@
 #import "./templates/page.typ": page-width, is-dark-theme
 #import "@preview/fontawesome:0.1.0": *
 #import "@preview/colorful-boxes:1.1.0": *
-#import "@preview/commute:0.1.0": node, arr, commutative-diagram
+#import "@preview/cetz:0.1.0"
 
 #show: book-page.with(title: "Typst-Preview Architecture")
 #show link: underline
+
+#let natural-image(img) = style(styles => {
+  let (width, height) = measure(img, styles)
+  layout(page => {
+    let width_scale = 0.8 * page.width / width
+    block(width: width_scale * width, height: width_scale * height)[
+      #scale(x: width_scale * 100%, y: width_scale * 100%, origin: center+top)[#img]
+    ]
+  })
+})
 
 = Architecture
 
@@ -14,6 +24,67 @@ Typst preview consists of two parts:
 2. The second one is the typst preview client, which is a web client that renders the preview pages. This part is written in typescript and wasm.
 
 These two parts communicate with each other through websockets. The server sends the compiled document to the client, and the client renders it.
+
+#let img = {
+  set text(size: 8pt) 
+  cetz.canvas({
+    import cetz.draw: *
+    rect((0, 0), (7, 6), name: "binary", stroke: (dash: "dashed"))
+    rect((8, 0), (13, 2.5), name: "webview", stroke: (dash: "dashed"))
+    rect((8, 3), (13, 6), name: "vscode", stroke: (dash: "dashed"))
+    circle((1.7, 4.3), radius: 1, name: "typst-actor")
+    circle((1.9, 1.5), radius: 1, fill: white)
+    circle((1.8, 1.4), radius: 1, fill: white)
+    circle((1.7, 1.3), radius: 1, fill: white, name: "render-actor")
+    
+    rect((4.2, 0.7), (6.7, 2.2), fill: white)
+    rect((4.1, 0.6), (6.6, 2.1), fill: white)
+    rect((4, 0.5), (6.5, 2), fill: white, name: "webview-actor")
+    rect((4, 3.75), (6.7, 5.25), name: "editor-actor")
+    
+    line("editor-actor.right", "vscode.left", mark: (start: ">", end: ">"))
+    line("webview-actor.right", "webview.left", mark: (start: ">", end: ">"))
+    line("webview-actor.left", "typst-actor.right", mark: (start: ">", end: ">"))
+    line("editor-actor.left", "typst-actor.right", mark: (start: ">", end: ">"))
+    line("typst-actor.bottom", "render-actor.top", mark: (start: ">", end: ">"))
+    line("render-actor.right", "webview-actor.left", mark: (start: ">", end: ">"))
+    line("render-actor.right", "editor-actor.left", mark: (start: ">", end: ">"))
+    
+    content("binary.top-left", anchor: "top-left", padding: 0.3)[Typst Preview's Server(Rust)]
+    content("webview.top-left", anchor: "top-left", padding: 0.3)[
+      Webview(Typescript+Wasm)\
+      #set text(size: 6pt)
+      Incremental rendering based on VDOM are used\ to achieve high performance.
+      
+      Interact with the server using websockets.
+    ]
+    content("vscode.top-left", anchor: "top-left", padding: 0.3)[
+      VSCode(Typescript(Node.js))\
+      #set text(size: 6pt)
+      The VSCode extension starts the server and send\ events like file update to the server.
+      
+      Interact with the server using websockets.
+    ]
+    content("typst-actor")[Typst Actor]
+    content("render-actor")[Render Actor]
+    content("webview-actor.top-left", anchor: "top-left", padding: 0.2)[
+      Webview Actor\
+      #set text(size: 6pt)
+      There can be multiple\ webview actors\ in the system.
+    ]
+    content("editor-actor.top-left", anchor: "top-left", padding: 0.2)[
+      Editor Actor\
+      #set text(size: 6pt)
+      Communicate with\ VSCode using websocket\ and forward events.
+    ]
+  })
+}
+
+#figure(
+  natural-image(img),
+  caption: [Typst Preview Architecture],
+)
+
 
 == Rust Part of Typst Preview
 
