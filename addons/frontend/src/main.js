@@ -50,14 +50,14 @@ window.onload = function () {
 
       data.arrayBuffer().then((buffer) => {
         const messageData = new Uint8Array(buffer);
-        console.log(messageData);
+        // console.log(messageData);
 
         const message_idx = messageData.indexOf(COMMA[0]);
         const message = [
           dec.decode(messageData.slice(0, message_idx).buffer),
           messageData.slice(message_idx + 1),
         ];
-        console.log(message);
+        console.log(message[0], message[1].length);
 
         if (message[0] === "jump") {
           const [page, x, y] = dec
