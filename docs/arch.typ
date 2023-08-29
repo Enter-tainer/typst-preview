@@ -92,10 +92,10 @@ These two parts communicate with each other through websockets. The server sends
 
 The architecture of typst preview mainly follows the actor model. To be more specific, there are four actors in the system:
 
-1. _Typst Actor_: The typst actor is the main actor of the system. It is responsible for watching the file system, compiling the document and resolving cross jump requests. Basically everything related to typst's `World` is handled by this actor. There is exactly one typst actor in the system.
-3. _Editor Actor_: This actor listens to the events from the editor. It is responsible for sending the events to the typst actor. There is exactly one editor actor in the system. When the editor is closed, the editor actor will shutdown the whole program otherwise the program will keep running, resulting in process leak.
-2. _Render Actor_: The render actor is responsible for rendering the document. It receives the compiled document from the typst actor and renders it. There can be multiple render actors in the system. The number of render actors is equal to the number of clients connected to the server.
-4. _Webview Actor_: Webview actor is responsible for communicating with the webview client. It receives the events from the webview client and sends them to relevant actors. The number of webview actors is equal to the number of render actors.
++ _Typst Actor_: The typst actor is the main actor of the system. It is responsible for watching the file system, compiling the document and resolving cross jump requests. Basically everything related to typst's `World` is handled by this actor. There is exactly one typst actor in the system.
++ _Editor Actor_: This actor listens to the events from the editor. It is responsible for sending the events to the typst actor. There is exactly one editor actor in the system. When the editor is closed, the editor actor will shutdown the whole program otherwise the program will keep running, resulting in process leak.
++ _Render Actor_: The render actor is responsible for rendering the document. It receives the compiled document from the typst actor and renders it. There can be multiple render actors in the system. The number of render actors is equal to the number of clients connected to the server.
++ _Webview Actor_: Webview actor is responsible for communicating with the webview client. It receives the events from the webview client and sends them to relevant actors. The number of webview actors is equal to the number of render actors.
 
 We can see that the first two actors are CPU heavy, while the last two actors are IO heavy. Therefore we use different runtimes for them. For each CPU heavy actor, we create a thread and run the actor on it. For each IO heavy actor, we create a tokio task and run the actor on it. These actors can send messages to each other using `tokio::sync::mpsc`.
 
