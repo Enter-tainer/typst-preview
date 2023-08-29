@@ -127,3 +127,10 @@ Add preview button
 ## v0.7.3
 
 - Bugfix: fix a subtle rendering issue, [typst.ts#306](https://github.com/Myriad-Dreamin/typst.ts/pull/306).
+
+## v0.7.4
+
+- Typst Preview Book is now available at https://enter-tainer.github.io/typst-preview/ ! You can find the documentation of Typst Preview there.
+- Improved standalone usage: Use `typst-preview` without VSCode now becomes easier. All you need is `typst-preview --partial-rendering cool-doc.typ`. Take a look at https://enter-tainer.github.io/typst-preview/standalone.html
+- Upgrade to typst.ts 0.4.0-rc2. This fixes a subtle incremental parsing bug.
+- Partial rendering is now enabled by default. This should improve performance on long document. You can disable it by setting `typst-preview.partialRendering` to `false`.

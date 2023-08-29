@@ -14,13 +14,11 @@ Install this extension from [marketplace](https://marketplace.visualstudio.com/i
 
 https://github.com/Enter-tainer/typst-preview/assets/25521218/600529ce-8f42-4c2f-a224-b6b73e6ad017
 
+For more information, please visit https://enter-tainer.github.io/typst-preview/
+
 ## Extension Settings
 
-- `typst-preview.executable`: The executable path of typst-ws. Typically you don't need to change this because we already bundle typst-ws within the extension for all major platforms.
-- `typst-preview.fontPaths`: Absolute path to a directory or file containing font assets inaddition to the default font search paths.
-- `typst-preview.refresh`: When to refresh the preview. Refresh preview when the document is saved or when the document is changed. Possible values are `onType` and `onSave`. Default is `onType`.
-- `typst-preview.scrollSync`: Whether to sync the preview position with the cursor. Default is `onSelectionChange`.
-- `typst-preview.partialRendering`: Whether to render only the visible part of the document. This provides better performance on long document. Default is `false`. This is an experimental feature.
+See https://enter-tainer.github.io/typst-preview/config.html
 
 ## Known Issues
 
@@ -150,3 +148,10 @@ Add preview button
 ### v0.7.3
 
 - Bugfix: fix a subtle rendering issue, [typst.ts#306](https://github.com/Myriad-Dreamin/typst.ts/pull/306).
+
+### v0.7.4
+
+- Typst Preview Book is now available at https://enter-tainer.github.io/typst-preview/ ! You can find the documentation of Typst Preview there.
+- Improved standalone usage: Use `typst-preview` without VSCode now becomes easier. All you need is `typst-preview --partial-rendering cool-doc.typ`. Take a look at https://enter-tainer.github.io/typst-preview/standalone.html !
+- Upgrade to typst.ts 0.4.0-rc2. This fixes a subtle incremental parsing bug.
+- Partial rendering is now enabled by default. This should improve performance on long document. You can disable it by setting `typst-preview.partialRendering` to `false`.
