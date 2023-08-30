@@ -47,7 +47,7 @@ typst-preview \
 ```bash
 typst-preview --root \
   /path/to/my-project \
-  /path/to/my-super-cool-doc.typ
+  /path/to/my-project/cool-doc.typ
 ```
 
 5. Use `typst-preview` to preview your document with a custom font directory. This is useful when you want to use a custom font in your document.
