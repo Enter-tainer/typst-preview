@@ -6,6 +6,8 @@ import { spawn, sync as spawnSync } from 'cross-spawn';
 import { readFile } from 'fs/promises';
 import * as path from 'path';
 import { WebSocket } from 'ws';
+const vscodeVariables = require('vscode-variables');
+
 
 type ScrollSyncMode = "never" | "onSelectionChange";
 
@@ -67,7 +69,7 @@ export async function getCliPath(extensionPath?: string): Promise<string> {
 }
 
 export function getCliFontArgs(fontPaths?: string[]): string[] {
-	return (fontPaths ?? []).flatMap((fontPath) => ["--font-path", fontPath]);
+	return (fontPaths ?? []).flatMap((fontPath) => ["--font-path", vscodeVariables(fontPath)]);
 }
 
 export function codeGetCliFontArgs(): string[] {
