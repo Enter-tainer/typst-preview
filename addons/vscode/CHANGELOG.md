@@ -134,3 +134,8 @@ Add preview button
 - Improved standalone usage: Use `typst-preview` without VSCode now becomes easier. All you need is `typst-preview --partial-rendering cool-doc.typ`. Take a look at https://enter-tainer.github.io/typst-preview/standalone.html
 - Upgrade to typst.ts 0.4.0-rc2. This fixes a subtle incremental parsing bug.
 - Partial rendering is now enabled by default. This should improve performance on long document. You can disable it by setting `typst-preview.partialRendering` to `false`.
+
+## v0.7.5
+
+= Fix #107: now VSCode variables like `${workspaceFolder}` can be used in `typst-preview.fontPaths`.
+- Fix cannot open multiple preview tabs at the same time.
