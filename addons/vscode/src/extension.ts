@@ -373,14 +373,13 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		console.log(`Watching ${filePath} for changes`);
 		const projectRoot = getProjectRoot(filePath);
 		const rootArgs = ["--root", projectRoot];
-		const staticFileArgs = openInBrowser ? ["--static-file-host", "127.0.0.1:0"] : [];
 		const partialRenderingArgs = vscode.workspace.getConfiguration().get<boolean>('typst-preview.partialRendering') ? ["--partial-rendering"] : [];
 		const { dataPlanePort, controlPlanePort, staticFilePort, serverProcess } = await runServer(serverPath, [
 			"--data-plane-host", "127.0.0.1:0",
 			"--control-plane-host", "127.0.0.1:0",
+			"--static-file-host", "127.0.0.1:0",
 			"--no-open",
 			...rootArgs,
-			...staticFileArgs,
 			...partialRenderingArgs,
 			...codeGetCliFontArgs(),
 			filePath,
