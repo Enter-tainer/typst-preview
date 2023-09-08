@@ -87,6 +87,7 @@
       left: 20pt,
       // Typst is setting the page's bottom to the baseline of the last line of text. So bad :(.
       bottom: 0.5em,
+      right: 0.5em,
       // remove rest margins.
       rest: 0pt,
     ),

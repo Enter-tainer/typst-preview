@@ -18,6 +18,7 @@
     = Developer Guide
     - #chapter("arch.typ", section: "3")[Typst-Preview Architecture]
     - #chapter("dev.typ", section: "4")[Set Up Development Environment]
+    - #chapter("editor.typ", section: "5")[Port Typst-Preview To Other Editors]
   ]
 )
 
