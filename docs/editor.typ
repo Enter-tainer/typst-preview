@@ -14,7 +14,7 @@ The editor extension should start typst-preview server, and connect to it using 
 
 The editor extension mainly does these things:
 
-+ _In memory editing_: The editor extension should be send dirty document to the preview server, without saving it to the disk. This is the most important part of the editor extension. With this, Typst-Preview can get the content of the document and render it every time when user types something.
++ _In memory editing_: The editor extension should send dirty document to the preview server, without saving it to the disk. This is the most important part of the editor extension. With this, Typst-Preview can get the content of the document and render it every time when user types something.
 + _Source to preview jumping_: This is not necessary, but it's a nice feature to have. With this, the preview panel will be scrolled to the corresponding position when user clicks on the source code.
 + _Preview to source jumping_: This is quite similar to the previous one. With this, the source code will be scrolled to the corresponding position when user clicks on the preview panel.
 

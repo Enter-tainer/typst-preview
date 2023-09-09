@@ -24,7 +24,7 @@ Typst preview consists of three parts:
 2. The second one is the typst preview client, which is a web client that renders the preview pages. This part is written in typescript and wasm.
 3. The third one is the typst preview extension for VSCode. This part is written in typescript and is responsible for starting the server and sending/receive events to the server.
 
-These two parts communicate with each other through websockets. The server sends the compiled document to the client, and the client renders it.
+These three parts communicate with each other through websockets. The server sends the compiled document to the client, and the client renders it.
 
 #let img = {
   set text(size: 8pt) 
