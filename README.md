@@ -18,6 +18,11 @@ This repo contains:
 
 For comparison between alternative tools, please refer to [Comparison with other tools](https://enter-tainer.github.io/typst-preview/intro.html#loc-1x0.00x949.99).
 
+## Bug report
+
+To achieve high performance instant preview, we use a **different rendering backend** from official typst. We are making our best effort to keep the rendering result consistent with official typst. We have set up comprehensive tests to ensure the consistency of the rendering result. But we cannot guarantee that the rendering result is the same in all cases. There can be unknown corner cases that we haven't covered.
+
+**Therefore, if you encounter any rendering issue, please report it to this repo other than official typst repo.**
 ## How it works?
 
 The extension watches for file changes, and incrementally compile your document to svg files. Then we use a websocket to send the rendered svg to the client. The client calculates the diff between the new svg and the old one, and apply the diff to the old one. This is done by a VDOM based incremental rendering technique.
@@ -31,3 +36,7 @@ You can use the binary `typst-preview` as a standalone typst preview server. It 
 
 - [typst.ts](https://github.com/Myriad-Dreamin/typst.ts): typst.ts provide incremental svg export.
 - [typst-lsp](https://github.com/nvarner/typst-lsp): The CI and the vscode extension are heavily inspired by typst-lsp.
+
+## Legal
+
+This project is not affiliated with, created by, or endorsed by Typst the brand.

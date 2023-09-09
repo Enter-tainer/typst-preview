@@ -96,5 +96,12 @@ Download the `typst-preview` binary for your platform from #link("https://github
   [It is not supported by the official typst team. It may also introduce some bugs because it have a different rendering backend from the official typst web app.]
 )
 
+== Bug Report
+
+To achieve high performance instant preview, we use a *different rendering backend* from official typst. We are making our best effort to keep the rendering result consistent with official typst. We have set up comprehensive tests to ensure the consistency of the rendering result. But we cannot guarantee that the rendering result is the same in all cases. There can be unknown corner cases that we haven't covered.
+
+*Therefore, if you encounter any rendering issue, please report it to this repo other than official typst repo.*
+
+
 == Acknowledgement
 This book is written in typst, and compiled to HTML using #link("https://github.com/Myriad-Dreamin/typst-book/")[typst book]

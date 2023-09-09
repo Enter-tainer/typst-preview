@@ -20,9 +20,19 @@ For more information, please visit https://enter-tainer.github.io/typst-preview/
 
 See https://enter-tainer.github.io/typst-preview/config.html
 
+## Bug report
+
+To achieve high performance instant preview, we use a **different rendering backend** from official typst. We are making our best effort to keep the rendering result consistent with official typst. We have set up comprehensive tests to ensure the consistency of the rendering result. But we cannot guarantee that the rendering result is the same in all cases. There can be unknown corner cases that we haven't covered.
+
+**Therefore, if you encounter any rendering issue, please report it to this repo other than official typst repo.**
 ## Known Issues
 
 See [issues](https://github.com/Enter-tainer/typst-preview/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc) on GitHub.
+
+## Legal
+
+This project is not affiliated with, created by, or endorsed by Typst the brand.
+
 
 ## Release Notes
 
