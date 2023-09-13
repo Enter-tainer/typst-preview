@@ -12,9 +12,9 @@
     "link:local": "yarn link @myriaddreamin/typst.ts @myriaddreamin/typst-ts-renderer"
   },
   "dependencies": {
-    "@myriaddreamin/typst.ts": "0.4.0-rc2",
-    "@myriaddreamin/typst-ts-renderer": "0.4.0-rc2",
-    "@myriaddreamin/typst-ts-web-compiler": "0.4.0-rc2"
+    "@myriaddreamin/typst.ts": "0.4.0-rc3",
+    "@myriaddreamin/typst-ts-renderer": "0.4.0-rc3",
+    "@myriaddreamin/typst-ts-web-compiler": "0.4.0-rc3"
   },
   "devDependencies": {
     "typescript": "^5.0.2",

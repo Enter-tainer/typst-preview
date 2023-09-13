@@ -6,7 +6,7 @@ use crate::{
 use log::{debug, error, info};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::sync::{broadcast, mpsc, watch};
-use typst::syntax::FileId;
+use typst::syntax::{FileId, VirtualPath};
 use typst::{doc::Document, World};
 use typst_ts_compiler::{
     service::{CompileDriver, Compiler, DiagObserver},
@@ -234,7 +234,7 @@ impl TypstActor {
     fn resolve_src_to_doc_jump(&self, req: &SrcToDocJumpRequest) -> Option<SrcToDocJumpInfo> {
         let world = &self.compiler_driver.world;
         let relative_path = Path::new(&req.filepath).strip_prefix(&world.root).ok()?;
-        let source_id = FileId::new(None, &Path::new("/").join(relative_path));
+        let source_id = FileId::new(None, VirtualPath::new(relative_path));
         let source = world.source(source_id).ok()?;
         let cursor = req.to_byte_offset(&source)?;
         let doc = self.doc_sender.borrow().clone()?;
@@ -248,11 +248,11 @@ impl TypstActor {
 
     fn resolve_doc_to_src_jump(&self, id: u64) -> Option<DocToSrcJumpInfo> {
         let (src_id, span_number) = (id >> 48, id & 0x0000FFFFFFFFFFFF);
-        let src_id = FileId::from_u16(src_id as u16);
-        if src_id == FileId::detached() || span_number <= 1 {
+        let src_id = FileId::from_raw(src_id as u16);
+        if span_number <= 1 {
             return None;
         }
-        let span = typst::syntax::Span::new(src_id, span_number);
+        let span = typst::syntax::Span::new(src_id, span_number)?;
         let source = self.compiler_driver.world.source(src_id).ok()?;
         let range = source.find(span)?.range();
         let filepath = self.compiler_driver.world.path_for_id(src_id).ok()?;

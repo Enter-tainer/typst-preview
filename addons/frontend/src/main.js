@@ -2,7 +2,7 @@ import "./typst.css";
 import { SvgDocument } from "./svg-doc";
 import {
   rendererBuildInfo,
-  createTypstSvgRenderer,
+  createTypstRenderer,
 } from "@myriaddreamin/typst.ts";
 import renderModule from "@myriaddreamin/typst-ts-renderer/pkg/typst_ts_renderer_bg.wasm?url";
 
@@ -93,7 +93,7 @@ window.onload = function () {
     });
   }
 
-  let plugin = createTypstSvgRenderer();
+  let plugin = createTypstRenderer();
   plugin
     .init({
       getModule: () => renderModule,
