@@ -117,20 +117,20 @@
   resolved "https://registry.yarnpkg.com/@jridgewell/sourcemap-codec/-/sourcemap-codec-1.4.15.tgz#d7c6e6755c78567a951e04ab52ef0fd26de59f32"
   integrity sha512-eF2rxCRulEKXHTRiDrDy6erMYWqNw4LPdQ8UQA4huuxaQsVeRPFl2oM8oDGxMFhJUWZf9McpLtJasDDZb/Bpeg==
 
-"@myriaddreamin/typst-ts-renderer@0.4.0-rc3":
-  version "0.4.0-rc3"
-  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst-ts-renderer/-/typst-ts-renderer-0.4.0-rc3.tgz#a9c5e6fe609b0e6a7cbb1d4b84b1d546c3a2b123"
-  integrity sha512-VcLIC+OBoqoW2GXhslc6TC+TlE11pIKwj3PrUZF7VBTfbScGUCZFBGR9TdTYc7xZ+HU9Cw9LFgQ3AC5y4FofjA==
+"@myriaddreamin/typst-ts-renderer@0.4.0-rc4":
+  version "0.4.0-rc4"
+  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst-ts-renderer/-/typst-ts-renderer-0.4.0-rc4.tgz#a3c3b4b75cade45c1779016db2ee907c52f4bcd2"
+  integrity sha512-+2xMISUN3nMLL6JyAozwK4pou8egYqjXreUNDNvOeB+5LuLLqm9M0bqtA38uMoS25jASLyV4f/oXQPJet4eiOw==
 
-"@myriaddreamin/typst-ts-web-compiler@0.4.0-rc3":
-  version "0.4.0-rc3"
-  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst-ts-web-compiler/-/typst-ts-web-compiler-0.4.0-rc3.tgz#ce8916f8864fdf94c2789c93a9a3d1242851fb36"
-  integrity sha512-J5+y3xvTZYUDlCD6UiGrLOi6Z4/XRbB6CsseTq+RlUx/0qeNcPoRvDmzT2vkziuDsmxrHpdmu6AALp+w4MexIg==
+"@myriaddreamin/typst-ts-web-compiler@0.4.0-rc4":
+  version "0.4.0-rc4"
+  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst-ts-web-compiler/-/typst-ts-web-compiler-0.4.0-rc4.tgz#5a69af68e545c5678daae74d20cae64faca82597"
+  integrity sha512-32BvtLz5RJ0r6XyVy6eRzFfSYCkj74iA7kZ0iRAc/wVEgdS3mYZgr2u3FRPmGQNHhZGngvqh3B6nFIVDJrj5IQ==
 
-"@myriaddreamin/typst.ts@0.4.0-rc3":
-  version "0.4.0-rc3"
-  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst.ts/-/typst.ts-0.4.0-rc3.tgz#e1ab1ef0fca195e0f3053f704d1a545b378eb6ff"
-  integrity sha512-0YIrca4bIZZ40kRgFC5W/B70zJtxswM830wsGyJ5Awwem6RlIyFOg0xNjNzl+ykZTYwAa327QRWd5DhKs+kdIg==
+"@myriaddreamin/typst.ts@0.4.0-rc4":
+  version "0.4.0-rc4"
+  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst.ts/-/typst.ts-0.4.0-rc4.tgz#2c2c8772b5dcabb3d6b5a40e6c5d1de80bdb7009"
+  integrity sha512-9jpkeKDj0WFWLCAelasfjH8loSD0B0WddIx/4ifsahQizfvrHooqeTb61c+KJSO2sOGLhGhWeKRY2V9b9shCSw==
   dependencies:
     idb "^7.1.1"
 
