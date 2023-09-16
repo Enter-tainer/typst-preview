@@ -248,14 +248,20 @@ impl TypstActor {
 
     fn resolve_doc_to_src_jump(&self, id: u64) -> Option<DocToSrcJumpInfo> {
         let (src_id, span_number) = (id >> 48, id & 0x0000FFFFFFFFFFFF);
+        info!("TypstActor: resolving doc to src jump: {:?}", (src_id, span_number));
         let src_id = FileId::from_raw(src_id as u16);
         if span_number <= 1 {
             return None;
         }
+        info!("TypstActor: resolved file id: {:?}", src_id);
         let span = typst::syntax::Span::new(src_id, span_number)?;
+        info!("TypstActor: resolved span: {:?}", span);
         let source = self.compiler_driver.world.source(src_id).ok()?;
+        info!("TypstActor: resolved source: {:?}", source);
         let range = source.find(span)?.range();
+        info!("TypstActor: resolved range: {:?}", range);
         let filepath = self.compiler_driver.world.path_for_id(src_id).ok()?;
+        info!("TypstActor: resolved filepath: {:?}", filepath);
         Some(DocToSrcJumpInfo::from_option(
             filepath.to_string_lossy().to_string(),
             (
