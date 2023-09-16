@@ -210,7 +210,7 @@ impl TypstActor {
         for (path, content) in files.files.iter() {
             let path = Path::new(path).to_owned();
             // todo: is it safe to believe that the path is normalized?
-            match self.compiler_driver.world.map_shadow(&path, content) {
+            match self.compiler_driver.world.map_shadow(&path, content.as_bytes().into()) {
                 Ok(_) => {}
                 Err(e) => {
                     error!(

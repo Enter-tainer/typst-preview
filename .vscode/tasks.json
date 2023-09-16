@@ -24,7 +24,7 @@
 			"type": "cargo",
 			"command": "build",
 			"args": [
-				"--release"
+				"--profile=rel_dev"
 			],
 			"problemMatcher": [
 				"$rustc"
@@ -37,21 +37,21 @@
 			"windows": {
 				"command": "cp",
 				"args": [
-					"${workspaceFolder}\\target\\release\\typst-preview.exe",
+					"${workspaceFolder}\\target\\rel_dev\\typst-preview.exe",
 					"${workspaceFolder}\\addons\\vscode\\out\\"
 				]
 			},
 			"linux": {
 				"command": "cp",
 				"args": [
-					"${workspaceFolder}/target/release/typst-preview",
+					"${workspaceFolder}/target/rel_dev/typst-preview",
 					"${workspaceFolder}/addons/vscode/out/"
 				]
 			},
 			"osx": {
 				"command": "cp",
 				"args": [
-					"${workspaceFolder}/target/release/typst-preview",
+					"${workspaceFolder}/target/rel_dev/typst-preview",
 					"${workspaceFolder}/addons/vscode/out/"
 				]
 			}
