@@ -1,5 +1,6 @@
 import { patchRoot } from "./svg-patch";
 import { installEditorJumpToHandler } from "./svg-debug-info";
+import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer";
 
 export class SvgDocument {
   /// State fields
@@ -15,15 +16,13 @@ export class SvgDocument {
   /// enable partial rendering
   private partialRendering: boolean;
 
-  /// There are two scales in this class:
-  /// The real scale is to adjust the size of `hookedElem` to fit the svg.
-  /// The virtual scale (scale ratio) is to let user zoom in/out the svg.
-  /// For example:
-  /// + the default value of virtual scale is 1, which means the svg is
-  ///   totally fit in `hookedElem`.
-  /// + if user set virtual scale to 0.5, then the svg will be zoomed out
-  ///   to fit in half width of `hookedElem`.
-  /// "real" current scale of `hookedElem`
+  /// There are two scales in this class: The real scale is to adjust the size
+  /// of `hookedElem` to fit the svg. The virtual scale (scale ratio) is to let
+  /// user zoom in/out the svg. For example:
+  /// + the default value of virtual scale is 1, which means the svg is totally
+  ///   fit in `hookedElem`.
+  /// + if user set virtual scale to 0.5, then the svg will be zoomed out to fit
+  ///   in half width of `hookedElem`. "real" current scale of `hookedElem`
   private currentRealScale: number;
   /// "virtual" current scale of `hookedElem`
   private currentScaleRatio: number;
@@ -35,7 +34,7 @@ export class SvgDocument {
   /// cached `hookedElem.getBoundingClientRect()`
   private cachedBoundingRect: DOMRect;
 
-  constructor(private hookedElem: HTMLElement, public kModule: any) {
+  constructor(private hookedElem: HTMLElement, public kModule: RenderSession) {
     /// Cache fields
     this.cachedOffsetWidth = 0;
     this.cachedBoundingRect = hookedElem.getBoundingClientRect();
@@ -213,7 +212,8 @@ export class SvgDocument {
         if (eventName === "new") {
           this.reset();
         }
-        this.kModule.merge_delta(svgUpdateEvent[1]);
+        // todo: remove type cast
+        this.kModule.merge_delta(svgUpdateEvent[1] as unknown as Uint8Array);
 
         t1 = performance.now();
         // todo: trigger viewport change once
