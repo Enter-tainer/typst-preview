@@ -137,5 +137,12 @@ Add preview button
 
 ## v0.7.5
 
-= Fix #107: now VSCode variables like `${workspaceFolder}` can be used in `typst-preview.fontPaths`.
+- Fix #107: now VSCode variables like `${workspaceFolder}` can be used in `typst-preview.fontPaths`.
 - Fix cannot open multiple preview tabs at the same time.
+
+## v0.8.0
+
+- Upgrade to typst v0.8.0
+- Fix #111: Previously stroke related attributes are not rendered correctly. This is now fixed.
+- Fix #105: The compiler will panic randomly. This is now fixed.
+- Upstream bug fixes: https://github.com/Myriad-Dreamin/typst.ts/releases/tag/v0.4.0-rc3

@@ -24,4 +24,7 @@
 
 + Install rust toolchain. The common option is to use #link("https://rustup.rs/")[rustup].
 
-+ Build and debug the VSCode extension: press `F5` in VSCode. And a new VSCode window will pop up. Open a typst source file in the new window, and you will see the preview button in the top right corner of the editor.
++ Build and run:
+
+  - To build and debug the VSCode extension: press `F5` in VSCode. And a new VSCode window will pop up. Open a typst source file in the new window, and you will see the preview button in the top right corner of the editor.
+  - To build and run the binary only, run `cargo run` in the root directory of the project.
