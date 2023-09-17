@@ -3,7 +3,7 @@ import { SvgDocument } from "./svg-doc";
 import {
   rendererBuildInfo,
   createTypstRenderer,
-} from "@myriaddreamin/typst.ts";
+} from "@myriaddreamin/typst.ts/dist/esm/renderer";
 import renderModule from "@myriaddreamin/typst-ts-renderer/pkg/typst_ts_renderer_bg.wasm?url";
 
 const enc = new TextEncoder("utf-8");
