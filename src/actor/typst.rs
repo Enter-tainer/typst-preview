@@ -6,12 +6,13 @@ use crate::{
 use log::{debug, error, info};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::sync::{broadcast, mpsc, watch};
-use typst::syntax::FileId;
+use typst::syntax::{FileId, VirtualPath};
 use typst::{doc::Document, World};
 use typst_ts_compiler::{
     service::{CompileDriver, Compiler, DiagObserver},
     ShadowApi,
 };
+use typst_ts_core::vector::span_id_from_u64;
 
 use super::render::RenderActorRequest;
 use super::{
@@ -210,7 +211,11 @@ impl TypstActor {
         for (path, content) in files.files.iter() {
             let path = Path::new(path).to_owned();
             // todo: is it safe to believe that the path is normalized?
-            match self.compiler_driver.world.map_shadow(&path, content) {
+            match self
+                .compiler_driver
+                .world
+                .map_shadow(&path, content.as_bytes().into())
+            {
                 Ok(_) => {}
                 Err(e) => {
                     error!(
@@ -234,7 +239,7 @@ impl TypstActor {
     fn resolve_src_to_doc_jump(&self, req: &SrcToDocJumpRequest) -> Option<SrcToDocJumpInfo> {
         let world = &self.compiler_driver.world;
         let relative_path = Path::new(&req.filepath).strip_prefix(&world.root).ok()?;
-        let source_id = FileId::new(None, &Path::new("/").join(relative_path));
+        let source_id = FileId::new(None, VirtualPath::new(relative_path));
         let source = world.source(source_id).ok()?;
         let cursor = req.to_byte_offset(&source)?;
         let doc = self.doc_sender.borrow().clone()?;
@@ -247,12 +252,8 @@ impl TypstActor {
     }
 
     fn resolve_doc_to_src_jump(&self, id: u64) -> Option<DocToSrcJumpInfo> {
-        let (src_id, span_number) = (id >> 48, id & 0x0000FFFFFFFFFFFF);
-        let src_id = FileId::from_u16(src_id as u16);
-        if src_id == FileId::detached() || span_number <= 1 {
-            return None;
-        }
-        let span = typst::syntax::Span::new(src_id, span_number);
+        let span = span_id_from_u64(id)?;
+        let src_id = span.id()?;
         let source = self.compiler_driver.world.source(src_id).ok()?;
         let range = source.find(span)?.range();
         let filepath = self.compiler_driver.world.path_for_id(src_id).ok()?;

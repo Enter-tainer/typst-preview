@@ -124,6 +124,7 @@ pub struct MemoryFilesShort {
     files: Vec<String>,
 }
 
+/// If this file is not found, please refer to https://enter-tainer.github.io/typst-preview/dev.html to build the frontend.
 const HTML: &str = include_str!("../addons/vscode/out/frontend/index.html");
 
 /// Entry point.
