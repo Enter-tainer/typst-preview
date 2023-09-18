@@ -27,13 +27,13 @@ jobs:
         uses: actions/checkout@v3
       - name: Download font assets
         run: |
-          curl -L https://github.com/Myriad-Dreamin/typst-book/releases/download/v0.1.1-nightly1/charter-font-assets.tar.gz | tar -xvz -C assets/fonts
+          curl -L https://github.com/Myriad-Dreamin/typst-book/releases/download/v0.1.1/charter-font-assets.tar.gz | tar -xvz -C assets/fonts
           curl -L https://use.fontawesome.com/releases/v6.4.2/fontawesome-free-6.4.2-desktop.zip -o fontawesome-free-6.4.2-desktop.zip
           unzip fontawesome-free-6.4.2-desktop.zip
           cp -v -r fontawesome-free-6.4.2-desktop/otfs/* assets/fonts/
       - name: Download & install typst-book
         run: |
-          curl -L https://github.com/Myriad-Dreamin/typst-book/releases/download/v0.1.1-nightly1/typst-book-x86_64-unknown-linux-gnu.tar.gz | tar -xvz
+          curl -L https://github.com/Myriad-Dreamin/typst-book/releases/download/v0.1.1/typst-book-x86_64-unknown-linux-gnu.tar.gz | tar -xvz
           chmod +x typst-book-x86_64-unknown-linux-gnu/bin/typst-book
           sudo cp typst-book-x86_64-unknown-linux-gnu/bin/typst-book /usr/bin/typst-book
       - name: Build Book
