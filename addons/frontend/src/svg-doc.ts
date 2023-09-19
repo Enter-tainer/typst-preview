@@ -157,45 +157,49 @@ export class SvgDocument {
   }
 
   private decorateSvgElement(e: SVGElement) {
-
-    const width = e.getAttribute("width")!;
-    const height = e.getAttribute("height")!;
-
-    const nextPages = Array.from(e.children).filter(
-      (x) => x.classList.contains("typst-page")
-    );
-
-    // 25px height padding
-    // 25px width padding
+    /// Prepare scale
     // scale derived from svg width and container with.
     const computedScale = this.cachedOffsetWidth
       ? this.cachedOffsetWidth / this.kModule.doc_width
       : 1;
     // respect current scale ratio
     const scale = this.currentScaleRatio * computedScale;
+
+    /// Retrieve original width, height and pages
+    const width = e.getAttribute("width")!;
+    const height = e.getAttribute("height")!;
+    const nextPages = Array.from(e.children).filter(
+      (x) => x.classList.contains("typst-page")
+    );
+
+    /// Calculate new width, height
+    // 5px height padding, 0px width padding (it is buggy to add width padding)
     const heightPadding = 5 * scale;
     const widthPadding = 0;
     const newWidth = Number.parseFloat(width) + 2 * widthPadding;
     const newHeight = Number.parseFloat(height) + 2 * heightPadding * nextPages.length;
+
+    /// Apply new width, height
     e.setAttribute("viewBox", `0 0 ${newWidth} ${newHeight}`);
     e.setAttribute("width", `${newWidth}`);
     e.setAttribute("height", `${newHeight}`);
 
+    /// Apply new pages
     let accumulatedHeight = 0;
     const firstPage = (nextPages.length ? nextPages[0] : undefined)!;
     for (let i = 0; i < nextPages.length; i++) {
+      /// Retrieve page width, height
       const nextPage = nextPages[i];
       const pageWidth = Number.parseFloat(nextPage.getAttribute("data-page-width")!);
       const pageHeight = Number.parseFloat(nextPage.getAttribute("data-page-height")!);
 
-      // center the page
+      /// center the page and add padding
       const calculatedPaddedX = (newWidth - pageWidth) / 2;
       const calculatedPaddedY = accumulatedHeight + (i == 0 ? 0 : heightPadding);
-      // padding top and bottom
-      // const paddedPageWidth = newWidth;
       const sidePadding = ((i === 0 || i + 1 === nextPages.length) ? 0 : heightPadding);
       const paddedPageHeight = pageHeight + sidePadding + heightPadding;
 
+      /// Create outer rectangle
       const outerRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
       outerRect.setAttribute("class", "typst-page-outer");
       outerRect.setAttribute("data-page-width", newWidth.toString());
@@ -207,6 +211,7 @@ export class SvgDocument {
       // white background
       outerRect.setAttribute("fill", "rgba(0, 0, 0, 0.5)");
 
+      /// Create inner rectangle
       const innerRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
       innerRect.setAttribute("class", "typst-page-inner");
       innerRect.setAttribute("data-page-width", pageWidth.toString());
@@ -218,10 +223,14 @@ export class SvgDocument {
       // white background
       innerRect.setAttribute("fill", "white");
 
+      /// Move page to the correct position
       nextPage.setAttribute("transform", `translate(${calculatedPaddedX}, ${calculatedPaddedY})`);
+
+      /// Insert rectangles
       // todo: this is buggy not preserving order?
       e.insertBefore(innerRect, firstPage);
       e.insertBefore(outerRect, innerRect);
+
       accumulatedHeight = calculatedPaddedY + pageHeight + heightPadding;
     }
   }
