@@ -60,6 +60,7 @@ window.onload = function () {
       console.log(message[0], message[1].length);
 
       if (message[0] === "jump") {
+        // todo: aware height padding
         const [page, x, y] = dec
           .decode(message[1].buffer)
           .split(" ")

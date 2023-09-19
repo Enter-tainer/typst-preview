@@ -156,6 +156,76 @@ export class SvgDocument {
     this.rescale();
   }
 
+  private decorateSvgElement(e: SVGElement) {
+
+    const width = e.getAttribute("width")!;
+    const height = e.getAttribute("height")!;
+
+    const nextPages = Array.from(e.children).filter(
+      (x) => x.classList.contains("typst-page")
+    );
+
+    // 25px height padding
+    // 25px width padding
+    // scale derived from svg width and container with.
+    const computedScale = this.cachedOffsetWidth
+      ? this.cachedOffsetWidth / this.kModule.doc_width
+      : 1;
+    // respect current scale ratio
+    const scale = this.currentScaleRatio * computedScale;
+    const heightPadding = 5 * scale;
+    const widthPadding = 0;
+    const newWidth = Number.parseFloat(width) + 2 * widthPadding;
+    const newHeight = Number.parseFloat(height) + 2 * heightPadding * nextPages.length;
+    e.setAttribute("viewBox", `0 0 ${newWidth} ${newHeight}`);
+    e.setAttribute("width", `${newWidth}`);
+    e.setAttribute("height", `${newHeight}`);
+
+    let accumulatedHeight = 0;
+    const firstPage = (nextPages.length ? nextPages[0] : undefined)!;
+    for (let i = 0; i < nextPages.length; i++) {
+      const nextPage = nextPages[i];
+      const pageWidth = Number.parseFloat(nextPage.getAttribute("data-page-width")!);
+      const pageHeight = Number.parseFloat(nextPage.getAttribute("data-page-height")!);
+
+      // center the page
+      const calculatedPaddedX = (newWidth - pageWidth) / 2;
+      const calculatedPaddedY = accumulatedHeight + (i == 0 ? 0 : heightPadding);
+      // padding top and bottom
+      // const paddedPageWidth = newWidth;
+      const sidePadding = ((i === 0 || i + 1 === nextPages.length) ? 0 : heightPadding);
+      const paddedPageHeight = pageHeight + sidePadding + heightPadding;
+
+      const outerRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      outerRect.setAttribute("class", "typst-page-outer");
+      outerRect.setAttribute("data-page-width", newWidth.toString());
+      outerRect.setAttribute("data-page-height", paddedPageHeight.toString());
+      outerRect.setAttribute("width", newWidth.toString());
+      outerRect.setAttribute("height", paddedPageHeight.toString());
+      outerRect.setAttribute("x", "0");
+      outerRect.setAttribute("y", accumulatedHeight.toString());
+      // white background
+      outerRect.setAttribute("fill", "rgba(0, 0, 0, 0.5)");
+
+      const innerRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      innerRect.setAttribute("class", "typst-page-inner");
+      innerRect.setAttribute("data-page-width", pageWidth.toString());
+      innerRect.setAttribute("data-page-height", pageHeight.toString());
+      innerRect.setAttribute("width", pageWidth.toString());
+      innerRect.setAttribute("height", pageHeight.toString());
+      innerRect.setAttribute("x", calculatedPaddedX.toString());
+      innerRect.setAttribute("y", calculatedPaddedY.toString());
+      // white background
+      innerRect.setAttribute("fill", "white");
+
+      nextPage.setAttribute("transform", `translate(${calculatedPaddedX}, ${calculatedPaddedY})`);
+      // todo: this is buggy not preserving order?
+      e.insertBefore(innerRect, firstPage);
+      e.insertBefore(outerRect, innerRect);
+      accumulatedHeight = calculatedPaddedY + pageHeight + heightPadding;
+    }
+  }
+
   private toggleViewportChange() {
     const docRect = this.cachedBoundingRect;
     // scale derived from svg width and container with.
@@ -191,9 +261,11 @@ export class SvgDocument {
       const elem = document.createElement("div");
       elem.innerHTML = patchStr;
       const svgElement = elem.firstElementChild as SVGElement;
+      this.decorateSvgElement(svgElement!);
       patchRoot(this.hookedElem.firstElementChild as SVGElement, svgElement);
     } else {
       this.hookedElem.innerHTML = patchStr;
+      this.decorateSvgElement(this.hookedElem.firstElementChild! as SVGElement);
     }
     const t3 = performance.now();
 
