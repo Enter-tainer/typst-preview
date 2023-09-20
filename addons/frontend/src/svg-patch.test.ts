@@ -327,4 +327,41 @@ describe("interpretView", () => {
       []
     `);
   });
+
+  it("handleReuseAppend", () => {
+    const origin = injectOffsets("o", repeatOrJust([null, null, null, 0, 1]));
+    const target = injectOffsets("t", [1, null, 0, null, 1].map(reuseStub));
+    const result = interpretTargetView<MockElement>(
+      origin, target,
+      hasTid,
+    );
+    const result2 = changeViewPerspective<MockElement>(origin,
+      result[0],
+      hasTid,
+    );
+    expect(toSnapshot(result)).toMatchInlineSnapshot(`
+      [
+        "reuse,4",
+        "append,t1",
+        "reuse,3",
+        "append,t3",
+        "append,t4",
+        "o1->t0,o0->t2",
+      ]
+    `);
+
+    // after swap_in,3,4: [o0, o1, o2, o4(1), o3(0)]
+    // insert,4,t1: [o0, o1, o2, o4(1), t1, o3(0)]
+    // insert,6,t3: [o0, o1, o2, o4(1), t1, o3(0), t3]
+    // insert,7,t4: [o0, o1, o2, o4(1), t1, o3(0), t3, t4]
+    // with patch: [o0, o1, o2, t0, t1, t2, t3, t4]
+    expect(toSnapshot([result2, []])).toMatchInlineSnapshot(`
+      [
+        "swap_in,3,4",
+        "insert,4,t1",
+        "insert,6,t3",
+        "insert,7,t4",
+      ]
+    `);
+  });
 });
