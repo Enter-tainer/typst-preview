@@ -283,11 +283,44 @@ export class SvgDocument {
     // with 1px padding to avoid edge error
     if (this.partialRendering) {
       console.log("render_in_window with partial rendering enabled", revScale, left, top, width, height);
+
+      /// Adjust top and bottom
+      const ch = this.hookedElem.firstElementChild?.children;
+      let topEstimate = top - height - 1, bottomEstimate = top + height * 2 + 1;
+      if (ch) {
+        const pages = Array.from(ch).filter(
+          (x) => x.classList.contains("typst-page")
+        );
+        let minTop = 1e33, maxBottom = -1e33, accumulatedHeight = 0;
+        const translateRegex = /translate\(([-0-9.]+), ([-0-9.]+)\)/;
+        for (const page of pages) {
+          const pageHeight = Number.parseFloat(page.getAttribute("data-page-height")!);
+          const translate = page.getAttribute("transform")!;
+          const translateMatch = translate.match(translateRegex)!;
+          const translateY = Number.parseFloat(translateMatch[2]);
+          if (translateY + pageHeight > topEstimate) {
+            minTop = Math.min(minTop, accumulatedHeight);
+          }
+          if (translateY < bottomEstimate) {
+            maxBottom = Math.max(maxBottom, accumulatedHeight + pageHeight);
+          }
+          accumulatedHeight += pageHeight;
+        }
+
+        if (pages.length != 0) {
+          topEstimate = minTop;
+          bottomEstimate = maxBottom;
+        } else {
+          topEstimate = 0;
+          bottomEstimate = 1e33;
+        }
+      }
+      // translate
       patchStr = this.kModule.render_in_window(
-        left - 1,
-        top - height - 1,
-        left + width + 1,
-        top + height * 2 + 1
+        // lo.x, lo.y
+        left - 1, topEstimate,
+        // hi.x, hi.y
+        left + width + 1, bottomEstimate,
       );
     } else {
       console.log("render_in_window with partial rendering disabled", 0, 0, 1e33, 1e33)
