@@ -15,7 +15,7 @@ interface Attributes {
 class MockElement {
   tagName = "g";
 
-  constructor(public attrs: Attributes) {}
+  constructor(public attrs: Attributes) { }
 
   getAttribute(s: string): string | null {
     return this.attrs[s] ?? null;
@@ -30,7 +30,7 @@ class MockElement {
 const injectOffsets = (kind: string, elems: MockElement[]): MockElement[] => {
   for (let i = 0; i < elems.length; i++) {
     elems[i].attrs["data-kind"] = kind;
-    if (elems[i].attrs["data-tid"]) {
+    if (elems[i].attrs["data-tid"] || elems[i].attrs["data-tid"] === null) {
       continue;
     }
     elems[i].attrs["data-tid"] = i.toString();
@@ -39,10 +39,10 @@ const injectOffsets = (kind: string, elems: MockElement[]): MockElement[] => {
   return elems;
 };
 
-const repeatOrJust = (n: number | number[]): MockElement[] => {
+const repeatOrJust = (n: number | (number | null)[]): MockElement[] => {
   if (Array.isArray(n)) {
     return n.map((i) => new MockElement({
-      "data-tid": i.toString(),
+      "data-tid": (i !== null) ? i.toString() : null,
     }));
   }
 
@@ -56,7 +56,7 @@ const repeatOrJust = (n: number | number[]): MockElement[] => {
 
 const reuseStub = (n: number | null) =>
   new MockElement({
-    "data-reuse-from": n !== null ? n.toString() : null,
+    "data-reuse-from": (n !== null) ? n.toString() : null,
   });
 
 function toSnapshot([targetView, patchPair]: [
@@ -79,15 +79,19 @@ function toSnapshot([targetView, patchPair]: [
   return [...instructions, ...patches];
 }
 
-const indexTargetView = (init: number | number[], rearrange: (number | null)[]) =>
+const hasTid = (elem: MockElement): elem is MockElement => elem.getAttribute("data-tid") !== null;
+
+const indexTargetView = (init: number | (number | null)[], rearrange: (number | null)[]) =>
   interpretTargetView<MockElement>(
     injectOffsets("o", repeatOrJust(init)),
-    injectOffsets("t", rearrange.map(reuseStub))
+    injectOffsets("t", rearrange.map(reuseStub)),
+    hasTid,
   );
-const indexOriginView = (init: number | number[], rearrange: (number | null)[]) =>
+const indexOriginView = (init: number | (number | null)[], rearrange: (number | null)[]) =>
   changeViewPerspective<MockElement>(
     injectOffsets("o", repeatOrJust(init)),
-    indexTargetView(init, rearrange)[0]
+    indexTargetView(init, rearrange)[0],
+    hasTid,
   );
 
 describe("interpretView", () => {
@@ -273,6 +277,54 @@ describe("interpretView", () => {
         "swap_in,4,6",
         "swap_in,5,7",
       ]
+    `);
+  });
+  it("handleMasterproefThesisAffectedByEmptyPage", () => {
+    const origin = injectOffsets("o", repeatOrJust([null, null, null, 0]));
+    const target = injectOffsets("t", [0, null].map(reuseStub));
+    target[0].attrs["data-tid"] = "1";
+    target[1].attrs["data-tid"] = "0";
+    const result = interpretTargetView<MockElement>(
+      origin, target,
+      hasTid,
+    );
+    const result2 = changeViewPerspective<MockElement>(origin,
+      result[0],
+      hasTid,
+    );
+    expect(toSnapshot(result)).toMatchInlineSnapshot(`
+      [
+        "reuse,3",
+        "append,t0",
+        "o0->t1",
+      ]
+    `);
+    expect(toSnapshot([result2, []])).toMatchInlineSnapshot(`
+      [
+        "insert,4,t0",
+      ]
+    `);
+  });
+  it("handleMasterproefThesisAffectedByEmptyPageAntiCase", () => {
+    const origin = injectOffsets("o", repeatOrJust([null, null, null, 0, 1]));
+    const target = injectOffsets("t", [0, 1].map(reuseStub));
+    const result = interpretTargetView<MockElement>(
+      origin, target,
+      hasTid,
+    );
+    const result2 = changeViewPerspective<MockElement>(
+      origin, result[0],
+      hasTid,
+    );
+    expect(toSnapshot(result)).toMatchInlineSnapshot(`
+      [
+        "reuse,3",
+        "reuse,4",
+        "o0->t0,o1->t1",
+      ]
+    `);
+    expect(toSnapshot([result2, []])).toMatchInlineSnapshot(`
+      []
     `);
   });
 });
