@@ -333,8 +333,11 @@ export function patchRoot(prev: SVGElement, next: SVGElement) {
   /// Patch global svg resources
   patchSvgHeader(prev, next);
 
+  /// Hard replace elements that is not a `<g>` element.
+  const frozen = preReplaceNonSVGElements(prev, next, 3);
   /// Patch `<g>` children, call `reuseOrPatchElem` to patch.
   patchChildren(prev, next);
+  postReplaceNonSVGElements(prev, 3, frozen);
   return;
 
   function patchSvgHeader(prev: SVGElement, next: SVGElement) {
@@ -457,30 +460,68 @@ function reuseOrPatchElem(prev: SVGGElement, next: SVGGElement) {
   }
 
   /// Hard replace elements that is not a `<g>` element.
-  replaceNonSVGElements(prev, next);
+  const frozen = preReplaceNonSVGElements(prev, next, 0);
   /// Patch `<g>` children, will call `reuseOrPatchElem` again.
   patchChildren(prev, next);
+  postReplaceNonSVGElements(prev, 0, frozen);
   return false /* reused */;
+}
 
-  function replaceNonSVGElements(prev: Element, next: Element) {
-    const removedIndecies = [];
-    for (let i = 0; i < prev.children.length; i++) {
-      const prevChild = prev.children[i];
-      if (!isGElem(prevChild)) {
-        removedIndecies.push(i);
-      }
-    }
+interface FrozenReplacement {
+  inserts: Element[][];
+}
 
-    for (const index of removedIndecies.reverse()) {
-      prev.children[index].remove();
+function preReplaceNonSVGElements(prev: Element, next: Element, since: number): FrozenReplacement {
+  const removedIndecies = [];
+  const frozenReplacement: FrozenReplacement = {
+    inserts: [],
+  };
+  for (let i = since; i < prev.children.length; i++) {
+    const prevChild = prev.children[i];
+    if (!isGElem(prevChild)) {
+      removedIndecies.push(i);
     }
+  }
 
-    for (let i = 0; i < next.children.length; i++) {
-      const nextChild = next.children[i];
-      if (!isGElem(nextChild)) {
-        prev.appendChild(nextChild.cloneNode(true));
-      }
+  for (const index of removedIndecies.reverse()) {
+    prev.children[index].remove();
+  }
+
+  let elements: Element[] = [];
+  for (let i = since; i < next.children.length; i++) {
+    const nextChild = next.children[i];
+    if (!isGElem(nextChild)) {
+      elements.push(nextChild);
+    } else {
+      frozenReplacement.inserts.push(elements);
+      elements = [];
     }
+  }
+
+  frozenReplacement.inserts.push(elements);
+
+  return frozenReplacement;
+}
+
+function postReplaceNonSVGElements(prev: Element, since: number, frozen: FrozenReplacement) {
+
+  /// Retrive the `<g>` elements from the `prev` element.
+  const gElements = Array.from(prev.children).slice(since).filter(isGElem);
+  if (gElements.length + 1 !== frozen.inserts.length) {
+    throw new Error("invalid frozen replacement");
+  }
+
+  /// Insert the separated elements to the `prev` element.
+  for (let i = 0; i < gElements.length; i++) {
+    const prevChild = gElements[i];
+    for (const elem of frozen.inserts[i]) {
+      prev.insertBefore(elem, prevChild);
+    }
+  }
+
+  /// Append the last elements to the `prev` element.
+  for (const elem of frozen.inserts[gElements.length]) {
+    prev.append(elem);
   }
 }
 
