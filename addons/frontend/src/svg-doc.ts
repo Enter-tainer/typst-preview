@@ -27,6 +27,10 @@ export class SvgDocument {
   /// "virtual" current scale of `hookedElem`
   private currentScaleRatio: number;
 
+  /// Style fields
+
+  borderColor: string;
+
   /// Cache fields
 
   /// cached `hookedElem.offsetWidth`
@@ -50,6 +54,10 @@ export class SvgDocument {
 
     /// for ctrl-wheel rescaling
     this.hookedElem.style.transformOrigin = "0px 0px";
+
+    /// Style fields
+    this.borderColor = getComputedStyle(document.documentElement).getPropertyValue('--vscode-editor-background')
+      || 'rgba(0, 0, 0, 0.5)';
 
     installEditorJumpToHandler(this.kModule, this.hookedElem);
     this.installCtrlWheelHandler();
@@ -132,10 +140,14 @@ export class SvgDocument {
   }
 
   rescale() {
+    // hide: white unaligned page
+    // todo: better solution
+    const widthHideFactor = 1e-3;
+
     const newContainerWidth = this.cachedOffsetWidth;
     this.currentRealScale =
       this.currentRealScale *
-      (newContainerWidth / this.currentContainerWidth);
+      (newContainerWidth / this.currentContainerWidth) + widthHideFactor;
     this.currentContainerWidth = newContainerWidth;
 
     const scale = this.currentRealScale * this.currentScaleRatio;
@@ -157,6 +169,10 @@ export class SvgDocument {
   }
 
   private decorateSvgElement(e: SVGElement) {
+    // todo: typst.ts return a ceil width so we miss 1px here
+    // after we fix this, we can set the factor to 0.01
+    const backgroundHideFactor = 1;
+
     /// Prepare scale
     // scale derived from svg width and container with.
     const computedScale = this.cachedOffsetWidth
@@ -167,72 +183,86 @@ export class SvgDocument {
 
     /// Retrieve original width, height and pages
     const width = e.getAttribute("width")!;
-    const height = e.getAttribute("height")!;
+    // const height = e.getAttribute("height")!;
     const nextPages = Array.from(e.children).filter(
       (x) => x.classList.contains("typst-page")
     );
 
     /// Calculate new width, height
-    // 5px height padding, 0px width padding (it is buggy to add width padding)
-    const heightPadding = 5 * scale;
-    const widthPadding = 0;
-    const newWidth = Number.parseFloat(width) + 2 * widthPadding;
-    const newHeight = Number.parseFloat(height) + 2 * heightPadding * nextPages.length;
-
-    /// Apply new width, height
-    e.setAttribute("viewBox", `0 0 ${newWidth} ${newHeight}`);
-    e.setAttribute("width", `${newWidth}`);
-    e.setAttribute("height", `${newHeight}`);
+    // 5px height margin, 0px width margin (it is buggy to add width margin)
+    const heightMargin = 5 * scale;
+    const widthMargin = 0;
+    const newWidth = Number.parseFloat(width) + 2 * widthMargin + 1e-5;
 
     /// Apply new pages
     let accumulatedHeight = 0;
     const firstPage = (nextPages.length ? nextPages[0] : undefined)!;
+    let firstRect: SVGRectElement = undefined!;
+
     for (let i = 0; i < nextPages.length; i++) {
       /// Retrieve page width, height
       const nextPage = nextPages[i];
       const pageWidth = Number.parseFloat(nextPage.getAttribute("data-page-width")!);
       const pageHeight = Number.parseFloat(nextPage.getAttribute("data-page-height")!);
 
-      /// center the page and add padding
-      const calculatedPaddedX = (newWidth - pageWidth) / 2;
-      const calculatedPaddedY = accumulatedHeight + (i == 0 ? 0 : heightPadding);
-      const sidePadding = ((i === 0 || i + 1 === nextPages.length) ? 0 : heightPadding);
-      const paddedPageHeight = pageHeight + sidePadding + heightPadding;
-
-      /// Create outer rectangle
-      const outerRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-      outerRect.setAttribute("class", "typst-page-outer");
-      outerRect.setAttribute("data-page-width", newWidth.toString());
-      outerRect.setAttribute("data-page-height", paddedPageHeight.toString());
-      outerRect.setAttribute("width", newWidth.toString());
-      outerRect.setAttribute("height", paddedPageHeight.toString());
-      outerRect.setAttribute("x", "0");
-      outerRect.setAttribute("y", accumulatedHeight.toString());
-      // white background
-      outerRect.setAttribute("fill", "rgba(0, 0, 0, 0.5)");
+      /// center the page and add margin
+      const calculatedPaddedXRough = (newWidth - pageWidth) / 2;
+      const calculatedPaddedX = Math.abs(calculatedPaddedXRough) < 1e-3 ? 0 : calculatedPaddedXRough;
+      const calculatedPaddedY = accumulatedHeight + (i == 0 ? 0 : heightMargin);
+      const translateAttr = `translate(${calculatedPaddedX}, ${calculatedPaddedY})`;
 
       /// Create inner rectangle
       const innerRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
       innerRect.setAttribute("class", "typst-page-inner");
       innerRect.setAttribute("data-page-width", pageWidth.toString());
       innerRect.setAttribute("data-page-height", pageHeight.toString());
-      innerRect.setAttribute("width", pageWidth.toString());
-      innerRect.setAttribute("height", pageHeight.toString());
-      innerRect.setAttribute("x", calculatedPaddedX.toString());
-      innerRect.setAttribute("y", calculatedPaddedY.toString());
+      innerRect.setAttribute("width", Math.floor((pageWidth - backgroundHideFactor) * 100).toString());
+      innerRect.setAttribute("height", Math.floor((pageHeight - backgroundHideFactor) * 100).toString());
+      innerRect.setAttribute("x", "0");
+      innerRect.setAttribute("y", "0");
+      innerRect.setAttribute("transform", `${translateAttr} scale(0.01)`);
       // white background
       innerRect.setAttribute("fill", "white");
 
       /// Move page to the correct position
-      nextPage.setAttribute("transform", `translate(${calculatedPaddedX}, ${calculatedPaddedY})`);
+      nextPage.setAttribute("transform", translateAttr);
 
       /// Insert rectangles
       // todo: this is buggy not preserving order?
       e.insertBefore(innerRect, firstPage);
-      e.insertBefore(outerRect, innerRect);
+      if (!firstRect) {
+        firstRect = innerRect;
+      }
 
-      accumulatedHeight = calculatedPaddedY + pageHeight + heightPadding;
+      accumulatedHeight = calculatedPaddedY + pageHeight + (i + 1 === nextPages.length ? 0 : heightMargin);
     }
+
+    /// Apply new width, height
+    const newHeight = accumulatedHeight;
+
+    /// Create outer rectangle
+    if (firstPage) {
+      const rectHeight = Math.ceil(newHeight).toString();
+
+      const outerRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      outerRect.setAttribute("class", "typst-page-outer");
+      outerRect.setAttribute("data-page-width", newWidth.toString());
+      outerRect.setAttribute("data-page-height", rectHeight);
+      outerRect.setAttribute("width", newWidth.toString());
+      outerRect.setAttribute("height", rectHeight);
+      outerRect.setAttribute("x", "0");
+      outerRect.setAttribute("y", "0");
+      // white background
+      outerRect.setAttribute("fill", this.borderColor);
+      e.insertBefore(outerRect, firstRect);
+    }
+
+    // hide unaligned width
+    const newWidthFloor = newWidth - 1e-5;
+    const newHeightFloor = newHeight - 1e-5;
+    e.setAttribute("viewBox", `0 0 ${newWidthFloor} ${newHeightFloor}`);
+    e.setAttribute("width", `${newWidthFloor}`);
+    e.setAttribute("height", `${newHeightFloor}`);
   }
 
   private toggleViewportChange() {
