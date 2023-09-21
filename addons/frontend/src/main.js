@@ -25,7 +25,7 @@ function createSvgDocument(hookedElem, wasmDocRef) {
 window.onload = function () {
   function setupSocket(svgDoc) {
     window.typstWebsocket = new WebSocket("ws://127.0.0.1:23625");
-    // socket.binaryType = "arraybuffer";
+    window.typstWebsocket.binaryType = "arraybuffer";
     window.typstWebsocket.addEventListener("open", () => {
       console.log("WebSocket connection opened");
       svgDoc.reset();
@@ -39,47 +39,46 @@ window.onload = function () {
     // 当收到WebSocket数据时
     window.typstWebsocket.addEventListener("message", (event) => {
       const data = event.data;
-      if (!(data instanceof Blob)) {
+      if (!(data instanceof ArrayBuffer)) {
         if (data === NOT_AVAIABLE) {
           return;
         }
 
-        console.error("WebSocket data is not a Blob", data);
+        console.error("WebSocket data is not a ArrayBuffer", data);
         return;
       }
 
-      data.arrayBuffer().then((buffer) => {
-        const messageData = new Uint8Array(buffer);
-        // console.log(messageData);
+      const buffer = data;
+      const messageData = new Uint8Array(buffer);
+      // console.log(messageData);
 
-        const message_idx = messageData.indexOf(COMMA[0]);
-        const message = [
-          dec.decode(messageData.slice(0, message_idx).buffer),
-          messageData.slice(message_idx + 1),
-        ];
-        console.log(message[0], message[1].length);
+      const message_idx = messageData.indexOf(COMMA[0]);
+      const message = [
+        dec.decode(messageData.slice(0, message_idx).buffer),
+        messageData.slice(message_idx + 1),
+      ];
+      console.log(message[0], message[1].length);
 
-        if (message[0] === "jump") {
-          const [page, x, y] = dec
-            .decode(message[1].buffer)
-            .split(" ")
-            .map(Number);
-          const rootElem =
-            document.getElementById("imageContainer")?.firstElementChild;
-          if (rootElem) {
-            /// Note: when it is really scrolled, it will trigger `svgDoc.addViewportChange`
-            /// via `window.onscroll` event
-            window.handleTypstLocation(rootElem, page, x, y);
-          }
-          return;
-        } else if (message[0] === "partial-rendering") {
-          console.log("Experimental feature: partial rendering enabled");
-          svgDoc.setPartialRendering(true);
-          return;
+      if (message[0] === "jump") {
+        const [page, x, y] = dec
+          .decode(message[1].buffer)
+          .split(" ")
+          .map(Number);
+        const rootElem =
+          document.getElementById("imageContainer")?.firstElementChild;
+        if (rootElem) {
+          /// Note: when it is really scrolled, it will trigger `svgDoc.addViewportChange`
+          /// via `window.onscroll` event
+          window.handleTypstLocation(rootElem, page, x, y);
         }
+        return;
+      } else if (message[0] === "partial-rendering") {
+        console.log("Experimental feature: partial rendering enabled");
+        svgDoc.setPartialRendering(true);
+        return;
+      }
 
-        svgDoc.addChangement(message);
-      });
+      svgDoc.addChangement(message);
     });
 
     // 当WebSocket连接关闭时
