@@ -57,7 +57,7 @@ export class SvgDocument {
 
     /// Style fields
     this.borderColor = getComputedStyle(document.documentElement).getPropertyValue('--vscode-editor-background')
-      || 'rgba(0, 0, 0, 0.5)';
+      || 'rgb(82, 86, 89)';
 
     installEditorJumpToHandler(this.kModule, this.hookedElem);
     this.installCtrlWheelHandler();
