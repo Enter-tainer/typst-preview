@@ -332,10 +332,10 @@ function patchRoot(prev: SVGElement, next: SVGElement) {
   patchAttributes(prev, next);
 
   /// Hard replace elements that is not a `<g>` element.
-  const frozen = preReplaceNonSVGElements(prev, next, 0);
+  const frozen = preReplaceNonSVGElements(prev, next);
   /// Patch `<g>` children, call `reuseOrPatchElem` to patch.
   patchChildren(prev, next);
-  postReplaceNonSVGElements(prev, 0, frozen);
+  postReplaceNonSVGElements(prev, frozen);
   return;
 }
 
@@ -414,10 +414,10 @@ function reuseOrPatchElem(prev: SVGGElement, next: SVGGElement) {
   }
 
   /// Hard replace elements that is not a `<g>` element.
-  const frozen = preReplaceNonSVGElements(prev, next, 0);
+  const frozen = preReplaceNonSVGElements(prev, next);
   /// Patch `<g>` children, will call `reuseOrPatchElem` again.
   patchChildren(prev, next);
-  postReplaceNonSVGElements(prev, 0, frozen);
+  postReplaceNonSVGElements(prev, frozen);
   return false /* reused */;
 }
 
@@ -426,7 +426,7 @@ interface FrozenReplacement {
   debug?: string;
 }
 
-function preReplaceNonSVGElements(prev: Element, next: Element, since: number): FrozenReplacement {
+function preReplaceNonSVGElements(prev: Element, next: Element): FrozenReplacement {
   const removedIndecies = [];
   const frozenReplacement: FrozenReplacement = {
     inserts: [],
@@ -434,7 +434,7 @@ function preReplaceNonSVGElements(prev: Element, next: Element, since: number): 
     // prev: ${prev.outerHTML}
     // next: ${next.outerHTML}`
   };
-  for (let i = since; i < prev.children.length; i++) {
+  for (let i = 0; i < prev.children.length; i++) {
     const prevChild = prev.children[i];
     if (!isGElem(prevChild)) {
       removedIndecies.push(i);
@@ -446,7 +446,7 @@ function preReplaceNonSVGElements(prev: Element, next: Element, since: number): 
   }
 
   let elements: Element[] = [];
-  for (let i = since; i < next.children.length; i++) {
+  for (let i = 0; i < next.children.length; i++) {
     const nextChild = next.children[i];
     if (!isGElem(nextChild)) {
       elements.push(nextChild);
@@ -461,10 +461,10 @@ function preReplaceNonSVGElements(prev: Element, next: Element, since: number): 
   return frozenReplacement;
 }
 
-function postReplaceNonSVGElements(prev: Element, since: number, frozen: FrozenReplacement) {
+function postReplaceNonSVGElements(prev: Element, frozen: FrozenReplacement) {
 
   /// Retrive the `<g>` elements from the `prev` element.
-  const gElements = Array.from(prev.children).slice(since).filter(isGElem);
+  const gElements = Array.from(prev.children).filter(isGElem);
   if (gElements.length + 1 !== frozen.inserts.length) {
     throw new Error(`invalid frozen replacement: gElements.length (${gElements.length}) + 1 !=== frozen.inserts.length (${frozen.inserts.length}) ${frozen.debug || ''}
 current: ${prev.outerHTML}`);
