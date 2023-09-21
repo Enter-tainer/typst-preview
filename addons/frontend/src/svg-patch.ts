@@ -266,6 +266,7 @@ export function changeViewPerspective<
     if (!tIsU(prevChild)) {
       const target_off = getShift(off);
       swapIns.push(target_off);
+      appendOffset++;
       continue;
     }
 
