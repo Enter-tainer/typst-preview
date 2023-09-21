@@ -29,7 +29,7 @@ export class SvgDocument {
 
   /// Style fields
 
-  borderColor: string;
+  backgroundColor: string;
 
   /// Cache fields
 
@@ -56,7 +56,7 @@ export class SvgDocument {
     this.hookedElem.style.transformOrigin = "0px 0px";
 
     /// Style fields
-    this.borderColor = getComputedStyle(document.documentElement).getPropertyValue('--vscode-editor-background')
+    this.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--vscode-editor-background')
       || 'rgb(82, 86, 89)';
 
     installEditorJumpToHandler(this.kModule, this.hookedElem);
@@ -253,7 +253,7 @@ export class SvgDocument {
       outerRect.setAttribute("x", "0");
       outerRect.setAttribute("y", "0");
       // white background
-      outerRect.setAttribute("fill", this.borderColor);
+      outerRect.setAttribute("fill", this.backgroundColor);
       e.insertBefore(outerRect, firstRect);
     }
 
