@@ -1,4 +1,4 @@
-import { patchRoot } from "./svg-patch";
+import { patchSvgToContainer } from "./svg-patch";
 import { installEditorJumpToHandler } from "./svg-debug-info";
 import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer";
 
@@ -328,17 +328,7 @@ export class SvgDocument {
     }
 
     const t2 = performance.now();
-
-    if (this.hookedElem.firstElementChild) {
-      const elem = document.createElement("div");
-      elem.innerHTML = patchStr;
-      const svgElement = elem.firstElementChild as SVGElement;
-      this.decorateSvgElement(svgElement!);
-      patchRoot(this.hookedElem.firstElementChild as SVGElement, svgElement);
-    } else {
-      this.hookedElem.innerHTML = patchStr;
-      this.decorateSvgElement(this.hookedElem.firstElementChild! as SVGElement);
-    }
+    patchSvgToContainer(this.hookedElem, patchStr, (elem) => this.decorateSvgElement(elem));
     const t3 = performance.now();
 
     return [t2, t3];

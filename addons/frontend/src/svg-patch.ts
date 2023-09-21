@@ -327,62 +327,16 @@ function runOriginViewInstructions(
 /// Begin of Recursive Svg Patch
 
 /// Patch the `prev <svg>` in the DOM according to `next <svg>` from the backend.
-export function patchRoot(prev: SVGElement, next: SVGElement) {
+function patchRoot(prev: SVGElement, next: SVGElement) {
   /// Patch attributes
   patchAttributes(prev, next);
-  /// Patch global svg resources
-  patchSvgHeader(prev, next);
 
   /// Hard replace elements that is not a `<g>` element.
-  const frozen = preReplaceNonSVGElements(prev, next, 3);
+  const frozen = preReplaceNonSVGElements(prev, next, 0);
   /// Patch `<g>` children, call `reuseOrPatchElem` to patch.
   patchChildren(prev, next);
-  postReplaceNonSVGElements(prev, 3, frozen);
+  postReplaceNonSVGElements(prev, 0, frozen);
   return;
-
-  function patchSvgHeader(prev: SVGElement, next: SVGElement) {
-    for (let i = 0; i < 3; i++) {
-      const prevChild = prev.children[i];
-      const nextChild = next.children[i];
-      // console.log("prev", prevChild);
-      // console.log("next", nextChild);
-      if (prevChild.tagName === "defs") {
-        if (prevChild.getAttribute("class") === "glyph") {
-          // console.log("append glyphs:", nextChild.children, "to", prevChild);
-          prevChild.append(...nextChild.children);
-        } else if (prevChild.getAttribute("class") === "clip-path") {
-          // console.log("clip path: replace");
-          // todo: gc
-          prevChild.append(...nextChild.children);
-        }
-      } else if (
-        prevChild.tagName === "style" &&
-        nextChild.getAttribute("data-reuse") !== "1"
-      ) {
-        // console.log("replace extra style", prevChild, nextChild);
-
-        // todo: gc
-        if (nextChild.textContent) {
-          // todo: looks slow
-          // https://stackoverflow.com/questions/3326494/parsing-css-in-javascript-jquery
-          var doc = document.implementation.createHTMLDocument(""),
-            styleElement = document.createElement("style");
-
-          styleElement.textContent = nextChild.textContent;
-          // the style will only be parsed once it is added to a document
-          doc.body.appendChild(styleElement);
-
-          const currentSvgSheet = (prevChild as HTMLStyleElement).sheet!;
-          const rulesToInsert = styleElement.sheet?.cssRules || [];
-
-          // console.log("rules to insert", currentSvgSheet, rulesToInsert);
-          for (const rule of rulesToInsert) {
-            currentSvgSheet.insertRule(rule.cssText);
-          }
-        }
-      }
-    }
-  }
 }
 
 /// apply attribute patches to the `prev <svg or g>` element
@@ -531,3 +485,105 @@ current: ${prev.outerHTML}`);
 }
 
 /// End of Recursive Svg Patch
+/// Begin of Update to Global Svg Resources
+
+/// the first three elements in the svg patch are common resources used by svg.
+const SVG_HEADER_LENGTH = 3;
+
+function initOrPatchSvgHeader(svg: SVGElement) {
+  if (!svg) {
+    throw new Error('no initial svg found');
+  }
+
+  const prevResourceHeader = document.getElementById('typst-svg-resources');
+  if (prevResourceHeader) {
+    patchSvgHeader(prevResourceHeader as unknown as SVGElement, svg);
+    return;
+  }
+
+  /// Create a global resource header
+  const resourceHeader = document.createElementNS(
+    "http://www.w3.org/2000/svg",
+    "svg"
+  );
+  resourceHeader.id = 'typst-svg-resources';
+  // set viewbox, width, and height
+  resourceHeader.setAttribute("viewBox", "0 0 0 0");
+  resourceHeader.setAttribute("width", "0");
+  resourceHeader.setAttribute("height", "0")
+
+  /// Move resources
+  for (let i = 0; i < SVG_HEADER_LENGTH; i++) {
+    // move ownership of elements
+    resourceHeader.append(svg.firstElementChild!);
+  }
+
+  /// Insert resource header to somewhere visble to the svg element.
+  document.head.append(resourceHeader);
+}
+
+function patchSvgHeader(prev: SVGElement, next: SVGElement) {
+  for (let i = 0; i < SVG_HEADER_LENGTH; i++) {
+    const prevChild = prev.children[i];
+    const nextChild = next.firstElementChild!;
+    nextChild.remove();
+
+    // console.log("prev", prevChild);
+    // console.log("next", nextChild);
+    if (prevChild.tagName === "defs") {
+      if (prevChild.getAttribute("class") === "glyph") {
+        // console.log("append glyphs:", nextChild.children, "to", prevChild);
+        prevChild.append(...nextChild.children);
+      } else if (prevChild.getAttribute("class") === "clip-path") {
+        // console.log("clip path: replace");
+        // todo: gc
+        prevChild.append(...nextChild.children);
+      }
+    } else if (
+      prevChild.tagName === "style" &&
+      nextChild.getAttribute("data-reuse") !== "1"
+    ) {
+      // console.log("replace extra style", prevChild, nextChild);
+
+      // todo: gc
+      if (nextChild.textContent) {
+        // todo: looks slow
+        // https://stackoverflow.com/questions/3326494/parsing-css-in-javascript-jquery
+        var doc = document.implementation.createHTMLDocument(""),
+          styleElement = document.createElement("style");
+
+        styleElement.textContent = nextChild.textContent;
+        // the style will only be parsed once it is added to a document
+        doc.body.appendChild(styleElement);
+
+        const currentSvgSheet = (prevChild as HTMLStyleElement).sheet!;
+        const rulesToInsert = styleElement.sheet?.cssRules || [];
+
+        // console.log("rules to insert", currentSvgSheet, rulesToInsert);
+        for (const rule of rulesToInsert) {
+          currentSvgSheet.insertRule(rule.cssText);
+        }
+      }
+    }
+  }
+}
+
+/// End of Update to Global Svg Resources
+/// Main
+
+export function patchSvgToContainer(
+  hookedElem: Element, patchStr: string, decorateSvgElement: (elem: SVGElement) => void = () => void (0)) {
+  if (hookedElem.firstElementChild) {
+    const elem = document.createElement("div");
+    elem.innerHTML = patchStr;
+    const next = elem.firstElementChild! as SVGElement;
+    initOrPatchSvgHeader(next);
+    decorateSvgElement(next);
+    patchRoot(/* prev */ hookedElem.firstElementChild as SVGElement, next);
+  } else {
+    hookedElem.innerHTML = patchStr;
+    const next = hookedElem.firstElementChild! as SVGElement;
+    initOrPatchSvgHeader(next);
+    decorateSvgElement(next);
+  }
+}
