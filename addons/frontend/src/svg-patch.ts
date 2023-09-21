@@ -469,12 +469,16 @@ function reuseOrPatchElem(prev: SVGGElement, next: SVGGElement) {
 
 interface FrozenReplacement {
   inserts: Element[][];
+  debug?: string;
 }
 
 function preReplaceNonSVGElements(prev: Element, next: Element, since: number): FrozenReplacement {
   const removedIndecies = [];
   const frozenReplacement: FrozenReplacement = {
     inserts: [],
+    //     debug: `preReplaceNonSVGElements ${since}
+    // prev: ${prev.outerHTML}
+    // next: ${next.outerHTML}`
   };
   for (let i = since; i < prev.children.length; i++) {
     const prevChild = prev.children[i];
@@ -508,7 +512,8 @@ function postReplaceNonSVGElements(prev: Element, since: number, frozen: FrozenR
   /// Retrive the `<g>` elements from the `prev` element.
   const gElements = Array.from(prev.children).slice(since).filter(isGElem);
   if (gElements.length + 1 !== frozen.inserts.length) {
-    throw new Error("invalid frozen replacement");
+    throw new Error(`invalid frozen replacement: gElements.length (${gElements.length}) + 1 !=== frozen.inserts.length (${frozen.inserts.length}) ${frozen.debug || ''}
+current: ${prev.outerHTML}`);
   }
 
   /// Insert the separated elements to the `prev` element.
