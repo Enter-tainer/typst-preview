@@ -56,8 +56,7 @@ export class SvgDocument {
     this.hookedElem.style.transformOrigin = "0px 0px";
 
     /// Style fields
-    this.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--vscode-sideBar-background')
-      || 'rgb(82, 86, 89)';
+    this.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--typst-preview-background-color');
 
     installEditorJumpToHandler(this.kModule, this.hookedElem);
     this.installCtrlWheelHandler();
