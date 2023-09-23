@@ -56,7 +56,7 @@ export class SvgDocument {
     this.hookedElem.style.transformOrigin = "0px 0px";
 
     /// Style fields
-    this.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--vscode-editor-background')
+    this.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--vscode-sideBar-background')
       || 'rgb(82, 86, 89)';
 
     installEditorJumpToHandler(this.kModule, this.hookedElem);
@@ -212,17 +212,22 @@ export class SvgDocument {
       const translateAttr = `translate(${calculatedPaddedX}, ${calculatedPaddedY})`;
 
       /// Create inner rectangle
+      const INNER_RECT_UNIT = 100;
       const innerRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
       innerRect.setAttribute("class", "typst-page-inner");
       innerRect.setAttribute("data-page-width", pageWidth.toString());
       innerRect.setAttribute("data-page-height", pageHeight.toString());
-      innerRect.setAttribute("width", Math.floor((pageWidth - backgroundHideFactor) * 100).toString());
-      innerRect.setAttribute("height", Math.floor((pageHeight - backgroundHideFactor) * 100).toString());
+      innerRect.setAttribute("width", Math.floor((pageWidth - backgroundHideFactor) * INNER_RECT_UNIT).toString());
+      innerRect.setAttribute("height", Math.floor((pageHeight - backgroundHideFactor) * INNER_RECT_UNIT).toString());
       innerRect.setAttribute("x", "0");
       innerRect.setAttribute("y", "0");
       innerRect.setAttribute("transform", `${translateAttr} scale(0.01)`);
       // white background
       innerRect.setAttribute("fill", "white");
+      // It is quite ugly
+      // innerRect.setAttribute("stroke", "black");
+      // innerRect.setAttribute("stroke-width", (2 * INNER_RECT_UNIT * scale).toString());
+      // innerRect.setAttribute("stroke-opacity", "0.4");
 
       /// Move page to the correct position
       nextPage.setAttribute("transform", translateAttr);
