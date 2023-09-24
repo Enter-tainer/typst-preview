@@ -69,9 +69,6 @@ export class SvgDocument {
     this.partialRendering = false;
     this.currentScaleRatio = 1;
 
-    /// for ctrl-wheel rescaling
-    this.hookedElem.style.transformOrigin = "0px 0px";
-
     /// Style fields
     this.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--typst-preview-background-color');
 
@@ -136,20 +133,15 @@ export class SvgDocument {
         const scrollX = event.pageX * (scrollFactor - 1);
         const scrollY = event.pageY * (scrollFactor - 1);
 
-        // Apply new scale
-        const scale = this.currentRealScale * this.currentScaleRatio;
-        this.hookedElem.style.transform = `scale(${scale})`;
-
         // make sure the cursor is still on the same position
         window.scrollBy(scrollX, scrollY);
-
-        /// Note: even if `window.scrollBy` can trigger viewport change event,
-        /// we still manually trigger it for explicitness.
+        // toggle scale change event
         this.addViewportChange();
 
         return false;
       }
     };
+
     const vscodeAPI = typeof acquireVsCodeApi !== "undefined";
     if (vscodeAPI) {
       window.addEventListener("wheel", wheelEventHandler, {
@@ -162,39 +154,44 @@ export class SvgDocument {
     }
   }
 
+  // Note: one should retrieve dom state before rescale
   rescale() {
-    const { width: containerWidth } = this.cachedDOMState;
     // hide: white unaligned page
     // todo: better solution
     const widthHideFactor = 1e-3;
 
-    const newContainerWidth = containerWidth;
-    this.currentRealScale =
-      this.currentRealScale *
-      (newContainerWidth / this.currentContainerWidth) + widthHideFactor;
-    this.currentContainerWidth = newContainerWidth;
-
-    const scale = this.currentRealScale * this.currentScaleRatio;
-    const targetScale = `scale(${scale})`;
-    if (this.hookedElem.style.transform !== targetScale) {
-      this.hookedElem.style.transform = targetScale;
-    }
-    // console.log("rescale", scale, this.currentScaleRatio);
-  }
-
-  initScale() {
+    // get dom state from cache, so we are free from layout reflowing
+    // Note: one should retrieve dom state before rescale
     const { width: containerWidth } = this.cachedDOMState;
+    const svg = this.hookedElem.firstElementChild! as SVGElement;
 
     this.currentContainerWidth = containerWidth;
     const svgWidth = Number.parseFloat(
-      this.hookedElem.firstElementChild!.getAttribute("width") || "1"
+      svg.getAttribute("data-width") || svg.getAttribute("width") || "1"
     );
-    this.currentRealScale = this.currentContainerWidth / svgWidth;
+    this.currentRealScale = this.currentContainerWidth / svgWidth + widthHideFactor;
+    this.currentContainerWidth = containerWidth;
 
-    this.rescale();
+    const scale = this.currentRealScale * this.currentScaleRatio;
+
+    // apply scale
+    const dataWidth = Number.parseFloat(svg.getAttribute("data-width")!);
+    const dataHeight = Number.parseFloat(svg.getAttribute("data-height")!);
+    const appliedWidth = (dataWidth * scale).toString();
+    const appliedHeight = (dataHeight * scale).toString();
+
+    // set data applied width and height to memoize change
+    if (svg.getAttribute("data-applied-width") !== appliedWidth) {
+      svg.setAttribute("data-applied-width", appliedWidth);
+      svg.setAttribute("width", `${dataWidth * scale}`);
+    }
+    if (svg.getAttribute("data-applied-height") !== appliedHeight) {
+      svg.setAttribute("data-applied-height", appliedHeight);
+      svg.setAttribute("height", `${dataHeight * scale}`);
+    }
   }
 
-  private decorateSvgElement(e: SVGElement) {
+  private decorateSvgElement(svg: SVGElement) {
     const { width: containerWidth } = this.cachedDOMState;
 
     // todo: typst.ts return a ceil width so we miss 1px here
@@ -210,9 +207,9 @@ export class SvgDocument {
     const scale = this.currentScaleRatio * computedScale;
 
     /// Retrieve original width, height and pages
-    const width = e.getAttribute("width")!;
+    const width = svg.getAttribute("width")!;
     // const height = e.getAttribute("height")!;
-    const nextPages = Array.from(e.children).filter(
+    const nextPages = Array.from(svg.children).filter(
       (x) => x.classList.contains("typst-page")
     );
 
@@ -262,7 +259,7 @@ export class SvgDocument {
 
       /// Insert rectangles
       // todo: this is buggy not preserving order?
-      e.insertBefore(innerRect, firstPage);
+      svg.insertBefore(innerRect, firstPage);
       if (!firstRect) {
         firstRect = innerRect;
       }
@@ -287,15 +284,17 @@ export class SvgDocument {
       outerRect.setAttribute("y", "0");
       // white background
       outerRect.setAttribute("fill", this.backgroundColor);
-      e.insertBefore(outerRect, firstRect);
+      svg.insertBefore(outerRect, firstRect);
     }
 
     // hide unaligned width
     const newWidthFloor = newWidth - 1e-5;
     const newHeightFloor = newHeight - 1e-5;
-    e.setAttribute("viewBox", `0 0 ${newWidthFloor} ${newHeightFloor}`);
-    e.setAttribute("width", `${newWidthFloor}`);
-    e.setAttribute("height", `${newHeightFloor}`);
+    svg.setAttribute("viewBox", `0 0 ${newWidthFloor} ${newHeightFloor}`);
+    svg.setAttribute("width", `${newWidthFloor}`);
+    svg.setAttribute("height", `${newHeightFloor}`);
+    svg.setAttribute("data-width", `${newWidthFloor}`);
+    svg.setAttribute("data-height", `${newHeightFloor}`);
   }
 
   private toggleViewportChange() {
@@ -438,12 +437,7 @@ export class SvgDocument {
       try {
         while (this.patchQueue.length > 0) {
           this.processQueue(this.patchQueue.shift()!);
-        }
-
-        // to hide the rescale behavior at the first time
-        const docRoot = this.hookedElem.firstElementChild as SVGElement;
-        if (docRoot) {
-          this.initScale();
+          this.rescale();
         }
 
         requestAnimationFrame(doSvgUpdate);
@@ -460,8 +454,7 @@ export class SvgDocument {
     const docRoot = this.hookedElem.firstElementChild as SVGElement;
     if (docRoot) {
       window.initTypstSvg(docRoot);
-
-      this.initScale();
+      this.rescale();
     }
   }
 
