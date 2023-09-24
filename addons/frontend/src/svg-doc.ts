@@ -1,6 +1,17 @@
-import { patchRoot } from "./svg-patch";
+import { patchSvgToContainer } from "./svg-patch";
 import { installEditorJumpToHandler } from "./svg-debug-info";
 import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer";
+
+export interface ContainerDOMState {
+  /// cached `hookedElem.offsetWidth` or `hookedElem.innerWidth`
+  width: number;
+  /// cached `hookedElem.getBoundingClientRect()`
+  /// We only use `left` and `top` here.
+  boundingRect: {
+    left: number;
+    top: number;
+  };
+}
 
 export class SvgDocument {
   /// State fields
@@ -27,17 +38,27 @@ export class SvgDocument {
   /// "virtual" current scale of `hookedElem`
   private currentScaleRatio: number;
 
+  /// Style fields
+
+  backgroundColor: string;
+
   /// Cache fields
 
-  /// cached `hookedElem.offsetWidth`
-  private cachedOffsetWidth: number;
-  /// cached `hookedElem.getBoundingClientRect()`
-  private cachedBoundingRect: DOMRect;
+  /// cached state of container, default to retrieve state from `this.hookedElem`
+  private cachedDOMState: ContainerDOMState;
 
-  constructor(private hookedElem: HTMLElement, public kModule: RenderSession) {
-    /// Cache fields
-    this.cachedOffsetWidth = 0;
-    this.cachedBoundingRect = hookedElem.getBoundingClientRect();
+  private retrieveDOMState: () => ContainerDOMState;
+
+  constructor(private hookedElem: HTMLElement, public kModule: RenderSession, options?: {
+    retrieveDOMState?: () => ContainerDOMState,
+  }) {
+    /// Apply option
+    this.retrieveDOMState = options?.retrieveDOMState || (() => {
+      return {
+        width: this.hookedElem.offsetWidth,
+        boundingRect: this.hookedElem.getBoundingClientRect(),
+      }
+    });
 
     /// State fields
     this.svgUpdating = false;
@@ -48,8 +69,15 @@ export class SvgDocument {
     this.partialRendering = false;
     this.currentScaleRatio = 1;
 
-    /// for ctrl-wheel rescaling
-    this.hookedElem.style.transformOrigin = "0px 0px";
+    /// Style fields
+    this.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--typst-preview-background-color');
+
+    /// Cache fields
+    this.cachedDOMState = {
+      width: 0,
+      // todo: we should not query dom state here, which may cause layout reflowing
+      boundingRect: hookedElem.getBoundingClientRect(),
+    };
 
     installEditorJumpToHandler(this.kModule, this.hookedElem);
     this.installCtrlWheelHandler();
@@ -105,20 +133,15 @@ export class SvgDocument {
         const scrollX = event.pageX * (scrollFactor - 1);
         const scrollY = event.pageY * (scrollFactor - 1);
 
-        // Apply new scale
-        const scale = this.currentRealScale * this.currentScaleRatio;
-        this.hookedElem.style.transform = `scale(${scale})`;
-
         // make sure the cursor is still on the same position
         window.scrollBy(scrollX, scrollY);
-
-        /// Note: even if `window.scrollBy` can trigger viewport change event,
-        /// we still manually trigger it for explicitness.
+        // toggle scale change event
         this.addViewportChange();
 
         return false;
       }
     };
+
     const vscodeAPI = typeof acquireVsCodeApi !== "undefined";
     if (vscodeAPI) {
       window.addEventListener("wheel", wheelEventHandler, {
@@ -131,41 +154,152 @@ export class SvgDocument {
     }
   }
 
+  // Note: one should retrieve dom state before rescale
   rescale() {
-    const newContainerWidth = this.cachedOffsetWidth;
-    this.currentRealScale =
-      this.currentRealScale *
-      (newContainerWidth / this.currentContainerWidth);
-    this.currentContainerWidth = newContainerWidth;
+    // get dom state from cache, so we are free from layout reflowing
+    // Note: one should retrieve dom state before rescale
+    const { width: containerWidth } = this.cachedDOMState;
+    const svg = this.hookedElem.firstElementChild! as SVGElement;
 
-    const scale = this.currentRealScale * this.currentScaleRatio;
-    const targetScale = `scale(${scale})`;
-    if (this.hookedElem.style.transform !== targetScale) {
-      this.hookedElem.style.transform = targetScale;
-    }
-    // console.log("rescale", scale, this.currentScaleRatio);
-  }
-
-  initScale() {
-    this.currentContainerWidth = this.cachedOffsetWidth;
+    this.currentContainerWidth = containerWidth;
     const svgWidth = Number.parseFloat(
-      this.hookedElem.firstElementChild!.getAttribute("width") || "1"
+      svg.getAttribute("data-width") || svg.getAttribute("width") || "1"
     );
     this.currentRealScale = this.currentContainerWidth / svgWidth;
+    this.currentContainerWidth = containerWidth;
 
-    this.rescale();
+    const scale = this.currentRealScale * this.currentScaleRatio;
+
+    // apply scale
+    const dataWidth = Number.parseFloat(svg.getAttribute("data-width")!);
+    const dataHeight = Number.parseFloat(svg.getAttribute("data-height")!);
+    const appliedWidth = (dataWidth * scale).toString();
+    const appliedHeight = (dataHeight * scale).toString();
+
+    // set data applied width and height to memoize change
+    if (svg.getAttribute("data-applied-width") !== appliedWidth) {
+      svg.setAttribute("data-applied-width", appliedWidth);
+      svg.setAttribute("width", `${dataWidth * scale}`);
+    }
+    if (svg.getAttribute("data-applied-height") !== appliedHeight) {
+      svg.setAttribute("data-applied-height", appliedHeight);
+      svg.setAttribute("height", `${dataHeight * scale}`);
+    }
+  }
+
+  private decorateSvgElement(svg: SVGElement) {
+    const { width: containerWidth } = this.cachedDOMState;
+
+    // todo: typst.ts return a ceil width so we miss 1px here
+    // after we fix this, we can set the factor to 0.01
+    const backgroundHideFactor = 1;
+
+    /// Prepare scale
+    // scale derived from svg width and container with.
+    const computedScale = containerWidth
+      ? containerWidth / this.kModule.doc_width
+      : 1;
+    // respect current scale ratio
+    const scale = this.currentScaleRatio * computedScale;
+
+    /// Retrieve original width, height and pages
+    const width = svg.getAttribute("width")!;
+    // const height = e.getAttribute("height")!;
+    const nextPages = Array.from(svg.children).filter(
+      (x) => x.classList.contains("typst-page")
+    );
+
+    /// Calculate new width, height
+    // 5px height margin, 0px width margin (it is buggy to add width margin)
+    const heightMargin = 5 * scale;
+    const widthMargin = 0;
+    const newWidth = Number.parseFloat(width) + 2 * widthMargin;
+
+    /// Apply new pages
+    let accumulatedHeight = 0;
+    const firstPage = (nextPages.length ? nextPages[0] : undefined)!;
+    let firstRect: SVGRectElement = undefined!;
+
+    for (let i = 0; i < nextPages.length; i++) {
+      /// Retrieve page width, height
+      const nextPage = nextPages[i];
+      const pageWidth = Number.parseFloat(nextPage.getAttribute("data-page-width")!);
+      const pageHeight = Number.parseFloat(nextPage.getAttribute("data-page-height")!);
+
+      /// center the page and add margin
+      const calculatedPaddedX = (newWidth - pageWidth) / 2;
+      const calculatedPaddedY = accumulatedHeight + (i == 0 ? 0 : heightMargin);
+      const translateAttr = `translate(${calculatedPaddedX}, ${calculatedPaddedY})`;
+
+      /// Create inner rectangle
+      const INNER_RECT_UNIT = 100;
+      const innerRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      innerRect.setAttribute("class", "typst-page-inner");
+      innerRect.setAttribute("data-page-width", pageWidth.toString());
+      innerRect.setAttribute("data-page-height", pageHeight.toString());
+      innerRect.setAttribute("width", Math.floor((pageWidth - backgroundHideFactor) * INNER_RECT_UNIT).toString());
+      innerRect.setAttribute("height", Math.floor((pageHeight - backgroundHideFactor) * INNER_RECT_UNIT).toString());
+      innerRect.setAttribute("x", "0");
+      innerRect.setAttribute("y", "0");
+      innerRect.setAttribute("transform", `${translateAttr} scale(0.01)`);
+      // white background
+      innerRect.setAttribute("fill", "white");
+      // It is quite ugly
+      // innerRect.setAttribute("stroke", "black");
+      // innerRect.setAttribute("stroke-width", (2 * INNER_RECT_UNIT * scale).toString());
+      // innerRect.setAttribute("stroke-opacity", "0.4");
+
+      /// Move page to the correct position
+      nextPage.setAttribute("transform", translateAttr);
+
+      /// Insert rectangles
+      // todo: this is buggy not preserving order?
+      svg.insertBefore(innerRect, firstPage);
+      if (!firstRect) {
+        firstRect = innerRect;
+      }
+
+      accumulatedHeight = calculatedPaddedY + pageHeight + (i + 1 === nextPages.length ? 0 : heightMargin);
+    }
+
+    /// Apply new width, height
+    const newHeight = accumulatedHeight;
+
+    /// Create outer rectangle
+    if (firstPage) {
+      const rectHeight = Math.ceil(newHeight).toString();
+
+      const outerRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      outerRect.setAttribute("class", "typst-page-outer");
+      outerRect.setAttribute("data-page-width", newWidth.toString());
+      outerRect.setAttribute("data-page-height", rectHeight);
+      outerRect.setAttribute("width", newWidth.toString());
+      outerRect.setAttribute("height", rectHeight);
+      outerRect.setAttribute("x", "0");
+      outerRect.setAttribute("y", "0");
+      // white background
+      outerRect.setAttribute("fill", this.backgroundColor);
+      svg.insertBefore(outerRect, firstRect);
+    }
+
+    /// Update svg width, height information
+    svg.setAttribute("viewBox", `0 0 ${newWidth} ${newHeight}`);
+    svg.setAttribute("width", `${newWidth}`);
+    svg.setAttribute("height", `${newHeight}`);
+    svg.setAttribute("data-width", `${newWidth}`);
+    svg.setAttribute("data-height", `${newHeight}`);
   }
 
   private toggleViewportChange() {
-    const docRect = this.cachedBoundingRect;
+    const { width: containerWidth, boundingRect: containerBRect } = this.cachedDOMState;
     // scale derived from svg width and container with.
-    const computedRevScale = this.cachedOffsetWidth
-      ? this.kModule.doc_width / this.cachedOffsetWidth
+    const computedRevScale = containerWidth
+      ? this.kModule.doc_width / containerWidth
       : 1;
     // respect current scale ratio
     const revScale = computedRevScale / this.currentScaleRatio;
-    const left = (window.screenLeft - docRect.left) * revScale;
-    const top = (window.screenTop - docRect.top) * revScale;
+    const left = (window.screenLeft - containerBRect.left) * revScale;
+    const top = (window.screenTop - containerBRect.top) * revScale;
     const width = window.innerWidth * revScale;
     const height = window.innerHeight * revScale;
 
@@ -174,11 +308,44 @@ export class SvgDocument {
     // with 1px padding to avoid edge error
     if (this.partialRendering) {
       console.log("render_in_window with partial rendering enabled", revScale, left, top, width, height);
+
+      /// Adjust top and bottom
+      const ch = this.hookedElem.firstElementChild?.children;
+      let topEstimate = top - height - 1, bottomEstimate = top + height * 2 + 1;
+      if (ch) {
+        const pages = Array.from(ch).filter(
+          (x) => x.classList.contains("typst-page")
+        );
+        let minTop = 1e33, maxBottom = -1e33, accumulatedHeight = 0;
+        const translateRegex = /translate\(([-0-9.]+), ([-0-9.]+)\)/;
+        for (const page of pages) {
+          const pageHeight = Number.parseFloat(page.getAttribute("data-page-height")!);
+          const translate = page.getAttribute("transform")!;
+          const translateMatch = translate.match(translateRegex)!;
+          const translateY = Number.parseFloat(translateMatch[2]);
+          if (translateY + pageHeight > topEstimate) {
+            minTop = Math.min(minTop, accumulatedHeight);
+          }
+          if (translateY < bottomEstimate) {
+            maxBottom = Math.max(maxBottom, accumulatedHeight + pageHeight);
+          }
+          accumulatedHeight += pageHeight;
+        }
+
+        if (pages.length != 0) {
+          topEstimate = minTop;
+          bottomEstimate = maxBottom;
+        } else {
+          topEstimate = 0;
+          bottomEstimate = 1e33;
+        }
+      }
+      // translate
       patchStr = this.kModule.render_in_window(
-        left - 1,
-        top - height - 1,
-        left + width + 1,
-        top + height * 2 + 1
+        // lo.x, lo.y
+        left - 1, topEstimate,
+        // hi.x, hi.y
+        left + width + 1, bottomEstimate,
       );
     } else {
       console.log("render_in_window with partial rendering disabled", 0, 0, 1e33, 1e33)
@@ -186,15 +353,7 @@ export class SvgDocument {
     }
 
     const t2 = performance.now();
-
-    if (this.hookedElem.firstElementChild) {
-      const elem = document.createElement("div");
-      elem.innerHTML = patchStr;
-      const svgElement = elem.firstElementChild as SVGElement;
-      patchRoot(this.hookedElem.firstElementChild as SVGElement, svgElement);
-    } else {
-      this.hookedElem.innerHTML = patchStr;
-    }
+    patchSvgToContainer(this.hookedElem, patchStr, (elem) => this.decorateSvgElement(elem));
     const t3 = performance.now();
 
     return [t2, t3];
@@ -261,8 +420,7 @@ export class SvgDocument {
 
     this.svgUpdating = true;
     const doSvgUpdate = () => {
-      this.cachedOffsetWidth = this.hookedElem.offsetWidth;
-      this.cachedBoundingRect = this.hookedElem.getBoundingClientRect();
+      this.cachedDOMState = this.retrieveDOMState();
 
       if (this.patchQueue.length === 0) {
         this.svgUpdating = false;
@@ -272,12 +430,7 @@ export class SvgDocument {
       try {
         while (this.patchQueue.length > 0) {
           this.processQueue(this.patchQueue.shift()!);
-        }
-
-        // to hide the rescale behavior at the first time
-        const docRoot = this.hookedElem.firstElementChild as SVGElement;
-        if (docRoot) {
-          this.initScale();
+          this.rescale();
         }
 
         requestAnimationFrame(doSvgUpdate);
@@ -294,8 +447,7 @@ export class SvgDocument {
     const docRoot = this.hookedElem.firstElementChild as SVGElement;
     if (docRoot) {
       window.initTypstSvg(docRoot);
-
-      this.initScale();
+      this.rescale();
     }
   }
 

@@ -11,8 +11,20 @@ const dec = new TextDecoder("utf-8");
 const NOT_AVAIABLE = "current not avalible";
 const COMMA = enc.encode(",");
 
-function createSvgDocument(hookedElem, wasmDocRef) {
-  const svgDoc = new SvgDocument(hookedElem, wasmDocRef);
+function createSvgDocument(wasmDocRef) {
+  const hookedElem = document.getElementById("typst-app");
+  const resizeTarget = document.documentElement;
+
+  const svgDoc = new SvgDocument(hookedElem, wasmDocRef, {
+    // set rescale target to `body`
+    retrieveDOMState() {
+      return {
+        // reserving 1px to avoid initial width scrollbar
+        width: resizeTarget.clientWidth - 1,
+        boundingRect: resizeTarget.getBoundingClientRect(),
+      };
+    },
+  });
 
   // drag (panal resizing) -> rescaling
   // window.onresize = () => svgDoc.rescale();
@@ -60,12 +72,13 @@ window.onload = function () {
       console.log(message[0], message[1].length);
 
       if (message[0] === "jump") {
+        // todo: aware height padding
         const [page, x, y] = dec
           .decode(message[1].buffer)
           .split(" ")
           .map(Number);
         const rootElem =
-          document.getElementById("imageContainer")?.firstElementChild;
+          document.getElementById("typst-app")?.firstElementChild;
         if (rootElem) {
           /// Note: when it is really scrolled, it will trigger `svgDoc.addViewportChange`
           /// via `window.onscroll` event
@@ -101,10 +114,7 @@ window.onload = function () {
     .then(async (kModule /* module kernel from wasm */) => {
       console.log("plugin initialized, build info:", rendererBuildInfo());
 
-      const hookedElem = document.getElementById("imageContainer");
-      const svgDoc = createSvgDocument(hookedElem, kModule);
-
       // todo: plugin init and setup socket at the same time
-      setupSocket(svgDoc);
+      setupSocket(createSvgDocument(kModule));
     });
 };
