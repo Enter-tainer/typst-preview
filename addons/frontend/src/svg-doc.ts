@@ -2,6 +2,17 @@ import { patchSvgToContainer } from "./svg-patch";
 import { installEditorJumpToHandler } from "./svg-debug-info";
 import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer";
 
+export interface ContainerDOMState {
+  /// cached `hookedElem.offsetWidth` or `hookedElem.innerWidth`
+  width: number;
+  /// cached `hookedElem.getBoundingClientRect()`
+  /// We only use `left` and `top` here.
+  boundingRect: {
+    left: number;
+    top: number;
+  };
+}
+
 export class SvgDocument {
   /// State fields
 
@@ -33,15 +44,21 @@ export class SvgDocument {
 
   /// Cache fields
 
-  /// cached `hookedElem.offsetWidth`
-  private cachedOffsetWidth: number;
-  /// cached `hookedElem.getBoundingClientRect()`
-  private cachedBoundingRect: DOMRect;
+  /// cached state of container, default to retrieve state from `this.hookedElem`
+  private cachedDOMState: ContainerDOMState;
 
-  constructor(private hookedElem: HTMLElement, public kModule: RenderSession) {
-    /// Cache fields
-    this.cachedOffsetWidth = 0;
-    this.cachedBoundingRect = hookedElem.getBoundingClientRect();
+  private retrieveDOMState: () => ContainerDOMState;
+
+  constructor(private hookedElem: HTMLElement, public kModule: RenderSession, options?: {
+    retrieveDOMState?: () => ContainerDOMState,
+  }) {
+    /// Apply option
+    this.retrieveDOMState = options?.retrieveDOMState || (() => {
+      return {
+        width: this.hookedElem.offsetWidth,
+        boundingRect: this.hookedElem.getBoundingClientRect(),
+      }
+    });
 
     /// State fields
     this.svgUpdating = false;
@@ -57,6 +74,13 @@ export class SvgDocument {
 
     /// Style fields
     this.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--typst-preview-background-color');
+
+    /// Cache fields
+    this.cachedDOMState = {
+      width: 0,
+      // todo: we should not query dom state here, which may cause layout reflowing
+      boundingRect: hookedElem.getBoundingClientRect(),
+    };
 
     installEditorJumpToHandler(this.kModule, this.hookedElem);
     this.installCtrlWheelHandler();
@@ -139,11 +163,12 @@ export class SvgDocument {
   }
 
   rescale() {
+    const { width: containerWidth } = this.cachedDOMState;
     // hide: white unaligned page
     // todo: better solution
     const widthHideFactor = 1e-3;
 
-    const newContainerWidth = this.cachedOffsetWidth;
+    const newContainerWidth = containerWidth;
     this.currentRealScale =
       this.currentRealScale *
       (newContainerWidth / this.currentContainerWidth) + widthHideFactor;
@@ -158,7 +183,9 @@ export class SvgDocument {
   }
 
   initScale() {
-    this.currentContainerWidth = this.cachedOffsetWidth;
+    const { width: containerWidth } = this.cachedDOMState;
+
+    this.currentContainerWidth = containerWidth;
     const svgWidth = Number.parseFloat(
       this.hookedElem.firstElementChild!.getAttribute("width") || "1"
     );
@@ -168,14 +195,16 @@ export class SvgDocument {
   }
 
   private decorateSvgElement(e: SVGElement) {
+    const { width: containerWidth } = this.cachedDOMState;
+
     // todo: typst.ts return a ceil width so we miss 1px here
     // after we fix this, we can set the factor to 0.01
     const backgroundHideFactor = 1;
 
     /// Prepare scale
     // scale derived from svg width and container with.
-    const computedScale = this.cachedOffsetWidth
-      ? this.cachedOffsetWidth / this.kModule.doc_width
+    const computedScale = containerWidth
+      ? containerWidth / this.kModule.doc_width
       : 1;
     // respect current scale ratio
     const scale = this.currentScaleRatio * computedScale;
@@ -270,15 +299,15 @@ export class SvgDocument {
   }
 
   private toggleViewportChange() {
-    const docRect = this.cachedBoundingRect;
+    const { width: containerWidth, boundingRect: containerBRect } = this.cachedDOMState;
     // scale derived from svg width and container with.
-    const computedRevScale = this.cachedOffsetWidth
-      ? this.kModule.doc_width / this.cachedOffsetWidth
+    const computedRevScale = containerWidth
+      ? this.kModule.doc_width / containerWidth
       : 1;
     // respect current scale ratio
     const revScale = computedRevScale / this.currentScaleRatio;
-    const left = (window.screenLeft - docRect.left) * revScale;
-    const top = (window.screenTop - docRect.top) * revScale;
+    const left = (window.screenLeft - containerBRect.left) * revScale;
+    const top = (window.screenTop - containerBRect.top) * revScale;
     const width = window.innerWidth * revScale;
     const height = window.innerHeight * revScale;
 
@@ -399,8 +428,7 @@ export class SvgDocument {
 
     this.svgUpdating = true;
     const doSvgUpdate = () => {
-      this.cachedOffsetWidth = this.hookedElem.offsetWidth;
-      this.cachedBoundingRect = this.hookedElem.getBoundingClientRect();
+      this.cachedDOMState = this.retrieveDOMState();
 
       if (this.patchQueue.length === 0) {
         this.svgUpdating = false;
