@@ -156,10 +156,6 @@ export class SvgDocument {
 
   // Note: one should retrieve dom state before rescale
   rescale() {
-    // hide: white unaligned page
-    // todo: better solution
-    const widthHideFactor = 1e-3;
-
     // get dom state from cache, so we are free from layout reflowing
     // Note: one should retrieve dom state before rescale
     const { width: containerWidth } = this.cachedDOMState;
@@ -169,7 +165,7 @@ export class SvgDocument {
     const svgWidth = Number.parseFloat(
       svg.getAttribute("data-width") || svg.getAttribute("width") || "1"
     );
-    this.currentRealScale = this.currentContainerWidth / svgWidth + widthHideFactor;
+    this.currentRealScale = this.currentContainerWidth / svgWidth;
     this.currentContainerWidth = containerWidth;
 
     const scale = this.currentRealScale * this.currentScaleRatio;
@@ -217,7 +213,7 @@ export class SvgDocument {
     // 5px height margin, 0px width margin (it is buggy to add width margin)
     const heightMargin = 5 * scale;
     const widthMargin = 0;
-    const newWidth = Number.parseFloat(width) + 2 * widthMargin + 1e-5;
+    const newWidth = Number.parseFloat(width) + 2 * widthMargin;
 
     /// Apply new pages
     let accumulatedHeight = 0;
@@ -231,8 +227,7 @@ export class SvgDocument {
       const pageHeight = Number.parseFloat(nextPage.getAttribute("data-page-height")!);
 
       /// center the page and add margin
-      const calculatedPaddedXRough = (newWidth - pageWidth) / 2;
-      const calculatedPaddedX = Math.abs(calculatedPaddedXRough) < 1e-3 ? 0 : calculatedPaddedXRough;
+      const calculatedPaddedX = (newWidth - pageWidth) / 2;
       const calculatedPaddedY = accumulatedHeight + (i == 0 ? 0 : heightMargin);
       const translateAttr = `translate(${calculatedPaddedX}, ${calculatedPaddedY})`;
 
@@ -287,14 +282,12 @@ export class SvgDocument {
       svg.insertBefore(outerRect, firstRect);
     }
 
-    // hide unaligned width
-    const newWidthFloor = newWidth - 1e-5;
-    const newHeightFloor = newHeight - 1e-5;
-    svg.setAttribute("viewBox", `0 0 ${newWidthFloor} ${newHeightFloor}`);
-    svg.setAttribute("width", `${newWidthFloor}`);
-    svg.setAttribute("height", `${newHeightFloor}`);
-    svg.setAttribute("data-width", `${newWidthFloor}`);
-    svg.setAttribute("data-height", `${newHeightFloor}`);
+    /// Update svg width, height information
+    svg.setAttribute("viewBox", `0 0 ${newWidth} ${newHeight}`);
+    svg.setAttribute("width", `${newWidth}`);
+    svg.setAttribute("height", `${newHeight}`);
+    svg.setAttribute("data-width", `${newWidth}`);
+    svg.setAttribute("data-height", `${newHeight}`);
   }
 
   private toggleViewportChange() {
