@@ -177,3 +177,13 @@ Add preview button
 - Fix #111: Previously stroke related attributes are not rendered correctly. This is now fixed.
 - Fix #105: The compiler will panic randomly. This is now fixed.
 - Upstream bug fixes: https://github.com/Myriad-Dreamin/typst.ts/releases/tag/v0.4.0-rc3
+
+### v0.8.1
+
+- Bug fixes:
+  - #121: Disable darkreader for preview panel. This should fix the problem where the preview panel is invisible when darkreader is installed in the browser.
+  - #123: Fix a VDOM bug which may cause color/clip-path desync.
+  - #124: Fix a race condition which may cause the webview process messages out of order, resulting in blank screen.
+  - #125: Resizing the preview panel is not that laggy now.
+- Features:
+  - #120: We now show page breaks and center pages horizontally. By default we will choose the `vscode-sideBar-background` color as the page break color. If it is not distinguishable from white, we will use `rgb(82, 86, 89)` instead. 
