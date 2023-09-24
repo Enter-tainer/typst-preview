@@ -19,7 +19,8 @@ function createSvgDocument(wasmDocRef) {
     // set rescale target to `body`
     retrieveDOMState() {
       return {
-        width: resizeTarget.clientWidth,
+        // reserving 1px to avoid initial width scrollbar
+        width: resizeTarget.clientWidth - 1,
         boundingRect: resizeTarget.getBoundingClientRect(),
       };
     },
