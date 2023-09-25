@@ -7,25 +7,19 @@ use hyper::http::Error;
 use hyper::service::{make_service_fn, service_fn};
 use log::{error, info};
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::collections::HashMap;
 use tokio_tungstenite::tungstenite::Message;
 
-use typst::geom::Point;
-
-use std::num::NonZeroUsize;
 use std::path::PathBuf;
 
 use tokio::net::{TcpListener, TcpStream};
-use typst::doc::{Frame, FrameItem, Position};
 
 use crate::actor::editor::EditorActor;
 use crate::actor::typst::TypstActor;
 use crate::args::CliArguments;
 
 use tokio_tungstenite::WebSocketStream;
-
-use typst::syntax::{LinkedNode, Source, Span, SyntaxKind};
 
 use typst_ts_compiler::service::CompileDriver;
 use typst_ts_compiler::TypstSystemWorld;
@@ -72,26 +66,7 @@ impl CompileSettings {
     }
 }
 
-#[derive(Debug, Serialize)]
-pub struct DocToSrcJumpInfo {
-    filepath: String,
-    start: Option<(usize, usize)>, // row, column
-    end: Option<(usize, usize)>,
-}
-
-impl DocToSrcJumpInfo {
-    pub fn from_option(
-        filepath: String,
-        start: (Option<usize>, Option<usize>),
-        end: (Option<usize>, Option<usize>),
-    ) -> Self {
-        Self {
-            filepath,
-            start: start.0.zip(start.1),
-            end: end.0.zip(end.1),
-        }
-    }
-}
+pub use typst_ts_compiler::service::DocToSrcJumpInfo;
 
 // JSON.stringify({
 // 		'event': 'panelScrollTo',
@@ -101,7 +76,7 @@ impl DocToSrcJumpInfo {
 // 	})
 #[derive(Debug, Deserialize)]
 pub struct SrcToDocJumpRequest {
-    filepath: String,
+    filepath: PathBuf,
     line: usize,
     /// fixme: character is 0-based, UTF-16 code unit.
     /// We treat it as UTF-8 now.
@@ -116,12 +91,12 @@ impl SrcToDocJumpRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct MemoryFiles {
-    files: HashMap<String, String>,
+    files: HashMap<PathBuf, String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct MemoryFilesShort {
-    files: Vec<String>,
+    files: Vec<PathBuf>,
 }
 
 /// If this file is not found, please refer to https://enter-tainer.github.io/typst-preview/dev.html to build the frontend.
@@ -186,16 +161,13 @@ async fn main() {
     let typst_actor = TypstActor::new(
         compiler_driver,
         typst_mailbox.1,
-        typst_mailbox.0.clone(),
         doc_watch.0,
         renderer_mailbox.0.clone(),
         doc_to_src_jump.0,
         src_to_doc_jump.0.clone(),
     );
 
-    std::thread::spawn(move || {
-        typst_actor.run();
-    });
+    tokio::spawn(typst_actor.run());
 
     let (data_plane_port_tx, data_plane_port_rx) = tokio::sync::oneshot::channel();
     let data_plane_addr = arguments.data_plane_host;
@@ -359,71 +331,3 @@ pub static EMBEDDED_FONT: &[Cow<'_, [u8]>] = &[
     #[cfg(feature = "embedded-emoji-fonts")]
     Cow::Borrowed(include_bytes!("../assets/fonts/NotoColorEmoji.ttf").as_slice()),
 ];
-
-/// Find the output location in the document for a cursor position.
-pub fn jump_from_cursor(frames: &[Frame], source: &Source, cursor: usize) -> Option<Position> {
-    let node = LinkedNode::new(source.root()).leaf_at(cursor)?;
-    if node.kind() != SyntaxKind::Text {
-        return None;
-    }
-
-    info!("jump_from_cursor: {:?} {:?}", node, node.span());
-
-    let mut min_dis = u64::MAX;
-    let mut p = Point::default();
-    let mut ppage = 0usize;
-
-    let span = node.span();
-    for (i, frame) in frames.iter().enumerate() {
-        let t_dis = min_dis;
-        if let Some(pos) = find_in_frame(frame, span, &mut min_dis, &mut p) {
-            return Some(Position {
-                page: NonZeroUsize::new(i + 1).unwrap(),
-                point: pos,
-            });
-        }
-        if t_dis != min_dis {
-            ppage = i;
-        }
-        info!("min_dis: {} {:?} {:?}", min_dis, ppage, p);
-    }
-
-    if min_dis == u64::MAX {
-        return None;
-    }
-
-    Some(Position {
-        page: NonZeroUsize::new(ppage + 1).unwrap(),
-        point: p,
-    })
-}
-
-/// Find the position of a span in a frame.
-fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) -> Option<Point> {
-    for (mut pos, item) in frame.items() {
-        if let FrameItem::Group(group) = item {
-            // TODO: Handle transformation.
-            if let Some(point) = find_in_frame(&group.frame, span, min_dis, p) {
-                return Some(point + pos);
-            }
-        }
-
-        if let FrameItem::Text(text) = item {
-            for glyph in &text.glyphs {
-                if glyph.span.0 == span {
-                    return Some(pos);
-                }
-                if glyph.span.0.id() == span.id() {
-                    let dis = glyph.span.0.number().abs_diff(span.number());
-                    if dis < *min_dis {
-                        *min_dis = dis;
-                        *p = pos;
-                    }
-                }
-                pos.x += glyph.x_advance.at(text.size);
-            }
-        }
-    }
-
-    None
-}
