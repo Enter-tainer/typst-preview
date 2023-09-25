@@ -3252,6 +3252,7 @@ dependencies = [
 [[package]]
 name = "typst-ts-compiler"
 version = "0.4.0-rc6"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?branch=watch-compiler-actor#04b7663a93946facbd07ab2cb6c7a7ac767ba8e5"
 dependencies = [
  "append-only-vec",
  "base64",
@@ -3290,6 +3291,7 @@ dependencies = [
 [[package]]
 name = "typst-ts-core"
 version = "0.4.0-rc6"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?branch=watch-compiler-actor#04b7663a93946facbd07ab2cb6c7a7ac767ba8e5"
 dependencies = [
  "base64",
  "base64-serde",
@@ -3323,6 +3325,7 @@ dependencies = [
 [[package]]
 name = "typst-ts-svg-exporter"
 version = "0.4.0-rc6"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?branch=watch-compiler-actor#04b7663a93946facbd07ab2cb6c7a7ac767ba8e5"
 dependencies = [
  "base64",
  "comemo",
