@@ -97,6 +97,7 @@ pub struct MemoryFiles {
 #[derive(Debug, Deserialize)]
 pub struct MemoryFilesShort {
     files: Vec<PathBuf>,
+    // mtime: Option<u64>,
 }
 
 /// If this file is not found, please refer to https://enter-tainer.github.io/typst-preview/dev.html to build the frontend.

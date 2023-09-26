@@ -200,14 +200,14 @@ impl TypstClient<CompileClient> {
     fn update_memory_files(&mut self, files: MemoryFiles, reset_shadow: bool) {
         // todo: is it safe to believe that the path is normalized?
         let now = std::time::SystemTime::now();
-        let files = FileChangeSet::new_insert(
+        let files = FileChangeSet::new_inserts(
             files
                 .files
                 .into_iter()
                 .map(|(path, content)| {
                     let path = Path::new(&path).to_owned();
                     let content = content.as_bytes().into();
-                    (path, Ok((now, content)))
+                    (path, Ok((now, content)).into(), now)
                 })
                 .collect(),
         );
@@ -220,7 +220,9 @@ impl TypstClient<CompileClient> {
 
     fn remove_shadow_files(&mut self, files: MemoryFilesShort) {
         // todo: is it safe to believe that the path is normalized?
-        let files = FileChangeSet::new_remove(files.files);
+        let now = std::time::SystemTime::now();
+        let files =
+            FileChangeSet::new_removes(files.files.into_iter().map(|path| (path, now)).collect());
         self.inner.add_memory_changes(MemoryEvent::Update(files))
     }
 }
