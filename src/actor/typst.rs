@@ -93,17 +93,18 @@ impl TypstActor {
     pub async fn run(self) {
         let (server, client) = self.inner.split();
         tokio::spawn(server.spawn());
-        tokio::spawn(async move {
-            let mut client = self.client.replace(client);
 
-            debug!("TypstActor: waiting for message");
-            while let Some(mail) = client.mailbox.recv().await {
-                client.process_mail(mail).await;
-            }
-            info!("TypstActor: exiting");
-        })
-        .await
-        .unwrap();
+        if self.client.inner.set(client).is_err() {
+            unreachable!();
+        }
+
+        let mut client = self.client;
+
+        debug!("TypstActor: waiting for message");
+        while let Some(mail) = client.mailbox.recv().await {
+            client.process_mail(mail).await;
+        }
+        info!("TypstActor: exiting");
     }
 }
 
