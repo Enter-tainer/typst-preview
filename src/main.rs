@@ -110,6 +110,12 @@ async fn main() {
         // TODO: set this back to Info
         .filter_module("typst_preview", log::LevelFilter::Debug)
         .filter_module("typst_ts", log::LevelFilter::Info)
+        // TODO: set this back to Info
+        .filter_module(
+            "typst_ts_compiler::service::compile",
+            log::LevelFilter::Debug,
+        )
+        .filter_module("typst_ts_compiler::service::watch", log::LevelFilter::Debug)
         .try_init();
     let arguments = CliArguments::parse();
     info!("Arguments: {:#?}", arguments);

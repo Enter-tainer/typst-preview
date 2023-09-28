@@ -1,14 +1,12 @@
-use std::{path::Path, sync::Arc};
+use std::sync::Arc;
 
 use crate::{MemoryFiles, MemoryFilesShort, SrcToDocJumpRequest};
 use log::{debug, error, info};
 use tokio::sync::{broadcast, mpsc, watch};
 use typst::{doc::Document, World};
 use typst_ts_compiler::service::CompileDriver;
-use typst_ts_compiler::service::{
-    CompileActor, CompileClient as TsCompileClient, CompileExporter, MemoryEvent,
-};
-use typst_ts_compiler::vfs::notify::FileChangeSet;
+use typst_ts_compiler::service::{CompileActor, CompileClient as TsCompileClient, CompileExporter};
+use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
 
 use super::render::RenderActorRequest;
 use super::{
@@ -205,9 +203,9 @@ impl TypstClient<CompileClient> {
                 .files
                 .into_iter()
                 .map(|(path, content)| {
-                    let path = Path::new(&path).to_owned();
                     let content = content.as_bytes().into();
-                    (path, Ok((now, content)).into(), now)
+                    // todo: cloning PathBuf -> Arc<Path>
+                    (path.into(), Ok((now, content)).into())
                 })
                 .collect(),
         );
@@ -220,9 +218,7 @@ impl TypstClient<CompileClient> {
 
     fn remove_shadow_files(&mut self, files: MemoryFilesShort) {
         // todo: is it safe to believe that the path is normalized?
-        let now = std::time::SystemTime::now();
-        let files =
-            FileChangeSet::new_removes(files.files.into_iter().map(|path| (path, now)).collect());
+        let files = FileChangeSet::new_removes(files.files.into_iter().map(From::from).collect());
         self.inner.add_memory_changes(MemoryEvent::Update(files))
     }
 }
