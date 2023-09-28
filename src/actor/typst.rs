@@ -29,7 +29,7 @@ type CompileClient = TsCompileClient<CompileService>;
 
 pub struct TypstActor {
     inner: CompileService,
-    client: TypstClient<()>,
+    client: TypstClient,
 }
 
 type MpScChannel<T> = (mpsc::UnboundedSender<T>, mpsc::UnboundedReceiver<T>);
@@ -82,7 +82,7 @@ impl TypstActor {
         Self {
             inner,
             client: TypstClient {
-                inner: (),
+                inner: once_cell::sync::OnceCell::new(),
                 mailbox,
                 doc_to_src_jump_sender,
                 src_to_doc_jump_sender,
@@ -108,8 +108,8 @@ impl TypstActor {
     }
 }
 
-struct TypstClient<T> {
-    inner: T,
+struct TypstClient {
+    inner: once_cell::sync::OnceCell<CompileClient>,
 
     mailbox: mpsc::UnboundedReceiver<TypstActorRequest>,
 
@@ -117,26 +117,18 @@ struct TypstClient<T> {
     src_to_doc_jump_sender: broadcast::Sender<WebviewActorRequest>,
 }
 
-impl<T> TypstClient<T> {
-    fn replace<U>(self, new: U) -> TypstClient<U> {
-        TypstClient {
-            inner: new,
-            mailbox: self.mailbox,
-
-            doc_to_src_jump_sender: self.doc_to_src_jump_sender,
-            src_to_doc_jump_sender: self.src_to_doc_jump_sender,
-        }
+impl TypstClient {
+    fn inner(&mut self) -> &mut CompileClient {
+        self.inner.get_mut().unwrap()
     }
-}
 
-impl TypstClient<CompileClient> {
     async fn process_mail(&mut self, mail: TypstActorRequest) {
         match mail {
             TypstActorRequest::DocToSrcJumpResolve(id) => {
                 debug!("TypstActor: processing doc2src: {:?}", id);
 
                 let res = self
-                    .inner
+                    .inner()
                     .resolve_doc_to_src_jump(id)
                     .await
                     .map_err(|err| {
@@ -155,7 +147,7 @@ impl TypstClient<CompileClient> {
                 debug!("TypstActor: processing src2doc: {:?}", req);
 
                 let res = self
-                    .inner
+                    .inner()
                     .resolve_src_to_doc_jump(req.filepath, req.line, req.character)
                     .await
                     .map_err(|err| {
@@ -210,7 +202,7 @@ impl TypstClient<CompileClient> {
                 })
                 .collect(),
         );
-        self.inner.add_memory_changes(if reset_shadow {
+        self.inner().add_memory_changes(if reset_shadow {
             MemoryEvent::Sync(files)
         } else {
             MemoryEvent::Update(files)
@@ -220,6 +212,6 @@ impl TypstClient<CompileClient> {
     fn remove_shadow_files(&mut self, files: MemoryFilesShort) {
         // todo: is it safe to believe that the path is normalized?
         let files = FileChangeSet::new_removes(files.files.into_iter().map(From::from).collect());
-        self.inner.add_memory_changes(MemoryEvent::Update(files))
+        self.inner().add_memory_changes(MemoryEvent::Update(files))
     }
 }
