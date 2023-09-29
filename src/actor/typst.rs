@@ -92,7 +92,7 @@ impl TypstActor {
 
     pub async fn run(self) {
         let (server, client) = self.inner.split();
-        tokio::spawn(server.spawn());
+        server.spawn().await;
 
         if self.client.inner.set(client).is_err() {
             unreachable!();
