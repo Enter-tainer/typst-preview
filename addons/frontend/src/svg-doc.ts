@@ -68,6 +68,10 @@ export class SvgDocument {
     this.patchQueue = [];
     this.partialRendering = false;
     this.currentScaleRatio = 1;
+    // if init scale == 1
+    // hide scrollbar if scale == 1
+    this.hookedElem.classList.add("hide-scrollbar-x");
+    document.body.classList.add("hide-scrollbar-x");
 
     /// Style fields
     this.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--typst-preview-background-color');
@@ -133,6 +137,15 @@ export class SvgDocument {
         const scrollX = event.pageX * (scrollFactor - 1);
         const scrollY = event.pageY * (scrollFactor - 1);
 
+        // hide scrollbar if scale == 1
+        if (Math.abs(scrollFactor - 1) < 1e-5) {
+          this.hookedElem.classList.add("hide-scrollbar-x");
+          document.body.classList.add("hide-scrollbar-x");
+        } else {
+          this.hookedElem.classList.remove("hide-scrollbar-x");
+          document.body.classList.remove("hide-scrollbar-x");
+        }
+
         // make sure the cursor is still on the same position
         window.scrollBy(scrollX, scrollY);
         // toggle scale change event
@@ -175,45 +188,59 @@ export class SvgDocument {
     const dataHeight = Number.parseFloat(svg.getAttribute("data-height")!);
     const appliedWidth = (dataWidth * scale).toString();
     const appliedHeight = (dataHeight * scale).toString();
+    const scaledWidth = Math.ceil(dataWidth * scale);
+    const scaledHeight = Math.ceil(dataHeight * scale);
 
     // set data applied width and height to memoize change
     if (svg.getAttribute("data-applied-width") !== appliedWidth) {
       svg.setAttribute("data-applied-width", appliedWidth);
-      svg.setAttribute("width", `${dataWidth * scale}`);
+      svg.setAttribute("width", `${scaledWidth}`);
     }
     if (svg.getAttribute("data-applied-height") !== appliedHeight) {
       svg.setAttribute("data-applied-height", appliedHeight);
-      svg.setAttribute("height", `${dataHeight * scale}`);
+      svg.setAttribute("height", `${scaledHeight}`);
     }
   }
 
   private decorateSvgElement(svg: SVGElement) {
     const { width: containerWidth } = this.cachedDOMState;
 
-    // todo: typst.ts return a ceil width so we miss 1px here
-    // after we fix this, we can set the factor to 0.01
-    const backgroundHideFactor = 1;
+    // the <rect> could only have integer width and height
+    // so we scale it by 100 to make it more accurate
+    const INNER_RECT_UNIT = 100;
+    const INNER_RECT_SCALE = 'scale(0.01)';
 
-    /// Prepare scale
-    // scale derived from svg width and container with.
-    const computedScale = containerWidth
-      ? containerWidth / this.kModule.doc_width
-      : 1;
-    // respect current scale ratio
-    const scale = this.currentScaleRatio * computedScale;
-
-    /// Retrieve original width, height and pages
-    const width = svg.getAttribute("width")!;
-    // const height = e.getAttribute("height")!;
+    /// Retrieve original pages
     const nextPages = Array.from(svg.children).filter(
       (x) => x.classList.contains("typst-page")
     );
 
+    /// Caclulate width
+    let maxWidth = 0;
+    for (let i = 0; i < nextPages.length; i++) {
+      const nextPage = nextPages[i];
+      const pageWidth = Number.parseFloat(nextPage.getAttribute("data-page-width")!);
+      maxWidth = Math.max(maxWidth, pageWidth);
+    }
+    if (maxWidth < 1e-5) {
+      maxWidth = 1;
+    }
+    // const width = e.getAttribute("width")!;
+    // const height = e.getAttribute("height")!;
+
+    /// Prepare scale
+    // scale derived from svg width and container with.
+    const computedScale = containerWidth
+      ? containerWidth / maxWidth
+      : 1;
+    // respect current scale ratio
+    const scale = this.currentScaleRatio * computedScale;
+
     /// Calculate new width, height
-    // 5px height margin, 0px width margin (it is buggy to add width margin)
+    // 5pt height margin, 0pt width margin (it is buggy to add width margin)
     const heightMargin = 5 * scale;
     const widthMargin = 0;
-    const newWidth = Number.parseFloat(width) + 2 * widthMargin;
+    const newWidth = maxWidth + 2 * widthMargin;
 
     /// Apply new pages
     let accumulatedHeight = 0;
@@ -232,16 +259,15 @@ export class SvgDocument {
       const translateAttr = `translate(${calculatedPaddedX}, ${calculatedPaddedY})`;
 
       /// Create inner rectangle
-      const INNER_RECT_UNIT = 100;
       const innerRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
       innerRect.setAttribute("class", "typst-page-inner");
       innerRect.setAttribute("data-page-width", pageWidth.toString());
       innerRect.setAttribute("data-page-height", pageHeight.toString());
-      innerRect.setAttribute("width", Math.floor((pageWidth - backgroundHideFactor) * INNER_RECT_UNIT).toString());
-      innerRect.setAttribute("height", Math.floor((pageHeight - backgroundHideFactor) * INNER_RECT_UNIT).toString());
+      innerRect.setAttribute("width", Math.floor((pageWidth * INNER_RECT_UNIT)).toString());
+      innerRect.setAttribute("height", Math.floor((pageHeight * INNER_RECT_UNIT)).toString());
       innerRect.setAttribute("x", "0");
       innerRect.setAttribute("y", "0");
-      innerRect.setAttribute("transform", `${translateAttr} scale(0.01)`);
+      innerRect.setAttribute("transform", `${translateAttr} ${INNER_RECT_SCALE}`);
       // white background
       innerRect.setAttribute("fill", "white");
       // It is quite ugly
@@ -284,17 +310,35 @@ export class SvgDocument {
 
     /// Update svg width, height information
     svg.setAttribute("viewBox", `0 0 ${newWidth} ${newHeight}`);
-    svg.setAttribute("width", `${newWidth}`);
-    svg.setAttribute("height", `${newHeight}`);
+    svg.setAttribute("width", `${Math.ceil(newWidth)}`);
+    svg.setAttribute("height", `${Math.ceil(newHeight)}`);
     svg.setAttribute("data-width", `${newWidth}`);
     svg.setAttribute("data-height", `${newHeight}`);
+  }
+
+  private get docWidth() {
+    const svg = this.hookedElem.firstElementChild!;
+
+    if (svg) {
+      let svgWidth = Number.parseFloat(
+        svg.getAttribute("data-width")! || svg.getAttribute("width")! || "1"
+      );
+      if (svgWidth < 1e-5) {
+        svgWidth = 1
+      }
+      return svgWidth;
+    }
+
+    return this.kModule.docWidth;
   }
 
   private toggleViewportChange() {
     const { width: containerWidth, boundingRect: containerBRect } = this.cachedDOMState;
     // scale derived from svg width and container with.
+    // svg.setAttribute("data-width", `${newWidth}`);
+
     const computedRevScale = containerWidth
-      ? this.kModule.doc_width / containerWidth
+      ? this.docWidth / containerWidth
       : 1;
     // respect current scale ratio
     const revScale = computedRevScale / this.currentScaleRatio;
