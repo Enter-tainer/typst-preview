@@ -51,21 +51,22 @@ pub struct CliArguments {
     pub input: PathBuf,
 }
 
+static NONE: &str = "None";
 static LONG_VERSION: Lazy<String> = Lazy::new(|| {
     format!(
         "
 Build Timestamp:     {}
 Build Git Discribe:  {}
-Commit SHA:          {:?}
-Commit Date:         {:?}
-Commit Branch:       {:?}
+Commit SHA:          {}
+Commit Date:         {}
+Commit Branch:       {}
 Cargo Target Triple: {}
 ",
         env!("VERGEN_BUILD_TIMESTAMP"),
         env!("VERGEN_GIT_DESCRIBE"),
-        option_env!("VERGEN_GIT_SHA"),
-        option_env!("VERGEN_GIT_COMMIT_TIMESTAMP"),
-        option_env!("VERGEN_GIT_BRANCH"),
+        option_env!("VERGEN_GIT_SHA").unwrap_or(NONE),
+        option_env!("VERGEN_GIT_COMMIT_TIMESTAMP").unwrap_or(NONE),
+        option_env!("VERGEN_GIT_BRANCH").unwrap_or(NONE),
         env!("VERGEN_CARGO_TARGET_TRIPLE"),
     )
 });
