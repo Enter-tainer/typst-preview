@@ -259,7 +259,6 @@ async fn main() {
     let static_file_addr = arguments.static_file_host;
     let data_plane_port = data_plane_port_rx.await.unwrap();
     let make_service = make_service_fn(|_| {
-        let data_plane_port = data_plane_port;
         async move {
             Ok::<_, hyper::http::Error>(service_fn(move |req| {
                 async move {

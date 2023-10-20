@@ -96,7 +96,7 @@ impl TypstActor {
         server.spawn().await;
 
         if self.client.inner.set(client).is_err() {
-            unreachable!();
+            panic!("TypstActor: failed to set client");
         }
 
         let mut client = self.client;
