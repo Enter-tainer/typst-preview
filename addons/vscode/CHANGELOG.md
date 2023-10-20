@@ -156,3 +156,15 @@ Add preview button
   - #125: Resizing the preview panel is not that laggy now.
 - Features:
   - #120: We now show page breaks and center pages horizontally. By default we will choose the `vscode-sideBar-background` color as the page break color. If it is not distinguishable from white, we will use rgb(82, 86, 89) instead. 
+
+## v0.8.2
+
+- Features:
+  - #142 The scroll position of the preview panel is now preserved when you switch between tabs.
+  - #133 We now provide a button to show log when the server crashes. This should make debugging easier. You may also use the command `typst-preview.showLog` to show the log.
+  - #129 A `--version` flag is now provided in the cli
+
+- Bug fixes:
+  - #137 Previously preview page might go blank when saving the file
+  - #130 Previously you cannot watch a file in `/tmp`
+  - #118 Previously the preview page might flash when you save the file
