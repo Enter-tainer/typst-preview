@@ -3,6 +3,7 @@ name = "typst-preview"
 version = "0.8.1"
 authors = ["The Typst Project Developers"]
 edition = "2021"
+build = "build.rs"
 
 [[bin]]
 name = "typst-preview"
@@ -50,6 +51,7 @@ futures = "0.3.28"
 serde = "1.0.188"
 hyper = { version = "0.14", features = ["full"] }
 
+
 [patch.crates-io]
 typst = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "c7e91e216310d5c8dca3eee8a23a64b3ede99e15" }
 typst-library = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "c7e91e216310d5c8dca3eee8a23a64b3ede99e15" }
@@ -69,7 +71,14 @@ typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = 
 clap = { version = "4.2.1", features = ["derive", "string"] }
 clap_complete = "4.2.0"
 clap_mangen = "0.2.10"
-
+vergen = { version = "8.2.5", features = [
+  "build",
+  "cargo",
+  "git",
+  "git2",
+  "rustc",
+] }
+anyhow = "1.0.75"
 [features]
 default = ["embed-fonts"]
 

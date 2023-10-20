@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
 use clap::{ArgAction, Parser};
-
+use once_cell::sync::Lazy;
 #[derive(Debug, Clone, Parser)]
-#[clap(name = "typst-preview", author)]
+#[clap(name = "typst-preview", author, version, about, long_version(LONG_VERSION.as_str()))]
 pub struct CliArguments {
     /// Add additional directories to search for fonts
     #[clap(long = "font-path", value_name = "DIR", action = ArgAction::Append, env = "TYPST_FONT_PATHS")]
@@ -50,3 +50,22 @@ pub struct CliArguments {
 
     pub input: PathBuf,
 }
+
+static LONG_VERSION: Lazy<String> = Lazy::new(|| {
+    format!(
+        "
+Build Timestamp:     {}
+Build Git Discribe:  {}
+Commit SHA:          {:?}
+Commit Date:         {:?}
+Commit Branch:       {:?}
+Cargo Target Triple: {}
+",
+        env!("VERGEN_BUILD_TIMESTAMP"),
+        env!("VERGEN_GIT_DESCRIBE"),
+        option_env!("VERGEN_GIT_SHA"),
+        option_env!("VERGEN_GIT_COMMIT_TIMESTAMP"),
+        option_env!("VERGEN_GIT_BRANCH"),
+        env!("VERGEN_CARGO_TARGET_TRIPLE"),
+    )
+});
