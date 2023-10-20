@@ -56,7 +56,7 @@ static LONG_VERSION: Lazy<String> = Lazy::new(|| {
     format!(
         "
 Build Timestamp:     {}
-Build Git Discribe:  {}
+Build Git Describe:  {}
 Commit SHA:          {}
 Commit Date:         {}
 Commit Branch:       {}
