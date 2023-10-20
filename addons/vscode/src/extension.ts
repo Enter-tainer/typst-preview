@@ -311,6 +311,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 			vscode.ViewColumn.Beside, // 显示在编辑器的哪一侧
 			{
 				enableScripts: true, // 启用 JS
+				retainContextWhenHidden: true,
 			}
 		);
 
