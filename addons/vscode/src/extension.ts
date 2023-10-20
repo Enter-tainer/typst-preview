@@ -179,9 +179,12 @@ function runServer(command: string, args: string[], outputChannel: vscode.Output
 	serverProcess.stderr.on('data', (data: Buffer) => {
 		outputChannel.append(data.toString());
 	});
-	serverProcess.on('exit', (code: any) => {
-		if (code !== null && code !== 0) {
-			vscode.window.showErrorMessage(`typst-preview process exited with code ${code}`);
+	serverProcess.on('exit', async (code: any) => {
+		if (code === null || code !== 0) {
+			const response = await vscode.window.showErrorMessage(`typst-preview process exited with code ${code}`, "Show Logs");
+			if (response === "Show Logs") {
+				outputChannel.show();
+			}
 		}
 		console.log(`child process exited with code ${code}`);
 	});
@@ -418,8 +421,11 @@ export function activate(context: vscode.ExtensionContext) {
 
 		panelScrollTo(activeEditor.document, activeEditor);
 	});
+	let showLogDisposable = vscode.commands.registerCommand('typst-preview.showLog', async () => {
+		outputChannel.show();
+	});
 
-	context.subscriptions.push(webviewDisposable, browserDisposable, syncDisposable);
+	context.subscriptions.push(webviewDisposable, browserDisposable, syncDisposable, showLogDisposable);
 	process.on('SIGINT', () => {
 		for (const serverProcess of serverProcesses) {
 			serverProcess.kill();
