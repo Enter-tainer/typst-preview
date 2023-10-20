@@ -47,6 +47,13 @@
         "description": "Scroll preview to current cursor position",
         "icon": "$(sync)",
         "when": "resourceLangId == typst && editorTextFocus"
+      },
+      {
+        "command": "typst-preview.showLog",
+        "title": "Typst Preview: Show Log",
+        "description": "Show typst-preview log",
+        "icon": "$(list-flat)",
+        "when": "resourceLangId == typst"
       }
     ],
     "menus": {
