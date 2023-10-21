@@ -180,7 +180,7 @@ function runServer(command: string, args: string[], outputChannel: vscode.Output
 		outputChannel.append(data.toString());
 	});
 	serverProcess.on('exit', async (code: any) => {
-		if (code === null || code !== 0) {
+		if (code !== null && code !== 0) {
 			const response = await vscode.window.showErrorMessage(`typst-preview process exited with code ${code}`, "Show Logs");
 			if (response === "Show Logs") {
 				outputChannel.show();
