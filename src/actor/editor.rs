@@ -6,8 +6,8 @@ use tokio::sync::mpsc;
 use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
 
 use crate::{
-    actor::typst::TypstActorRequest, DocToSrcJumpInfo, MemoryFiles, MemoryFilesShort,
-    SrcToDocJumpRequest,
+    actor::typst::TypstActorRequest, ChangeCursorPositionRequest, DocToSrcJumpInfo, MemoryFiles,
+    MemoryFilesShort, SrcToDocJumpRequest,
 };
 
 #[derive(Debug)]
@@ -25,6 +25,8 @@ pub struct EditorActor {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "event")]
 enum ControlPlaneMessage {
+    #[serde(rename = "changeCursorPosition")]
+    ChangeCursorPosition(ChangeCursorPositionRequest),
     #[serde(rename = "panelScrollTo")]
     SrcToDocJump(SrcToDocJumpRequest),
     #[serde(rename = "syncMemoryFiles")]
@@ -85,6 +87,10 @@ impl EditorActor {
                         continue;
                     };
                     match msg {
+                        ControlPlaneMessage::ChangeCursorPosition(cursor_info) => {
+                            debug!("EditorActor: received message from editor: {:?}", cursor_info);
+                            self.world_sender.send(TypstActorRequest::ChangeCursorPosition(cursor_info))
+                        }
                         ControlPlaneMessage::SrcToDocJump(jump_info) => {
                             debug!("EditorActor: received message from editor: {:?}", jump_info);
                             self.world_sender.send(TypstActorRequest::SrcToDocJumpResolve(jump_info))

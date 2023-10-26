@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{MemoryFiles, MemoryFilesShort, SrcToDocJumpRequest};
+use crate::{ChangeCursorPositionRequest, MemoryFiles, MemoryFilesShort, SrcToDocJumpRequest};
 use log::{debug, error, info};
 use tokio::sync::{broadcast, mpsc, watch};
 use typst::{doc::Document, World};
@@ -17,6 +17,7 @@ use super::{
 #[derive(Debug)]
 pub enum TypstActorRequest {
     DocToSrcJumpResolve(u64),
+    ChangeCursorPosition(ChangeCursorPositionRequest),
     SrcToDocJumpResolve(SrcToDocJumpRequest),
 
     SyncMemoryFiles(MemoryFiles),
@@ -141,6 +142,31 @@ impl TypstClient {
                     let _ = self
                         .doc_to_src_jump_sender
                         .send(EditorActorRequest::DocToSrcJump(info));
+                }
+            }
+            TypstActorRequest::ChangeCursorPosition(req) => {
+                debug!("TypstActor: processing src2doc: {:?}", req);
+
+                // todo: change name to resolve resolve src position
+                let res = self
+                    .inner()
+                    .resolve_src_to_doc_jump(req.filepath, req.line, req.character)
+                    .await
+                    .map_err(|err| {
+                        error!("TypstActor: failed to resolve cursor position: {:#}", err);
+                    })
+                    .ok()
+                    .flatten()
+                    .map(|jump_pos| SrcToDocJumpInfo {
+                        page_no: jump_pos.page.into(),
+                        x: jump_pos.point.x.to_pt(),
+                        y: jump_pos.point.y.to_pt(),
+                    });
+
+                if let Some(info) = res {
+                    let _ = self
+                        .src_to_doc_jump_sender
+                        .send(WebviewActorRequest::CursorPosition(info));
                 }
             }
             TypstActorRequest::SrcToDocJumpResolve(req) => {

@@ -85,6 +85,16 @@ window.onload = function () {
           window.handleTypstLocation(rootElem, page, x, y);
         }
         return;
+      } else if (message[0] === "cursor") {
+        // todo: aware height padding
+        const [page, x, y] = dec
+          .decode(message[1].buffer)
+          .split(" ")
+          .map(Number);
+        console.log("cursor", page, x, y);
+        svgDoc.setCursor(page, x, y);
+        svgDoc.addViewportChange(); // todo: synthesizing cursor event
+        return;
       } else if (message[0] === "partial-rendering") {
         console.log("Experimental feature: partial rendering enabled");
         svgDoc.setPartialRendering(true);

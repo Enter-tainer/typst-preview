@@ -94,14 +94,14 @@ function getProjectRoot(currentPath: string): string {
 const serverProcesses: Array<any> = [];
 const activeTask = new Map<vscode.TextDocument, TaskControlBlock>();
 
-const panelScrollTo = async (bindDocument: vscode.TextDocument, activeEditor: vscode.TextEditor) => {
+const reportPosition = async (bindDocument: vscode.TextDocument, activeEditor: vscode.TextEditor, event: string) => {
 	const tcb = activeTask.get(bindDocument);
 	if (tcb === undefined) {
 		return;
 	}
 	const { addonΠserver } = tcb;
 	const scrollRequest = {
-		'event': 'panelScrollTo',
+		event,
 		'filepath': bindDocument.uri.fsPath,
 		'line': activeEditor.selection.active.line,
 		'character': activeEditor.selection.active.character,
@@ -268,14 +268,20 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		}
 	});
 
+	addonΠserver.addEventListener("open", () => {
+		reportPosition(bindDocument, activeEditor, 'changeCursorPosition');
+	});
+
 	const src2docHandler = (e: vscode.TextEditorSelectionChangeEvent) => {
 		if (e.textEditor === activeEditor) {
 			const kind = e.kind;
 			console.log(`selection changed, kind: ${kind && vscode.TextEditorSelectionChangeKind[kind]}`);
 			if (kind === vscode.TextEditorSelectionChangeKind.Mouse) {
 				console.log(`selection changed, sending src2doc jump request`);
-				panelScrollTo(bindDocument, activeEditor);
+				reportPosition(bindDocument, activeEditor, 'panelScrollTo');
 			}
+
+			reportPosition(bindDocument, activeEditor, 'changeCursorPosition');
 		}
 	};
 	const src2docHandlerDispose =
@@ -419,7 +425,7 @@ export function activate(context: vscode.ExtensionContext) {
 			return;
 		}
 
-		panelScrollTo(activeEditor.document, activeEditor);
+		reportPosition(activeEditor.document, activeEditor, 'panelScrollTo');
 	});
 	let showLogDisposable = vscode.commands.registerCommand('typst-preview.showLog', async () => {
 		outputChannel.show();

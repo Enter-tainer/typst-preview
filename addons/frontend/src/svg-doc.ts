@@ -26,6 +26,8 @@ export class SvgDocument {
   private patchQueue: [string, string][];
   /// enable partial rendering
   private partialRendering: boolean;
+  /// enable cursor rendering
+  private enableCursor: boolean;
 
   /// There are two scales in this class: The real scale is to adjust the size
   /// of `hookedElem` to fit the svg. The virtual scale (scale ratio) is to let
@@ -41,6 +43,8 @@ export class SvgDocument {
   /// Style fields
 
   backgroundColor: string;
+
+  private cursorPosition: [number, number, number] | undefined;
 
   /// Cache fields
 
@@ -67,6 +71,7 @@ export class SvgDocument {
     this.currentContainerWidth = hookedElem.offsetWidth;
     this.patchQueue = [];
     this.partialRendering = false;
+    this.enableCursor = false;
     this.currentScaleRatio = 1;
     // if init scale == 1
     // hide scrollbar if scale == 1
@@ -75,6 +80,7 @@ export class SvgDocument {
 
     /// Style fields
     this.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--typst-preview-background-color');
+    this.cursorPosition = undefined;
 
     /// Cache fields
     this.cachedDOMState = {
@@ -283,6 +289,17 @@ export class SvgDocument {
       svg.insertBefore(innerRect, firstPage);
       if (!firstRect) {
         firstRect = innerRect;
+      }
+
+      if (this.enableCursor && this.cursorPosition && this.cursorPosition[0] === i + 1) {
+        const [_, x, y] = this.cursorPosition;
+        const cursor = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        cursor.setAttribute("cx", (x * INNER_RECT_UNIT).toString());
+        cursor.setAttribute("cy", (y * INNER_RECT_UNIT).toString());
+        cursor.setAttribute("r", (5 * scale * INNER_RECT_UNIT).toString());
+        cursor.setAttribute("fill", "#86C166CC");
+        cursor.setAttribute("transform", `${translateAttr} ${INNER_RECT_SCALE}`);
+        svg.appendChild(cursor);
       }
 
       accumulatedHeight = calculatedPaddedY + pageHeight + (i + 1 === nextPages.length ? 0 : heightMargin);
@@ -512,5 +529,9 @@ export class SvgDocument {
 
   setPartialRendering(partialRendering: boolean) {
     this.partialRendering = partialRendering;
+  }
+
+  setCursor(page: number, x: number, y: number) {
+    this.cursorPosition = [page, x, y];
   }
 }
