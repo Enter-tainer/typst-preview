@@ -48,16 +48,15 @@ export function wsMain() {
             openObserver: {
                 next: (e) => {
                     const sock = e.target;
-                    console.log('connection opened', sock);
+                    console.log('WebSocket connection opened', sock);
                     window.typstWebsocket = sock as any;
                     svgDoc.reset();
-                    window.typstWebsocket.binaryType = "arraybuffer";
                     window.typstWebsocket.send("current");
                 }
             },
             closeObserver: {
                 next: (e) => {
-                    console.log('connection closed', e);
+                    console.log('WebSocket connection closed', e);
                     subject.unsubscribe();
                     setTimeout(() => setupSocket(svgDoc), 1000);
                 }
@@ -89,14 +88,14 @@ export function wsMain() {
 
             const buffer = data;
             const messageData = new Uint8Array(buffer);
-            console.log('recv!!! ...................', messageData);
+            console.log('recv', messageData);
 
             const message_idx = messageData.indexOf(COMMA[0]);
             const message = [
                 dec.decode(messageData.slice(0, message_idx).buffer),
                 messageData.slice(message_idx + 1),
             ];
-            console.log(message[0], message[1].length);
+            // console.log(message[0], message[1].length);
 
             if (message[0] === "jump") {
                 // todo: aware height padding
