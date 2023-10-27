@@ -68,6 +68,15 @@ impl CompileSettings {
 
 pub use typst_ts_compiler::service::DocToSrcJumpInfo;
 
+#[derive(Debug, Deserialize)]
+pub struct ChangeCursorPositionRequest {
+    filepath: PathBuf,
+    line: usize,
+    /// fixme: character is 0-based, UTF-16 code unit.
+    /// We treat it as UTF-8 now.
+    character: usize,
+}
+
 // JSON.stringify({
 // 		'event': 'panelScrollTo',
 // 		'filepath': bindDocument.uri.fsPath,

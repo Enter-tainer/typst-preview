@@ -1,6 +1,6 @@
 import { patchSvgToContainer } from "./svg-patch";
 import { installEditorJumpToHandler } from "./svg-debug-info";
-import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer";
+import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 
 export interface ContainerDOMState {
   /// cached `hookedElem.offsetWidth` or `hookedElem.innerWidth`
@@ -42,6 +42,8 @@ export class SvgDocument {
 
   backgroundColor: string;
 
+  private cursorPosition: [number, number, number] | undefined;
+
   /// Cache fields
 
   /// cached state of container, default to retrieve state from `this.hookedElem`
@@ -75,6 +77,7 @@ export class SvgDocument {
 
     /// Style fields
     this.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--typst-preview-background-color');
+    this.cursorPosition = undefined;
 
     /// Cache fields
     this.cachedDOMState = {
@@ -283,6 +286,17 @@ export class SvgDocument {
       svg.insertBefore(innerRect, firstPage);
       if (!firstRect) {
         firstRect = innerRect;
+      }
+
+      if (this.cursorPosition && this.cursorPosition[0] === i + 1) {
+        const [_, x, y] = this.cursorPosition;
+        const cursor = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        cursor.setAttribute("cx", (x * INNER_RECT_UNIT).toString());
+        cursor.setAttribute("cy", (y * INNER_RECT_UNIT).toString());
+        cursor.setAttribute("r", (5 * scale * INNER_RECT_UNIT).toString());
+        cursor.setAttribute("fill", "#86C166CC");
+        cursor.setAttribute("transform", `${translateAttr} ${INNER_RECT_SCALE}`);
+        svg.appendChild(cursor);
       }
 
       accumulatedHeight = calculatedPaddedY + pageHeight + (i + 1 === nextPages.length ? 0 : heightMargin);
@@ -512,5 +526,9 @@ export class SvgDocument {
 
   setPartialRendering(partialRendering: boolean) {
     this.partialRendering = partialRendering;
+  }
+
+  setCursor(page: number, x: number, y: number) {
+    this.cursorPosition = [page, x, y];
   }
 }

@@ -9,19 +9,26 @@ use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
 use super::{render::RenderActorRequest, typst::TypstActorRequest};
 
 #[derive(Debug, Clone, Copy)]
-pub struct SrcToDocJumpInfo {
+pub struct CursorPosition {
     pub page_no: usize,
     pub x: f64,
     pub y: f64,
 }
 
+pub type SrcToDocJumpInfo = CursorPosition;
+
 #[derive(Debug, Clone, Copy)]
 pub enum WebviewActorRequest {
     SrcToDocJump(SrcToDocJumpInfo),
+    CursorPosition(CursorPosition),
 }
 
 fn src_to_doc_jump_to_string(page_no: usize, x: f64, y: f64) -> String {
     format!("jump,{page_no} {x} {y}")
+}
+
+fn cursor_position_to_string(page_no: usize, x: f64, y: f64) -> String {
+    format!("cursor,{page_no} {x} {y}")
 }
 
 pub struct WebviewActor {
@@ -76,6 +83,11 @@ impl WebviewActor {
                         WebviewActorRequest::SrcToDocJump(jump_info) => {
                             let SrcToDocJumpInfo { page_no, x, y } = jump_info;
                             let msg = src_to_doc_jump_to_string(page_no, x, y);
+                            self.webview_websocket_conn.send(Message::Binary(msg.into_bytes())).await.unwrap();
+                        }
+                        WebviewActorRequest::CursorPosition(jump_info) => {
+                            let SrcToDocJumpInfo { page_no, x, y } = jump_info;
+                            let msg = cursor_position_to_string(page_no, x, y);
                             self.webview_websocket_conn.send(Message::Binary(msg.into_bytes())).await.unwrap();
                         }
                     }
