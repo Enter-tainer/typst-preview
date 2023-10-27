@@ -251,6 +251,8 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 
 	const refreshStyle = vscode.workspace.getConfiguration().get<string>('typst-preview.refresh') || "onSave";
 	const scrollSyncMode = vscode.workspace.getConfiguration().get<ScrollSyncMode>('typst-preview.scrollSync') || "never";
+	//  todo: getConfiguration
+	const enableCursor = false;
 	const fontendPath = path.resolve(context.extensionPath, "out/frontend");
 	await watchEditorFiles();
 	const { serverProcess, controlPlanePort, dataPlanePort } = await launchCli(task.kind === 'browser');
@@ -268,9 +270,11 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		}
 	});
 
-	addonΠserver.addEventListener("open", () => {
-		reportPosition(bindDocument, activeEditor, 'changeCursorPosition');
-	});
+	if (enableCursor) {
+		addonΠserver.addEventListener("open", () => {
+			reportPosition(bindDocument, activeEditor, 'changeCursorPosition');
+		});
+	}
 
 	const src2docHandler = (e: vscode.TextEditorSelectionChangeEvent) => {
 		if (e.textEditor === activeEditor) {
@@ -281,7 +285,9 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 				reportPosition(bindDocument, activeEditor, 'panelScrollTo');
 			}
 
-			reportPosition(bindDocument, activeEditor, 'changeCursorPosition');
+			if (enableCursor) {
+				reportPosition(bindDocument, activeEditor, 'changeCursorPosition');
+			}
 		}
 	};
 	const src2docHandlerDispose =
