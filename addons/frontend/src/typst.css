@@ -8,6 +8,10 @@ body {
   background-color: #fff;
 }
 
+.hide-scrollbar-x {
+  overflow-x: hidden;
+}
+
 .typst-text {
   pointer-events: bounding-box;
 }
