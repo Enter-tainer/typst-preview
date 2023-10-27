@@ -251,8 +251,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 
 	const refreshStyle = vscode.workspace.getConfiguration().get<string>('typst-preview.refresh') || "onSave";
 	const scrollSyncMode = vscode.workspace.getConfiguration().get<ScrollSyncMode>('typst-preview.scrollSync') || "never";
-	//  todo: getConfiguration
-	const enableCursor = false;
+	const enableCursor = vscode.workspace.getConfiguration().get<boolean>('typst-preview.cursorIndicator') || false;
 	const fontendPath = path.resolve(context.extensionPath, "out/frontend");
 	await watchEditorFiles();
 	const { serverProcess, controlPlanePort, dataPlanePort } = await launchCli(task.kind === 'browser');

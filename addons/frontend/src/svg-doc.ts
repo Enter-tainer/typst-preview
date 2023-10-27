@@ -26,8 +26,6 @@ export class SvgDocument {
   private patchQueue: [string, string][];
   /// enable partial rendering
   private partialRendering: boolean;
-  /// enable cursor rendering
-  private enableCursor: boolean;
 
   /// There are two scales in this class: The real scale is to adjust the size
   /// of `hookedElem` to fit the svg. The virtual scale (scale ratio) is to let
@@ -71,7 +69,6 @@ export class SvgDocument {
     this.currentContainerWidth = hookedElem.offsetWidth;
     this.patchQueue = [];
     this.partialRendering = false;
-    this.enableCursor = false;
     this.currentScaleRatio = 1;
     // if init scale == 1
     // hide scrollbar if scale == 1
@@ -291,7 +288,7 @@ export class SvgDocument {
         firstRect = innerRect;
       }
 
-      if (this.enableCursor && this.cursorPosition && this.cursorPosition[0] === i + 1) {
+      if (this.cursorPosition && this.cursorPosition[0] === i + 1) {
         const [_, x, y] = this.cursorPosition;
         const cursor = document.createElementNS("http://www.w3.org/2000/svg", "circle");
         cursor.setAttribute("cx", (x * INNER_RECT_UNIT).toString());
