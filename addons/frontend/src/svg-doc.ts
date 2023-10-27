@@ -1,6 +1,6 @@
 import { patchSvgToContainer } from "./svg-patch";
 import { installEditorJumpToHandler } from "./svg-debug-info";
-import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer";
+import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 
 export interface ContainerDOMState {
   /// cached `hookedElem.offsetWidth` or `hookedElem.innerWidth`

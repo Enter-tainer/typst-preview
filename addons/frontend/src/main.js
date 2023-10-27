@@ -3,7 +3,7 @@ import { SvgDocument } from "./svg-doc";
 import {
   rendererBuildInfo,
   createTypstRenderer,
-} from "@myriaddreamin/typst.ts/dist/esm/renderer";
+} from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 import renderModule from "@myriaddreamin/typst-ts-renderer/pkg/typst_ts_renderer_bg.wasm?url";
 
 const enc = new TextEncoder("utf-8");
@@ -122,7 +122,7 @@ window.onload = function () {
     })
     .then(() => plugin.createModule())
     .then(async (kModule /* module kernel from wasm */) => {
-      console.log("plugin initialized, build info:", rendererBuildInfo());
+      console.log("plugin initialized, build info:", await rendererBuildInfo());
 
       // todo: plugin init and setup socket at the same time
       setupSocket(createSvgDocument(kModule));
