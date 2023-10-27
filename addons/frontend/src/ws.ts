@@ -3,11 +3,11 @@ import { SvgDocument } from "./svg-doc";
 import {
     rendererBuildInfo,
     createTypstRenderer,
-} from "@myriaddreamin/typst.ts/dist/esm/renderer";
+} from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 import renderModule from "@myriaddreamin/typst-ts-renderer/pkg/typst_ts_renderer_bg.wasm?url";
 import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 import { webSocket } from 'rxjs/webSocket';
-import { Subject, bufferTime } from "rxjs";
+import { Subject, bufferTime, filter, tap } from "rxjs";
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -73,8 +73,12 @@ export function wsMain() {
         });
 
         batchMessageChannel
-            .pipe(bufferTime(1))
-            .subscribe((dataList) => dataList.map(processMessage));
+            .pipe(bufferTime(16)) // 16ms stands for 60fps
+            .pipe(filter(arr => arr.length !== 0))
+            .pipe(tap(dataList => { console.log(`batch ${dataList.length} messages`) }))
+            .subscribe((dataList) => {
+                dataList.map(processMessage)
+            });
 
         function processMessage(data: ArrayBuffer) {
             if (!(data instanceof ArrayBuffer)) {
