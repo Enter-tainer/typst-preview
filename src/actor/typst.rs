@@ -49,7 +49,7 @@ impl TypstActor {
     pub fn set_up_channels() -> Channels {
         let typst_mailbox = mpsc::unbounded_channel();
         let doc_watch = watch::channel(None);
-        let renderer_mailbox = broadcast::channel(32);
+        let renderer_mailbox = broadcast::channel(1024);
         let doc_to_src_jump = mpsc::unbounded_channel();
         let src_to_doc_jump = broadcast::channel(32);
         Channels {
