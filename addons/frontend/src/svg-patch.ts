@@ -511,6 +511,8 @@ function initOrPatchSvgHeader(svg: SVGElement) {
   resourceHeader.setAttribute("viewBox", "0 0 0 0");
   resourceHeader.setAttribute("width", "0");
   resourceHeader.setAttribute("height", "0")
+  resourceHeader.style.opacity = "0";
+  resourceHeader.style.position = "absolute";
 
   /// Move resources
   for (let i = 0; i < SVG_HEADER_LENGTH; i++) {
@@ -519,7 +521,7 @@ function initOrPatchSvgHeader(svg: SVGElement) {
   }
 
   /// Insert resource header to somewhere visble to the svg element.
-  document.head.append(resourceHeader);
+  document.body.prepend(resourceHeader);
 }
 
 function patchSvgHeader(prev: SVGElement, next: SVGElement) {
