@@ -168,3 +168,13 @@ Add preview button
   - #137 Previously preview page might go blank when saving the file
   - #130 Previously you cannot watch a file in `/tmp`
   - #118 Previously the preview page might flash when you save the file
+
+## v0.8.3
+
+- Bug fixes:
+  - #152 Do not pop up error message when the preview window is closed
+  - #156 Fix shaking scrollbar/border
+  - #161 #151 Should not panic when the file is not exist
+
+- Features:
+  - #157 Add a rough indicator for the current cursor position in the preview panel. You may enable this in configuration.
