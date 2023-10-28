@@ -7,7 +7,7 @@ import {
 import renderModule from "@myriaddreamin/typst-ts-renderer/pkg/typst_ts_renderer_bg.wasm?url";
 import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 import { webSocket } from 'rxjs/webSocket';
-import { Subject, bufferTime, filter, tap } from "rxjs";
+import { Subject, buffer, debounceTime, tap } from "rxjs";
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -73,8 +73,7 @@ export function wsMain() {
         });
 
         batchMessageChannel
-            .pipe(bufferTime(16)) // 16ms stands for 60fps
-            .pipe(filter(arr => arr.length !== 0))
+            .pipe(buffer(batchMessageChannel.pipe(debounceTime(0))))
             .pipe(tap(dataList => { console.log(`batch ${dataList.length} messages`) }))
             .subscribe((dataList) => {
                 dataList.map(processMessage)
