@@ -486,6 +486,7 @@ export class SvgDocument {
         return;
       }
       try {
+        // console.log('patchQueue', JSON.stringify(this.patchQueue.map(x => x[0])));
         while (this.patchQueue.length > 0) {
           this.processQueue(this.patchQueue.shift()!);
           this.rescale();
