@@ -37,6 +37,10 @@ export class SvgDocument {
   private currentRealScale: number;
   /// "virtual" current scale of `hookedElem`
   private currentScaleRatio: number;
+  /// timeout for delayed viewport change
+  private vpTimeout: any;
+  /// sampled by last render time.
+  private sampledRenderTime: number;
 
   /// Style fields
 
@@ -70,6 +74,8 @@ export class SvgDocument {
     this.patchQueue = [];
     this.partialRendering = false;
     this.currentScaleRatio = 1;
+    this.vpTimeout = undefined;
+    this.sampledRenderTime = 0;
     // if init scale == 1
     // hide scrollbar if scale == 1
     this.hookedElem.classList.add("hide-scrollbar-x");
@@ -461,6 +467,7 @@ export class SvgDocument {
     /// perf event
     const d = (e: string, x: number, y: number) =>
       `${e} ${(y - x).toFixed(2)} ms`;
+    this.sampledRenderTime = t3 - t0;
     console.log(
       [
         d("parse", t0, t1),
@@ -517,8 +524,23 @@ export class SvgDocument {
     if (change[0] === "new") {
       this.patchQueue.splice(0, this.patchQueue.length);
     }
-    this.patchQueue.push(change);
-    this.triggerSvgUpdate();
+
+    const pushChange = () => {
+      this.vpTimeout = undefined;
+      this.patchQueue.push(change);
+      this.triggerSvgUpdate();
+    };
+
+    if (this.vpTimeout !== undefined) {
+      clearTimeout(this.vpTimeout);
+    }
+
+    if (change[0] === "viewport-change") {
+      // delay viewport change a bit
+      this.vpTimeout = setTimeout(pushChange, this.sampledRenderTime || 100);
+    } else {
+      pushChange();
+    }
   }
 
   addViewportChange() {
