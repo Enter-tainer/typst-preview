@@ -94,6 +94,15 @@ function getProjectRoot(currentPath: string): string {
 const serverProcesses: Array<any> = [];
 const activeTask = new Map<vscode.TextDocument, TaskControlBlock>();
 
+// If there is only one preview task, we treat the workspace as a multi-file project,
+// so `Sync preview with cursor` command in any file goes to the unique preview server.
+//
+// If there are more then one preview task, we assume user is previewing serval single file
+// document, only process sync command directly happened in those file.
+//
+// This is a compromise we made to support multi-file projects after evaluating performance,
+// effectiveness, and user needs.
+// See https://github.com/Enter-tainer/typst-preview/issues/164 for more detail.
 const reportPosition = async (bindDocument: vscode.TextDocument, activeEditor: vscode.TextEditor, event: string) => {
 	let tcb = activeTask.get(bindDocument);
 	if (tcb === undefined) {
@@ -279,6 +288,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		});
 	}
 
+	// See comment of reportPosition function to get context about multi-file project related logic.
 	const src2docHandler = (e: vscode.TextEditorSelectionChangeEvent) => {
 		if (e.textEditor === activeEditor || activeTask.size === 1) {
 			const editor = e.textEditor === activeEditor ? activeEditor : e.textEditor;
