@@ -17,6 +17,10 @@ const enum TypstSvgAttrs {
   /// The data-reuse attribute is used to this element is reused from specified element.
   /// The attribute content is the data-tid of the element.
   ReuseFrom = "data-reuse-from",
+
+  /// The data-bad-equality attribute is used to indicate that the element
+  /// doesn't have a good equality on hash.
+  BadEquality = "data-bad-equality",
 }
 
 /// Predicate that a xml element is a `<g>` element.
@@ -28,7 +32,15 @@ function isGElem(node: Element): node is SVGGElement {
 function equalElem(prev: SVGGElement, next: SVGGElement) {
   const prevDataTid = prev.getAttribute(TypstSvgAttrs.Tid);
   const nextDataTid = next.getAttribute(TypstSvgAttrs.Tid);
-  return prevDataTid && prevDataTid === nextDataTid;
+  /// Whenever we see a bad equality, we don't reuse it.
+  /// Note: there are three cases:
+  /// + prevBad && nextBad: we don't reuse it.
+  /// + !prevBad && nextBad: we don't reuse it.
+  /// + prevBad && !nextBad:
+  ///  Note: inferred that prevDataTid !== nextDataTid
+  ///  hence we still don't reuse it.
+  const nextBadEquality = next.getAttribute(TypstSvgAttrs.BadEquality);
+  return !nextBadEquality && prevDataTid && prevDataTid === nextDataTid;
 }
 
 /// Begin of View Interpretation
