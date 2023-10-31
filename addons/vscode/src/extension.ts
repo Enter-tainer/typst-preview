@@ -276,17 +276,20 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 			case "editorScrollTo": return await editorScrollTo(activeEditor, data /* JumpInfo */);
 			case "syncEditorChanges": return syncEditorChanges(addonΠserver);
 			case "compileStatus": {
-				if (data.status === "Compiling") {
+				if ("Compiling" in data) {
 					statusBarItem.text = "$(sync~spin) Compiling";
+					statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.prominentBackground");
 					statusBarItem.show();
-				} else if (data.status === "CompileSuccess") {
+				} else if ("CompileSuccess" in data) {
 					statusBarItem.text = "$(check) Compile Success";
+					statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.prominentBackground");
 					statusBarItem.show();
-				} else if (data.status === "CompileError") {
+				} else if ("CompileError" in data) {
 					statusBarItem.text = "$(error) Compile Error";
 					statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
 					statusBarItem.show();
 				}
+				break;
 			}
 			default: {
 				console.warn("unknown message", data);
@@ -450,7 +453,7 @@ export function activate(context: vscode.ExtensionContext) {
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
 	const outputChannel = vscode.window.createOutputChannel('typst-preview');
-	statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 0);
+	statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1000);
 	statusBarItem.name = 'typst-preview';
 	statusBarItem.command = 'typst-preview.showLog';
 	statusBarItem.tooltip = 'Typst Preview Status: Click to show logs';

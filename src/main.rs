@@ -171,18 +171,16 @@ async fn main() {
         typst_mailbox,
         doc_watch,
         renderer_mailbox,
-        doc_to_src_jump,
-        src_to_doc_jump,
-        diag,
+        editor_conn,
+        webview_conn,
     } = TypstActor::set_up_channels();
     let typst_actor = TypstActor::new(
         compiler_driver,
         typst_mailbox.1,
         doc_watch.0,
         renderer_mailbox.0.clone(),
-        doc_to_src_jump.0,
-        src_to_doc_jump.0.clone(),
-        diag.0,
+        editor_conn.0,
+        webview_conn.0.clone(),
     );
 
     tokio::spawn(typst_actor.run());
@@ -202,7 +200,7 @@ async fn main() {
             );
             let _ = data_plane_port_tx.send(listener.local_addr().unwrap().port());
             while let Ok((stream, _)) = listener.accept().await {
-                let src_to_doc_rx = src_to_doc_jump.0.subscribe();
+                let src_to_doc_rx = webview_conn.0.subscribe();
                 let typst_tx = typst_tx.clone();
                 let doc_watch_rx = doc_watch_rx.clone();
                 let mut conn = accept_connection(stream).await;
@@ -244,7 +242,7 @@ async fn main() {
     let control_plane_addr = arguments.control_plane_host;
     let control_plane_handle = {
         let typst_tx = typst_mailbox.0.clone();
-        let editor_rx = doc_to_src_jump.1;
+        let editor_rx = editor_conn.1;
         tokio::spawn(async move {
             let try_socket = TcpListener::bind(&control_plane_addr).await;
             let listener = try_socket.expect("Failed to bind");

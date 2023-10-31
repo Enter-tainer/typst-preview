@@ -20,7 +20,7 @@ pub enum CompileStatus {
 #[derive(Debug)]
 pub enum EditorActorRequest {
     DocToSrcJump(DocToSrcJumpInfo),
-    CompileStatus(CompileStatus)
+    CompileStatus(CompileStatus),
 }
 
 pub struct EditorActor {

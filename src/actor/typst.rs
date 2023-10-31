@@ -11,6 +11,7 @@ use typst_ts_compiler::service::{
 use typst_ts_compiler::service::{CompileDriver, WrappedCompiler};
 use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
 
+use super::editor::CompileStatus;
 use super::render::RenderActorRequest;
 use super::{
     editor::EditorActorRequest,
@@ -40,20 +41,17 @@ type MpScChannel<T> = (mpsc::UnboundedSender<T>, mpsc::UnboundedReceiver<T>);
 type WatchChannel<T> = (watch::Sender<T>, watch::Receiver<T>);
 type BroadcastChannel<T> = (broadcast::Sender<T>, broadcast::Receiver<T>);
 
-pub type Diag = Option<()>;
-
 pub struct Channels {
     pub typst_mailbox: MpScChannel<TypstActorRequest>,
     pub doc_watch: WatchChannel<Option<Arc<Document>>>,
     pub renderer_mailbox: BroadcastChannel<RenderActorRequest>,
-    pub doc_to_src_jump: MpScChannel<EditorActorRequest>,
-    pub src_to_doc_jump: BroadcastChannel<WebviewActorRequest>,
-    pub diag: MpScChannel<Diag>,
+    pub editor_conn: MpScChannel<EditorActorRequest>,
+    pub webview_conn: BroadcastChannel<WebviewActorRequest>,
 }
 
 struct Reporter<C> {
     inner: C,
-    sender: mpsc::UnboundedSender<Diag>,
+    sender: mpsc::UnboundedSender<EditorActorRequest>,
 }
 
 impl<C: Compiler> WrappedCompiler for Reporter<C> {
@@ -70,10 +68,14 @@ impl<C: Compiler> WrappedCompiler for Reporter<C> {
     fn wrap_compile(&mut self) -> SourceResult<Arc<Document>> {
         let doc = self.inner_mut().compile();
         if let Err(err) = &doc {
-            let _ = self.sender.send(Some(()));
+            let _ = self.sender.send(EditorActorRequest::CompileStatus(
+                CompileStatus::CompileError,
+            ));
             log::error!("TypstActor: compile error: {:?}", err);
         } else {
-            let _ = self.sender.send(None);
+            let _ = self.sender.send(EditorActorRequest::CompileStatus(
+                CompileStatus::CompileSuccess,
+            ));
         }
 
         doc
@@ -91,16 +93,14 @@ impl TypstActor {
         let typst_mailbox = mpsc::unbounded_channel();
         let doc_watch = watch::channel(None);
         let renderer_mailbox = broadcast::channel(1024);
-        let doc_to_src_jump = mpsc::unbounded_channel();
-        let src_to_doc_jump = broadcast::channel(32);
-        let diag = mpsc::unbounded_channel();
+        let editor_conn = mpsc::unbounded_channel();
+        let webview_conn = broadcast::channel(32);
         Channels {
             typst_mailbox,
             doc_watch,
             renderer_mailbox,
-            doc_to_src_jump,
-            src_to_doc_jump,
-            diag,
+            editor_conn,
+            webview_conn,
         }
     }
 
@@ -109,9 +109,8 @@ impl TypstActor {
         mailbox: mpsc::UnboundedReceiver<TypstActorRequest>,
         doc_sender: watch::Sender<Option<Arc<Document>>>,
         renderer_sender: broadcast::Sender<RenderActorRequest>,
-        doc_to_src_jump_sender: mpsc::UnboundedSender<EditorActorRequest>,
-        src_to_doc_jump_sender: broadcast::Sender<WebviewActorRequest>,
-        diag_sender: mpsc::UnboundedSender<Diag>,
+        editor_conn_sender: mpsc::UnboundedSender<EditorActorRequest>,
+        webview_conn_sender: broadcast::Sender<WebviewActorRequest>,
     ) -> Self {
         // CompileExporter + DynamicLayoutCompiler + WatchDriver
         let root = compiler_driver.world.root.clone();
@@ -124,7 +123,7 @@ impl TypstActor {
         );
         let driver = Reporter {
             inner: driver,
-            sender: diag_sender,
+            sender: editor_conn_sender.clone(),
         };
         let inner = CompileActor::new(driver, root.as_ref().to_owned()).with_watch(true);
 
@@ -133,8 +132,8 @@ impl TypstActor {
             client: TypstClient {
                 inner: once_cell::sync::OnceCell::new(),
                 mailbox,
-                doc_to_src_jump_sender,
-                src_to_doc_jump_sender,
+                editor_conn_sender,
+                webview_conn_sender,
             },
         }
     }
@@ -162,8 +161,8 @@ struct TypstClient {
 
     mailbox: mpsc::UnboundedReceiver<TypstActorRequest>,
 
-    doc_to_src_jump_sender: mpsc::UnboundedSender<EditorActorRequest>,
-    src_to_doc_jump_sender: broadcast::Sender<WebviewActorRequest>,
+    editor_conn_sender: mpsc::UnboundedSender<EditorActorRequest>,
+    webview_conn_sender: broadcast::Sender<WebviewActorRequest>,
 }
 
 impl TypstClient {
@@ -188,7 +187,7 @@ impl TypstClient {
 
                 if let Some(info) = res {
                     let _ = self
-                        .doc_to_src_jump_sender
+                        .editor_conn_sender
                         .send(EditorActorRequest::DocToSrcJump(info));
                 }
             }
@@ -213,7 +212,7 @@ impl TypstClient {
 
                 if let Some(info) = res {
                     let _ = self
-                        .src_to_doc_jump_sender
+                        .webview_conn_sender
                         .send(WebviewActorRequest::CursorPosition(info));
                 }
             }
@@ -237,7 +236,7 @@ impl TypstClient {
 
                 if let Some(info) = res {
                     let _ = self
-                        .src_to_doc_jump_sender
+                        .webview_conn_sender
                         .send(WebviewActorRequest::SrcToDocJump(info));
                 }
             }
