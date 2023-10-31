@@ -121,10 +121,6 @@ jobs:
           yarn
           yarn run compile
         working-directory: ./addons/vscode
-      - name: copy preview icon font
-        run: |
-          cp preview.woff out/
-        working-directory: ./addons/vscode
       - name: build server binary
         run: |
           cargo build --release -p typst-preview --target $RUST_TARGET
