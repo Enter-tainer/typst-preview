@@ -2,7 +2,7 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 import { ChildProcessWithoutNullStreams } from 'child_process';
-import { spawn, sync as spawnSync } from 'cross-spawn';
+import { spawn } from 'cross-spawn';
 import { readFile } from 'fs/promises';
 import * as path from 'path';
 import { WebSocket } from 'ws';
@@ -94,10 +94,23 @@ function getProjectRoot(currentPath: string): string {
 const serverProcesses: Array<any> = [];
 const activeTask = new Map<vscode.TextDocument, TaskControlBlock>();
 
+// If there is only one preview task, we treat the workspace as a multi-file project,
+// so `Sync preview with cursor` command in any file goes to the unique preview server.
+//
+// If there are more then one preview task, we assume user is previewing serval single file
+// document, only process sync command directly happened in those file.
+//
+// This is a compromise we made to support multi-file projects after evaluating performance,
+// effectiveness, and user needs.
+// See https://github.com/Enter-tainer/typst-preview/issues/164 for more detail.
 const reportPosition = async (bindDocument: vscode.TextDocument, activeEditor: vscode.TextEditor, event: string) => {
-	const tcb = activeTask.get(bindDocument);
+	let tcb = activeTask.get(bindDocument);
 	if (tcb === undefined) {
-		return;
+		if (activeTask.size === 1) {
+			tcb = Array.from(activeTask.values())[0];
+		} else {
+			return;
+		}
 	}
 	const { addonΠserver } = tcb;
 	const scrollRequest = {
@@ -275,17 +288,21 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		});
 	}
 
+	// See comment of reportPosition function to get context about multi-file project related logic.
 	const src2docHandler = (e: vscode.TextEditorSelectionChangeEvent) => {
-		if (e.textEditor === activeEditor) {
+		if (e.textEditor === activeEditor || activeTask.size === 1) {
+			const editor = e.textEditor === activeEditor ? activeEditor : e.textEditor;
+			const doc = e.textEditor === activeEditor ? bindDocument : e.textEditor.document;
+
 			const kind = e.kind;
 			console.log(`selection changed, kind: ${kind && vscode.TextEditorSelectionChangeKind[kind]}`);
 			if (kind === vscode.TextEditorSelectionChangeKind.Mouse) {
 				console.log(`selection changed, sending src2doc jump request`);
-				reportPosition(bindDocument, activeEditor, 'panelScrollTo');
+				reportPosition(doc, editor, 'panelScrollTo');
 			}
 
 			if (enableCursor) {
-				reportPosition(bindDocument, activeEditor, 'changeCursorPosition');
+				reportPosition(doc, editor, 'changeCursorPosition');
 			}
 		}
 	};
