@@ -10,9 +10,17 @@ use crate::{
     MemoryFilesShort, SrcToDocJumpRequest,
 };
 
+#[derive(Debug, Serialize, Deserialize)]
+pub enum CompileStatus {
+    Compiling,
+    CompileSuccess,
+    CompileError,
+}
+
 #[derive(Debug)]
 pub enum EditorActorRequest {
     DocToSrcJump(DocToSrcJumpInfo),
+    CompileStatus(CompileStatus),
 }
 
 pub struct EditorActor {
@@ -44,6 +52,8 @@ enum ControlPlaneResponse {
     EditorScrollTo(DocToSrcJumpInfo),
     #[serde(rename = "syncEditorChanges")]
     SyncEditorChanges(()),
+    #[serde(rename = "compileStatus")]
+    CompileStatus(CompileStatus),
 }
 
 impl EditorActor {
@@ -76,6 +86,14 @@ impl EditorActor {
                                 serde_json::to_string(&ControlPlaneResponse::EditorScrollTo(jump_info)).unwrap(),
                             )).await else {
                                 warn!("EditorActor: failed to send DocToSrcJump message to editor");
+                                break;
+                            };
+                        },
+                        EditorActorRequest::CompileStatus(status) => {
+                            let Ok(_) = self.editor_websocket_conn.send(Message::Text(
+                                serde_json::to_string(&ControlPlaneResponse::CompileStatus(status)).unwrap(),
+                            )).await else {
+                                warn!("EditorActor: failed to send CompileStatus message to editor");
                                 break;
                             };
                         }

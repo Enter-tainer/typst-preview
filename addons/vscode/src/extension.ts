@@ -275,6 +275,22 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		switch (data.event) {
 			case "editorScrollTo": return await editorScrollTo(activeEditor, data /* JumpInfo */);
 			case "syncEditorChanges": return syncEditorChanges(addonΠserver);
+			case "compileStatus": {
+				if ("Compiling" in data) {
+					statusBarItem.text = "$(sync~spin) Compiling";
+					statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.prominentBackground");
+					statusBarItem.show();
+				} else if ("CompileSuccess" in data) {
+					statusBarItem.text = "$(check) Compile Success";
+					statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.prominentBackground");
+					statusBarItem.show();
+				} else if ("CompileError" in data) {
+					statusBarItem.text = "$(error) Compile Error";
+					statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
+					statusBarItem.show();
+				}
+				break;
+			}
 			default: {
 				console.warn("unknown message", data);
 				break;
@@ -427,7 +443,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 	};
 };
 
-
+let statusBarItem: vscode.StatusBarItem;
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
@@ -437,6 +453,10 @@ export function activate(context: vscode.ExtensionContext) {
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
 	const outputChannel = vscode.window.createOutputChannel('typst-preview');
+	statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
+	statusBarItem.name = 'typst-preview';
+	statusBarItem.command = 'typst-preview.showLog';
+	statusBarItem.tooltip = 'Typst Preview Status: Click to show logs';
 
 	let webviewDisposable = vscode.commands.registerCommand('typst-preview.preview', launchPrologue('webview'));
 	let browserDisposable = vscode.commands.registerCommand('typst-preview.browser', launchPrologue('browser'));
@@ -453,7 +473,7 @@ export function activate(context: vscode.ExtensionContext) {
 		outputChannel.show();
 	});
 
-	context.subscriptions.push(webviewDisposable, browserDisposable, syncDisposable, showLogDisposable);
+	context.subscriptions.push(webviewDisposable, browserDisposable, syncDisposable, showLogDisposable, statusBarItem);
 	process.on('SIGINT', () => {
 		for (const serverProcess of serverProcesses) {
 			serverProcess.kill();
