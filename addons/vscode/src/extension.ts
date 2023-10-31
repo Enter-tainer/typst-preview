@@ -281,11 +281,11 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 					statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.prominentBackground");
 					statusBarItem.show();
 				} else if ("CompileSuccess" in data) {
-					statusBarItem.text = "$(check) Compile Success";
+					statusBarItem.text = "$(typst-guy)";
 					statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.prominentBackground");
 					statusBarItem.show();
 				} else if ("CompileError" in data) {
-					statusBarItem.text = "$(error) Compile Error";
+					statusBarItem.text = "$(typst-guy)";
 					statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
 					statusBarItem.show();
 				}
