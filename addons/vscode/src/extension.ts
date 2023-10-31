@@ -453,7 +453,7 @@ export function activate(context: vscode.ExtensionContext) {
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
 	const outputChannel = vscode.window.createOutputChannel('typst-preview');
-	statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1000);
+	statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
 	statusBarItem.name = 'typst-preview';
 	statusBarItem.command = 'typst-preview.showLog';
 	statusBarItem.tooltip = 'Typst Preview Status: Click to show logs';
