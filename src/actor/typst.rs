@@ -3,9 +3,12 @@ use std::sync::Arc;
 use crate::{ChangeCursorPositionRequest, MemoryFiles, MemoryFilesShort, SrcToDocJumpRequest};
 use log::{debug, error, info};
 use tokio::sync::{broadcast, mpsc, watch};
+use typst::diag::SourceResult;
 use typst::{doc::Document, World};
-use typst_ts_compiler::service::CompileDriver;
-use typst_ts_compiler::service::{CompileActor, CompileClient as TsCompileClient, CompileExporter};
+use typst_ts_compiler::service::{
+    CompileActor, CompileClient as TsCompileClient, CompileExporter, Compiler, WorldExporter,
+};
+use typst_ts_compiler::service::{CompileDriver, WrappedCompiler};
 use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
 
 use super::render::RenderActorRequest;
@@ -25,7 +28,7 @@ pub enum TypstActorRequest {
     RemoveMemoryFiles(MemoryFilesShort),
 }
 
-type CompileService = CompileActor<CompileExporter<CompileDriver>>;
+type CompileService = CompileActor<Reporter<CompileExporter<CompileDriver>>>;
 type CompileClient = TsCompileClient<CompileService>;
 
 pub struct TypstActor {
@@ -37,12 +40,50 @@ type MpScChannel<T> = (mpsc::UnboundedSender<T>, mpsc::UnboundedReceiver<T>);
 type WatchChannel<T> = (watch::Sender<T>, watch::Receiver<T>);
 type BroadcastChannel<T> = (broadcast::Sender<T>, broadcast::Receiver<T>);
 
+pub type Diag = Option<()>;
+
 pub struct Channels {
     pub typst_mailbox: MpScChannel<TypstActorRequest>,
     pub doc_watch: WatchChannel<Option<Arc<Document>>>,
     pub renderer_mailbox: BroadcastChannel<RenderActorRequest>,
     pub doc_to_src_jump: MpScChannel<EditorActorRequest>,
     pub src_to_doc_jump: BroadcastChannel<WebviewActorRequest>,
+    pub diag: MpScChannel<Diag>,
+}
+
+struct Reporter<C> {
+    inner: C,
+    sender: mpsc::UnboundedSender<Diag>,
+}
+
+impl<C: Compiler> WrappedCompiler for Reporter<C> {
+    type Compiler = C;
+
+    fn inner(&self) -> &Self::Compiler {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut Self::Compiler {
+        &mut self.inner
+    }
+
+    fn wrap_compile(&mut self) -> SourceResult<Arc<Document>> {
+        let doc = self.inner_mut().compile();
+        if let Err(err) = &doc {
+            let _ = self.sender.send(Some(()));
+            log::error!("TypstActor: compile error: {:?}", err);
+        } else {
+            let _ = self.sender.send(None);
+        }
+
+        doc
+    }
+}
+
+impl<C: Compiler + WorldExporter> WorldExporter for Reporter<C> {
+    fn export(&mut self, output: Arc<typst::doc::Document>) -> SourceResult<()> {
+        self.inner.export(output)
+    }
 }
 
 impl TypstActor {
@@ -52,12 +93,14 @@ impl TypstActor {
         let renderer_mailbox = broadcast::channel(1024);
         let doc_to_src_jump = mpsc::unbounded_channel();
         let src_to_doc_jump = broadcast::channel(32);
+        let diag = mpsc::unbounded_channel();
         Channels {
             typst_mailbox,
             doc_watch,
             renderer_mailbox,
             doc_to_src_jump,
             src_to_doc_jump,
+            diag,
         }
     }
 
@@ -68,6 +111,7 @@ impl TypstActor {
         renderer_sender: broadcast::Sender<RenderActorRequest>,
         doc_to_src_jump_sender: mpsc::UnboundedSender<EditorActorRequest>,
         src_to_doc_jump_sender: broadcast::Sender<WebviewActorRequest>,
+        diag_sender: mpsc::UnboundedSender<Diag>,
     ) -> Self {
         // CompileExporter + DynamicLayoutCompiler + WatchDriver
         let root = compiler_driver.world.root.clone();
@@ -78,6 +122,10 @@ impl TypstActor {
                 Ok(())
             },
         );
+        let driver = Reporter {
+            inner: driver,
+            sender: diag_sender,
+        };
         let inner = CompileActor::new(driver, root.as_ref().to_owned()).with_watch(true);
 
         Self {

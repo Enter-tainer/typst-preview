@@ -173,6 +173,7 @@ async fn main() {
         renderer_mailbox,
         doc_to_src_jump,
         src_to_doc_jump,
+        diag,
     } = TypstActor::set_up_channels();
     let typst_actor = TypstActor::new(
         compiler_driver,
@@ -181,6 +182,7 @@ async fn main() {
         renderer_mailbox.0.clone(),
         doc_to_src_jump.0,
         src_to_doc_jump.0.clone(),
+        diag.0,
     );
 
     tokio::spawn(typst_actor.run());
