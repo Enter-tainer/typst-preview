@@ -57,6 +57,7 @@ typst = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.t
 typst-library = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.ts-v0.9.0" }
 typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.ts-v0.9.0" }
 typst-ide = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.ts-v0.9.0" }
+hayagriva = { git = "https://github.com/Myriad-Dreamin/hayagriva.git", branch = "typst.ts-v0.9.0" }
 typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "d698d81324abdefe253bb39270d4a6052a0f6d3e", package = "typst-ts-svg-exporter" }
 typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "d698d81324abdefe253bb39270d4a6052a0f6d3e", package = "typst-ts-core" }
 typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "d698d81324abdefe253bb39270d4a6052a0f6d3e", package = "typst-ts-compiler" }
