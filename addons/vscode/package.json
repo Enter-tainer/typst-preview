@@ -18,6 +18,15 @@
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
+    "icons": {
+      "typst-guy": {
+        "description": "typst guy",
+        "default": {
+          "fontPath": "./preview.woff",
+          "fontCharacter": "A"
+        }
+      }
+    },
     "languages": [
       {
         "id": "typst",

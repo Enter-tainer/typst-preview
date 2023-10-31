@@ -55,6 +55,15 @@
 					"${workspaceFolder}/addons/vscode/out/"
 				]
 			}
+		},
+		{
+			"label": "Copy Icon",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"${workspaceFolder}/addons/vscode/preview.woff",
+				"${workspaceFolder}/addons/vscode/out/"
+			]
 		}
 	]
 }
