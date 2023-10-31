@@ -14,8 +14,8 @@ bench = false
 doc = false
 
 [dependencies]
-typst = "0.8.0"
-typst-library = "0.8.0"
+typst = "0.9.0"
+typst-library = "0.9.0"
 typst-ts-svg-exporter = "0.4.0-rc7"
 typst-ts-core = { version = "0.4.0-rc7", default-features = false, features = [
   "flat-vector",
@@ -53,16 +53,18 @@ hyper = { version = "0.14", features = ["full"] }
 
 
 [patch.crates-io]
-typst = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "c7e91e216310d5c8dca3eee8a23a64b3ede99e15" }
-typst-library = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "c7e91e216310d5c8dca3eee8a23a64b3ede99e15" }
-typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "c7e91e216310d5c8dca3eee8a23a64b3ede99e15" }
-typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "2e59fe654d1989f484887c03a8cdb5e8d0e771f6", package = "typst-ts-svg-exporter" }
-typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "2e59fe654d1989f484887c03a8cdb5e8d0e771f6", package = "typst-ts-core" }
-typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "2e59fe654d1989f484887c03a8cdb5e8d0e771f6", package = "typst-ts-compiler" }
+typst = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.ts-v0.9.0" }
+typst-library = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.ts-v0.9.0" }
+typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.ts-v0.9.0" }
+hayagriva = { git = "https://github.com/Myriad-Dreamin/hayagriva.git", branch = "typst.ts-v0.9.0" }
+typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "7871cb8e7135351951d8fe5e63eccb1883e8342e", package = "typst-ts-svg-exporter" }
+typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "7871cb8e7135351951d8fe5e63eccb1883e8342e", package = "typst-ts-core" }
+typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "7871cb8e7135351951d8fe5e63eccb1883e8342e", package = "typst-ts-compiler" }
 
 # typst = { path = "../../rust/typst/crates/typst" }
 # typst-library = { path = "../../rust/typst/crates/typst-library" }
 # typst-syntax = { path = "../../rust/typst/crates/typst-syntax" }
+# hayagriva = { path = "../../rust/hayagriva" }
 # typst-ts-svg-exporter = { path = "../../rust/typst.ts/exporter/svg" }
 # typst-ts-compiler = { path = "../../rust/typst.ts/compiler" }
 # typst-ts-core = { path = "../../rust/typst.ts/core" }

@@ -50,11 +50,11 @@ svg {
 }
 
 .image_glyph image,
-.outline_glyph path {
+.outline_glyph path, path.outline_glyph {
   transform: matrix(1, 0, 0, 1, var(--o), 0);
 }
 
-.outline_glyph path {
+.outline_glyph path, path.outline_glyph {
   fill: var(--glyph_fill);
 }
 
