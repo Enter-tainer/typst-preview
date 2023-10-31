@@ -209,3 +209,13 @@ Add preview button
 
 - Features:
   - #157 Add a rough indicator for the current cursor position in the preview panel. You may enable this in configuration.
+
+### v0.9.0
+
+- Features:
+  - Update to typst v0.9.0
+  - Add a status indicator in status bar. When compile fails, it becomes red. Clicking on it will show the error message.
+
+- Bug fixes:
+  - #143 Scrolling is not that laggy now
+  - #159 Fix a clip path bug
