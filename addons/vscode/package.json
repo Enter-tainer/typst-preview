@@ -149,6 +149,7 @@
     "build:frontend": "cd ../frontend && yarn run build && cd ../vscode && rimraf ./out/frontend/ && cpr ../frontend/dist/ ./out/frontend/",
     "vscode:prepublish": "yarn run compile",
     "compile": "tsc -p ./ && yarn run build:frontend",
+    "build": "yarn run compile",
     "watch": "tsc -watch -p ./",
     "pretest": "yarn run compile && yarn run lint",
     "package": "vsce package",
@@ -156,6 +157,7 @@
     "test": "node ./out/test/runTest.js"
   },
   "devDependencies": {
+    "typst-preview-frontend": "^0",
     "@types/cross-spawn": "^6.0.2",
     "@types/glob": "^8.1.0",
     "@types/mocha": "^10.0.1",
