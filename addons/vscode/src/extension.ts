@@ -276,15 +276,15 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 			case "editorScrollTo": return await editorScrollTo(activeEditor, data /* JumpInfo */);
 			case "syncEditorChanges": return syncEditorChanges(addonΠserver);
 			case "compileStatus": {
-				if ("Compiling" in data) {
-					statusBarItem.text = "$(sync~spin) Compiling";
+				if (data.kind === "Compiling") {
+					statusBarItem.text = "$(sync~spin)";
 					statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.prominentBackground");
 					statusBarItem.show();
-				} else if ("CompileSuccess" in data) {
+				} else if (data.kind === "CompileSuccess") {
 					statusBarItem.text = "$(typst-guy)";
 					statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.prominentBackground");
 					statusBarItem.show();
-				} else if ("CompileError" in data) {
+				} else if (data.kind === "CompileError") {
 					statusBarItem.text = "$(typst-guy)";
 					statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
 					statusBarItem.show();
