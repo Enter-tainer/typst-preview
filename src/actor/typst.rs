@@ -66,6 +66,7 @@ impl<C: Compiler> WrappedCompiler for Reporter<C> {
     }
 
     fn wrap_compile(&mut self) -> SourceResult<Arc<Document>> {
+        let _ = self.sender.send(EditorActorRequest::CompileStatus(CompileStatus::Compiling));
         let doc = self.inner_mut().compile();
         if let Err(err) = &doc {
             let _ = self.sender.send(EditorActorRequest::CompileStatus(

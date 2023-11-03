@@ -17,6 +17,37 @@ async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: stri
 	return fileContents;
 }
 
+function statusBarItemProcess(event: "Compiling" | "CompileSuccess" | "CompileError") {
+	const style = vscode.workspace.getConfiguration().get<string>('typst-preview.statusBarIndicator') || "compact";
+	if (statusBarItem) {
+		if (event === "Compiling") {
+			if (style === "compact") {
+				statusBarItem.text = "$(sync~spin)";
+			} else if (style === "full") {
+				statusBarItem.text = "$(sync~spin) Compiling";
+			}
+			statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.prominentBackground");
+			statusBarItem.show();
+		} else if (event === "CompileSuccess") {
+			if (style === "compact") {
+				statusBarItem.text = "$(typst-guy)";
+			} else if (style === "full") {
+				statusBarItem.text = "$(typst-guy) Compile Success";
+			}
+			statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.prominentBackground");
+			statusBarItem.show();
+		} else if (event === "CompileError") {
+			if (style === "compact") {
+				statusBarItem.text = "$(typst-guy)";
+			} else if (style === "full") {
+				statusBarItem.text = "$(typst-guy) Compile Error";
+			}
+			statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
+			statusBarItem.show();
+		}
+	}
+}
+
 export async function getCliPath(extensionPath?: string): Promise<string> {
 	const state = getCliPath as unknown as any;
 	(!state.BINARY_NAME) && (state.BINARY_NAME = "typst-preview");
@@ -276,19 +307,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 			case "editorScrollTo": return await editorScrollTo(activeEditor, data /* JumpInfo */);
 			case "syncEditorChanges": return syncEditorChanges(addonΠserver);
 			case "compileStatus": {
-				if ("Compiling" in data) {
-					statusBarItem.text = "$(sync~spin) Compiling";
-					statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.prominentBackground");
-					statusBarItem.show();
-				} else if ("CompileSuccess" in data) {
-					statusBarItem.text = "$(typst-guy)";
-					statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.prominentBackground");
-					statusBarItem.show();
-				} else if ("CompileError" in data) {
-					statusBarItem.text = "$(typst-guy)";
-					statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
-					statusBarItem.show();
-				}
+				statusBarItemProcess(data.kind);
 				break;
 			}
 			default: {
