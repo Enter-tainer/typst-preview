@@ -128,6 +128,19 @@
           "description": "(Experimental) Show typst cursor indicator in preview.",
           "type": "boolean",
           "default": false
+        },
+        "typst-preview.statusBarIndicator": {
+          "description": "Style of status bar indicator for typst-preview.",
+          "type": "string",
+          "enum": [
+            "full",
+            "compact"
+          ],
+          "default": "compact",
+          "enumDescriptions": [
+            "Show full status bar indicator ($(statusBarTypstPreview) Compile Success)",
+            "Show compact status bar indicator ($(statusBarTypstPreview))"
+          ]
         }
       }
     }
