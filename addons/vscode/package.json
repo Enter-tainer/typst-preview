@@ -138,8 +138,8 @@
           ],
           "default": "compact",
           "enumDescriptions": [
-            "Show full status bar indicator ($(statusBarTypstPreview) Compile Success)",
-            "Show compact status bar indicator ($(statusBarTypstPreview))"
+            "Show full status bar indicator (ICON Compile Success)",
+            "Show compact status bar indicator (ICON)"
           ]
         }
       }
