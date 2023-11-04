@@ -17,6 +17,7 @@ The editor extension mainly does these things:
 + _In memory editing_: The editor extension should send dirty document to the preview server, without saving it to the disk. This is the most important part of the editor extension. With this, Typst-Preview can get the content of the document and render it every time when user types something.
 + _Source to preview jumping_: This is not necessary, but it's a nice feature to have. With this, the preview panel will be scrolled to the corresponding position when user clicks on the source code.
 + _Preview to source jumping_: This is quite similar to the previous one. With this, the source code will be scrolled to the corresponding position when user clicks on the preview panel.
++ _Compile status reporting_: With this, the preview server can report the compile status to the editor extension. The editor extension can show the compile status to the user.
 
 == In memory editing
 
@@ -109,6 +110,23 @@ Example:
 }
 ```
 
+=== Compile Status Reporting
+
+To implement compile status reporting, the editor extension act on `compileStatus` event. The `event` field should be `compileStatus`. The `kind` field is the compile status. The `kind` field can be one of the following values:
+
+- `Compiling`
+- `CompileSuccess`
+- `CompileError`
+
+Example:
+
+```json
+{
+  "event": "compileStatus",
+  "kind": "Compiling"
+}
+```
+
 
 == References
 
@@ -159,5 +177,12 @@ pub struct DocToSrcJumpInfo {
     filepath: String,
     start: Option<(usize, usize)>, // row, column
     end: Option<(usize, usize)>,
+}
+
+#[serde(tag = "kind", content = "data")]
+pub enum CompileStatus {
+    Compiling,
+    CompileSuccess,
+    CompileError,
 }
 ```
