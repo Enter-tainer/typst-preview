@@ -13,6 +13,11 @@ export interface ContainerDOMState {
   };
 }
 
+export enum PreviewMode {
+  Doc,
+  Slide,
+}
+
 export class SvgDocument {
   /// State fields
 
@@ -26,6 +31,8 @@ export class SvgDocument {
   private patchQueue: [string, string][];
   /// enable partial rendering
   private partialRendering: boolean;
+  /// preview mode
+  private previewMode: PreviewMode;
 
   /// There are two scales in this class: The real scale is to adjust the size
   /// of `hookedElem` to fit the svg. The virtual scale (scale ratio) is to let
@@ -41,6 +48,8 @@ export class SvgDocument {
   private vpTimeout: any;
   /// sampled by last render time.
   private sampledRenderTime: number;
+  /// page to partial render
+  private partialRenderPage: number;
 
   /// Style fields
 
@@ -56,6 +65,7 @@ export class SvgDocument {
   private retrieveDOMState: () => ContainerDOMState;
 
   constructor(private hookedElem: HTMLElement, public kModule: RenderSession, options?: {
+    previewMode?: PreviewMode,
     retrieveDOMState?: () => ContainerDOMState,
   }) {
     /// Apply option
@@ -65,6 +75,11 @@ export class SvgDocument {
         boundingRect: this.hookedElem.getBoundingClientRect(),
       }
     });
+    this.partialRendering = false;
+    this.previewMode = PreviewMode.Doc;
+    if (options?.previewMode !== undefined) {
+      this.previewMode = options?.previewMode;
+    }
 
     /// State fields
     this.svgUpdating = false;
@@ -72,10 +87,10 @@ export class SvgDocument {
     this.currentRealScale = 1;
     this.currentContainerWidth = hookedElem.offsetWidth;
     this.patchQueue = [];
-    this.partialRendering = false;
     this.currentScaleRatio = 1;
     this.vpTimeout = undefined;
     this.sampledRenderTime = 0;
+    this.partialRenderPage = 0;
     // if init scale == 1
     // hide scrollbar if scale == 1
     this.hookedElem.classList.add("hide-scrollbar-x");
@@ -211,7 +226,7 @@ export class SvgDocument {
     }
   }
 
-  private decorateSvgElement(svg: SVGElement) {
+  private decorateSvgElementByMode(svg: SVGElement, mode: PreviewMode) {
     const { width: containerWidth } = this.cachedDOMState;
 
     // the <rect> could only have integer width and height
@@ -219,10 +234,23 @@ export class SvgDocument {
     const INNER_RECT_UNIT = 100;
     const INNER_RECT_SCALE = 'scale(0.01)';
 
-    /// Retrieve original pages
-    const nextPages = Array.from(svg.children).filter(
-      (x) => x.classList.contains("typst-page")
-    );
+    const nextPages = (() => {
+      /// Retrieve original pages
+      const filteredNextPages = Array.from(svg.children).filter(
+        (x) => x.classList.contains("typst-page")
+      );
+
+      if (mode === PreviewMode.Doc) {
+        return filteredNextPages;
+      } else if (mode === PreviewMode.Slide) {
+        // already fetched pages info
+        const pageOffset = this.partialRenderPage;
+        return [filteredNextPages[pageOffset]];
+      } else {
+        throw new Error(`unknown preview mode ${mode}`);
+      }
+    })();
+
 
     /// Caclulate width
     let maxWidth = 0;
@@ -352,14 +380,13 @@ export class SvgDocument {
     return this.kModule.docWidth;
   }
 
-  private toggleViewportChange() {
+
+  private statSvgFromDom() {
     const { width: containerWidth, boundingRect: containerBRect } = this.cachedDOMState;
     // scale derived from svg width and container with.
     // svg.setAttribute("data-width", `${newWidth}`);
 
-    const computedRevScale = containerWidth
-      ? this.docWidth / containerWidth
-      : 1;
+    const computedRevScale = containerWidth ? this.docWidth / containerWidth : 1;
     // respect current scale ratio
     const revScale = computedRevScale / this.currentScaleRatio;
     const left = (window.screenLeft - containerBRect.left) * revScale;
@@ -367,24 +394,98 @@ export class SvgDocument {
     const width = window.innerWidth * revScale;
     const height = window.innerHeight * revScale;
 
+    return { revScale, left, top, width, height };
+  }
+
+  private toggleViewportChange() {
+    let patchStr: string;
+    const mode = this.previewMode;
+    if (mode === PreviewMode.Doc) {
+      patchStr = this.fetchDataByDocMode();
+    } else if (mode === PreviewMode.Slide) {
+      patchStr = this.fetchDataBySlideMode();
+    } else {
+      throw new Error(`unknown preview mode ${mode}`);
+    }
+
+    const t2 = performance.now();
+    patchSvgToContainer(this.hookedElem, patchStr, elem => {
+      return this.decorateSvgElementByMode(elem, mode);
+    });
+    const t3 = performance.now();
+
+    return [t2, t3];
+  }
+
+  private fetchDataBySlideMode() {
+    const pagesInfo = this.kModule.retrievePagesInfo();
+
+    if (pagesInfo.length === 0) {
+      // svg warning
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+  <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="20">No page found</text>
+</svg>`;
+    }
+
+    if (this.partialRenderPage >= pagesInfo.length) {
+      this.partialRenderPage = pagesInfo.length - 1;
+    }
+
+    const pageOffset = this.partialRenderPage;
+    let lo = { x: 0, y: 0 },
+      hi = { x: 0, y: 0 };
+    for (let i = 0; i < pageOffset; i++) {
+      const pageInfo = pagesInfo[i];
+      lo.y += pageInfo.height;
+    }
+    const page = pagesInfo[pageOffset];
+    hi.y = lo.y + page.height;
+    hi.x = page.width;
+
+    console.log('render_in_window for slide mode', lo.x, lo.y, hi.x, hi.y);
+
+    // with a bit padding to avoid edge error
+    lo.x += 1e-1;
+    lo.y += 1e-1;
+    hi.x -= 1e-1;
+    hi.y -= 1e-1;
+
+    return this.kModule.renderSvgDiff({
+      window: {
+        lo,
+        hi,
+      },
+    });
+  }
+
+  private fetchDataByDocMode() {
+    const { revScale, left, top, width, height } = this.statSvgFromDom();
 
     let patchStr: string;
     // with 1px padding to avoid edge error
     if (this.partialRendering) {
-      console.log("render_in_window with partial rendering enabled", revScale, left, top, width, height);
+      console.log(
+        'render_in_window with partial rendering enabled',
+        revScale,
+        left,
+        top,
+        width,
+        height,
+      );
 
       /// Adjust top and bottom
       const ch = this.hookedElem.firstElementChild?.children;
-      let topEstimate = top - height - 1, bottomEstimate = top + height * 2 + 1;
+      let topEstimate = top - height - 1,
+        bottomEstimate = top + height * 2 + 1;
       if (ch) {
-        const pages = Array.from(ch).filter(
-          (x) => x.classList.contains("typst-page")
-        );
-        let minTop = 1e33, maxBottom = -1e33, accumulatedHeight = 0;
+        const pages = Array.from(ch).filter(x => x.classList.contains('typst-page'));
+        let minTop = 1e33,
+          maxBottom = -1e33,
+          accumulatedHeight = 0;
         const translateRegex = /translate\(([-0-9.]+), ([-0-9.]+)\)/;
         for (const page of pages) {
-          const pageHeight = Number.parseFloat(page.getAttribute("data-page-height")!);
-          const translate = page.getAttribute("transform")!;
+          const pageHeight = Number.parseFloat(page.getAttribute('data-page-height')!);
+          const translate = page.getAttribute('transform')!;
           const translateMatch = translate.match(translateRegex)!;
           const translateY = Number.parseFloat(translateMatch[2]);
           if (translateY + pageHeight > topEstimate) {
@@ -407,20 +508,18 @@ export class SvgDocument {
       // translate
       patchStr = this.kModule.render_in_window(
         // lo.x, lo.y
-        left - 1, topEstimate,
+        left - 1,
+        topEstimate,
         // hi.x, hi.y
-        left + width + 1, bottomEstimate,
+        left + width + 1,
+        bottomEstimate,
       );
     } else {
-      console.log("render_in_window with partial rendering disabled", 0, 0, 1e33, 1e33)
+      console.log('render_in_window with partial rendering disabled', 0, 0, 1e33, 1e33);
       patchStr = this.kModule.render_in_window(0, 0, 1e33, 1e33);
     }
 
-    const t2 = performance.now();
-    patchSvgToContainer(this.hookedElem, patchStr, (elem) => this.decorateSvgElement(elem));
-    const t3 = performance.now();
-
-    return [t2, t3];
+    return patchStr;
   }
 
   private processQueue(svgUpdateEvent: [string, string]) {
@@ -515,6 +614,13 @@ export class SvgDocument {
       window.initTypstSvg(docRoot);
       this.rescale();
     }
+
+    // todo: abstract this
+    if (this.previewMode === PreviewMode.Slide) {
+      document.querySelectorAll('.typst-page-number-indicator').forEach(x => {
+        x.textContent = `${this.kModule.retrievePagesInfo().length}`;
+      });
+    }
   }
 
   addChangement(change: [string, string]) {
@@ -553,5 +659,18 @@ export class SvgDocument {
 
   setCursor(page: number, x: number, y: number) {
     this.cursorPosition = [page, x, y];
+  }
+
+  setPartialPageNumber(page: number): boolean {
+    if (page <= 0 || page > this.kModule.retrievePagesInfo().length) {
+      return false;
+    }
+    this.partialRenderPage = page - 1;
+    this.addViewportChange();
+    return true;
+  }
+
+  getPartialPageNumber(): number {
+    return this.partialRenderPage + 1;
   }
 }

@@ -272,6 +272,7 @@ interface LaunchTask {
 	outputChannel: vscode.OutputChannel,
 	activeEditor: vscode.TextEditor,
 	bindDocument: vscode.TextDocument,
+	mode: 'doc' | 'slide',
 }
 
 interface LaunchInBrowserTask extends LaunchTask {
@@ -397,6 +398,11 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 				.asWebviewUri(vscode.Uri.file(fontendPath))
 				.toString()}/typst-webview-assets`
 		);
+		const previewMode = task.mode === 'doc' ? "Doc" : "Slide";
+		html = html.replace(
+			"preview-arg:previewMode:Doc",
+			`preview-arg:previewMode:${previewMode}`
+		);
 		panel.webview.html = html.replace("ws://127.0.0.1:23625", `ws://127.0.0.1:${dataPlanePort}`);
 		// 虽然配置的是 http，但是如果是桌面客户端，任何 tcp 连接都支持，这也就包括了 ws
 		// https://code.visualstudio.com/api/advanced-topics/remote-extensions#forwarding-localhost
@@ -441,6 +447,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		const projectRoot = getProjectRoot(filePath);
 		const rootArgs = ["--root", projectRoot];
 		const partialRenderingArgs = vscode.workspace.getConfiguration().get<boolean>('typst-preview.partialRendering') ? ["--partial-rendering"] : [];
+		const previewInSlideModeArgs = task.mode === 'slide' ? ["--preview-mode=slide"] : [];
 		const { dataPlanePort, controlPlanePort, staticFilePort, serverProcess } = await runServer(serverPath, [
 			"--data-plane-host", "127.0.0.1:0",
 			"--control-plane-host", "127.0.0.1:0",
@@ -448,6 +455,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 			"--no-open",
 			...rootArgs,
 			...partialRenderingArgs,
+			...previewInSlideModeArgs,
 			...codeGetCliFontArgs(),
 			filePath,
 		], outputChannel, openInBrowser);
@@ -477,8 +485,10 @@ export function activate(context: vscode.ExtensionContext) {
 	statusBarItem.command = 'typst-preview.showLog';
 	statusBarItem.tooltip = 'Typst Preview Status: Click to show logs';
 
-	let webviewDisposable = vscode.commands.registerCommand('typst-preview.preview', launchPrologue('webview'));
-	let browserDisposable = vscode.commands.registerCommand('typst-preview.browser', launchPrologue('browser'));
+	let webviewDisposable = vscode.commands.registerCommand('typst-preview.preview', launchPrologue('webview', 'doc'));
+	let browserDisposable = vscode.commands.registerCommand('typst-preview.browser', launchPrologue('browser', 'doc'));
+	let webviewSlideDisposable = vscode.commands.registerCommand('typst-preview.preview-slide', launchPrologue('webview', 'slide'));
+	let browserSlideDisposable = vscode.commands.registerCommand('typst-preview.browser-slide', launchPrologue('browser', 'slide'));
 	let syncDisposable = vscode.commands.registerCommand('typst-preview.sync', async () => {
 		const activeEditor = vscode.window.activeTextEditor;
 		if (!activeEditor) {
@@ -492,14 +502,14 @@ export function activate(context: vscode.ExtensionContext) {
 		outputChannel.show();
 	});
 
-	context.subscriptions.push(webviewDisposable, browserDisposable, syncDisposable, showLogDisposable, statusBarItem);
+	context.subscriptions.push(webviewDisposable, browserDisposable, webviewSlideDisposable, browserSlideDisposable, syncDisposable, showLogDisposable, statusBarItem);
 	process.on('SIGINT', () => {
 		for (const serverProcess of serverProcesses) {
 			serverProcess.kill();
 		}
 	});
 
-	function launchPrologue(kind: 'browser' | 'webview') {
+	function launchPrologue(kind: 'browser' | 'webview', mode: 'doc' | 'slide') {
 		return async () => {
 			const activeEditor = vscode.window.activeTextEditor;
 			if (!activeEditor) {
@@ -513,6 +523,7 @@ export function activate(context: vscode.ExtensionContext) {
 				outputChannel,
 				activeEditor,
 				bindDocument,
+				mode,
 			});
 		};
 	};

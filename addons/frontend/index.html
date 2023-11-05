@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -27,10 +27,7 @@
         let deltaLKlsl = deltaL / 1.0;
         let deltaCkcsc = deltaC / sc;
         let deltaHkhsh = deltaH / sh;
-        let i =
-          deltaLKlsl * deltaLKlsl +
-          deltaCkcsc * deltaCkcsc +
-          deltaHkhsh * deltaHkhsh;
+        let i = deltaLKlsl * deltaLKlsl + deltaCkcsc * deltaCkcsc + deltaHkhsh * deltaHkhsh;
         return i < 0 ? 0 : Math.sqrt(i);
       }
 
@@ -55,17 +52,17 @@
 
       // https://stackoverflow.com/questions/26414770/getting-the-rgb-values-for-a-css-html-named-color-in-javascript
       function cssColorToRgba(cssColor) {
-        var canvas = document.createElement("canvas");
-        var context = canvas.getContext("2d");
+        var canvas = document.createElement('canvas');
+        var context = canvas.getContext('2d');
         context.fillStyle = cssColor;
         context.fillRect(0, 0, 1, 1);
         return context.getImageData(0, 0, 1, 1).data;
       }
 
-      var defaultBackgroundColor = "rgb(82, 86, 89)";
+      var defaultBackgroundColor = 'rgb(82, 86, 89)';
       var previewBackgroundColor =
         getComputedStyle(document.documentElement).getPropertyValue(
-          "--vscode-sideBar-background"
+          '--vscode-sideBar-background',
         ) || defaultBackgroundColor;
 
       /// Perceptible distance between colors:
@@ -78,8 +75,8 @@
 
       // append css variable --typst-preview-background-color
       document.documentElement.style.setProperty(
-        "--typst-preview-background-color",
-        previewBackgroundColor
+        '--typst-preview-background-color',
+        previewBackgroundColor,
       );
     </script>
     <script type="module" src="/src/main.js"></script>
@@ -95,15 +92,50 @@
     "
   >
     <!-- reserving 1px to hide height border, margin-top: -1px; -->
-    <div
-      id="typst-app"
-      style="
-        width: fit-content;
-        height: fit-content;
-        margin: 0 auto;
-        margin-top: -1px;
-        background-color: var(--typst-preview-background-color) !important;
-      "
-    ></div>
+    <div id="typst-container">
+      <div id="typst-container-top" style="width: 100%">
+        <div id="typst-top-toolbar">
+          <div id="typst-top-toolbar-start">
+            <div id="navigator" style="width: 0.75rem; height: 0.75rem; flex: 0 0 20px">
+              <svg
+                viewBox="0 0 20 20"
+                preserveAspectRatio="xMidYMid meet"
+                focusable="false"
+                role="none"
+                style="pointer-events: none; display: block; width: 100%; height: 100%"
+              >
+                <g>
+                  <path d="M2 4h16v2H2zM2 9h16v2H2zM2 14h16v2H2z" fill="white"></path>
+                </g>
+              </svg>
+            </div>
+
+            <span id="title">Typst Preview (slide mode)</span>
+          </div>
+          <div id="typst-top-toolbar-center"></div>
+          <div id="typst-top-toolbar-end">
+            <div id="typst-page-next-selector">
+              <div class="typst-page-button">&gt;</div>
+            </div>
+            <div>
+              <div class="typst-page-selector-content" style="--page-length-digits: 2">
+                <input part="input" type="text" id="typst-page-selector" value="1" /><span
+                  class="typst-page-selector-divider"
+                  >&nbsp;/&nbsp;</span
+                >
+                <span class="typst-page-number-indicator"></span>
+              </div>
+            </div>
+            <div id="typst-page-prev-selector">
+              <div class="typst-page-button">&lt;</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div
+        id="typst-app"
+        style="background-color: var(--typst-preview-background-color) !important"
+      ></div>
+    </div>
   </body>
 </html>
