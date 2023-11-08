@@ -75,9 +75,9 @@ function createSvgDocument(wasmDocRef: RenderSession, previewMode: PreviewMode) 
             }
 
             window.addEventListener("keydown", (e) => {
-                if (e.key === "ArrowLeft") {
+                if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
                     updatePrev();
-                } else if (e.key === "ArrowRight") {
+                } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
                     updateNext();
                 } else if (e.key === " ") {
                     updateNext();
