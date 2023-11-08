@@ -5,6 +5,8 @@ import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 export interface ContainerDOMState {
   /// cached `hookedElem.offsetWidth` or `hookedElem.innerWidth`
   width: number;
+  /// cached `hookedElem.offsetHeight` or `hookedElem.innerHeight`
+  height: number;
   /// cached `hookedElem.getBoundingClientRect()`
   /// We only use `left` and `top` here.
   boundingRect: {
@@ -25,8 +27,6 @@ export class SvgDocument {
   private svgUpdating: boolean;
   /// whether kModule is initialized
   private moduleInitialized: boolean;
-  /// current width of `hookedElem`
-  private currentContainerWidth: number;
   /// patch queue for updating svg.
   private patchQueue: [string, string][];
   /// enable partial rendering
@@ -72,6 +72,7 @@ export class SvgDocument {
     this.retrieveDOMState = options?.retrieveDOMState || (() => {
       return {
         width: this.hookedElem.offsetWidth,
+        height: this.hookedElem.offsetHeight,
         boundingRect: this.hookedElem.getBoundingClientRect(),
       }
     });
@@ -85,7 +86,6 @@ export class SvgDocument {
     this.svgUpdating = false;
     this.moduleInitialized = false;
     this.currentRealScale = 1;
-    this.currentContainerWidth = hookedElem.offsetWidth;
     this.patchQueue = [];
     this.currentScaleRatio = 1;
     this.vpTimeout = undefined;
@@ -103,8 +103,12 @@ export class SvgDocument {
     /// Cache fields
     this.cachedDOMState = {
       width: 0,
+      height: 0,
       // todo: we should not query dom state here, which may cause layout reflowing
-      boundingRect: hookedElem.getBoundingClientRect(),
+      boundingRect: {
+        left: 0,
+        top: 0,
+      },
     };
 
     installEditorJumpToHandler(this.kModule, this.hookedElem);
@@ -195,15 +199,19 @@ export class SvgDocument {
   rescale() {
     // get dom state from cache, so we are free from layout reflowing
     // Note: one should retrieve dom state before rescale
-    const { width: containerWidth } = this.cachedDOMState;
+    const container = this.cachedDOMState;
     const svg = this.hookedElem.firstElementChild! as SVGElement;
 
-    this.currentContainerWidth = containerWidth;
     const svgWidth = Number.parseFloat(
       svg.getAttribute("data-width") || svg.getAttribute("width") || "1"
     );
-    this.currentRealScale = this.currentContainerWidth / svgWidth;
-    this.currentContainerWidth = containerWidth;
+    const svgHeight = Number.parseFloat(
+      svg.getAttribute("data-height") || svg.getAttribute("height") || "1"
+    );
+    this.currentRealScale =
+      this.previewMode === PreviewMode.Slide ?
+        Math.min(container.width / svgWidth, container.height / svgHeight) :
+        container.width / svgWidth;
 
     const scale = this.currentRealScale * this.currentScaleRatio;
 
@@ -224,15 +232,24 @@ export class SvgDocument {
       svg.setAttribute("data-applied-height", appliedHeight);
       svg.setAttribute("height", `${scaledHeight}`);
     }
+
+    if (this.previewMode === PreviewMode.Slide) {
+      const widthAdjust = Math.max((container.width - scaledWidth) / 2, 0);
+      const heightAdjust = Math.max((container.height - scaledHeight) / 2, 0);
+      this.hookedElem.style.transform = `translate(${widthAdjust}px, ${heightAdjust}px)`;
+    }
   }
 
-  private decorateSvgElementByMode(svg: SVGElement, mode: PreviewMode) {
-    const { width: containerWidth } = this.cachedDOMState;
+  private decorateSvgElement(svg: SVGElement, mode: PreviewMode) {
+    const container = this.cachedDOMState;
 
     // the <rect> could only have integer width and height
     // so we scale it by 100 to make it more accurate
     const INNER_RECT_UNIT = 100;
     const INNER_RECT_SCALE = 'scale(0.01)';
+
+    /// Caclulate width
+    let maxWidth = 0;
 
     const nextPages = (() => {
       /// Retrieve original pages
@@ -249,16 +266,18 @@ export class SvgDocument {
       } else {
         throw new Error(`unknown preview mode ${mode}`);
       }
-    })();
+    })().map((elem) => {
+      const width = Number.parseFloat(elem.getAttribute("data-page-width")!);
+      const height = Number.parseFloat(elem.getAttribute("data-page-height")!);
+      maxWidth = Math.max(maxWidth, width);
+      return {
+        elem,
+        width,
+        height,
+      }
+    });
 
-
-    /// Caclulate width
-    let maxWidth = 0;
-    for (let i = 0; i < nextPages.length; i++) {
-      const nextPage = nextPages[i];
-      const pageWidth = Number.parseFloat(nextPage.getAttribute("data-page-width")!);
-      maxWidth = Math.max(maxWidth, pageWidth);
-    }
+    /// Adjust width
     if (maxWidth < 1e-5) {
       maxWidth = 1;
     }
@@ -267,8 +286,8 @@ export class SvgDocument {
 
     /// Prepare scale
     // scale derived from svg width and container with.
-    const computedScale = containerWidth
-      ? containerWidth / maxWidth
+    const computedScale = container.width
+      ? container.width / maxWidth
       : 1;
     // respect current scale ratio
     const scale = this.currentScaleRatio * computedScale;
@@ -287,8 +306,7 @@ export class SvgDocument {
     for (let i = 0; i < nextPages.length; i++) {
       /// Retrieve page width, height
       const nextPage = nextPages[i];
-      const pageWidth = Number.parseFloat(nextPage.getAttribute("data-page-width")!);
-      const pageHeight = Number.parseFloat(nextPage.getAttribute("data-page-height")!);
+      const { width: pageWidth, height: pageHeight } = nextPage;
 
       /// center the page and add margin
       const calculatedPaddedX = (newWidth - pageWidth) / 2;
@@ -313,11 +331,11 @@ export class SvgDocument {
       // innerRect.setAttribute("stroke-opacity", "0.4");
 
       /// Move page to the correct position
-      nextPage.setAttribute("transform", translateAttr);
+      nextPage.elem.setAttribute("transform", translateAttr);
 
       /// Insert rectangles
       // todo: this is buggy not preserving order?
-      svg.insertBefore(innerRect, firstPage);
+      svg.insertBefore(innerRect, firstPage.elem);
       if (!firstRect) {
         firstRect = innerRect;
       }
@@ -409,9 +427,7 @@ export class SvgDocument {
     }
 
     const t2 = performance.now();
-    patchSvgToContainer(this.hookedElem, patchStr, elem => {
-      return this.decorateSvgElementByMode(elem, mode);
-    });
+    patchSvgToContainer(this.hookedElem, patchStr, elem => this.decorateSvgElement(elem, mode));
     const t3 = performance.now();
 
     return [t2, t3];

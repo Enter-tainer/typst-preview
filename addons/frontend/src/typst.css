@@ -7,92 +7,14 @@ body {
   flex-direction: row;
 }
 
+.flex-row-rev {
+  display: flex;
+  flex-direction: row-reverse;
+}
+
 .flex-col {
   display: flex;
   flex-direction: column;
-}
-
-#typst-top-toolbar {
-  align-items: center;
-  background-color: rgb(50, 54, 57);
-  color: #fff;
-  display: flex;
-  height: 2.625rem; 
-  padding: 0 0.75rem;
-}
-
-#title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  margin-inline-start: 0.75rem;
-}
-
-#title, .typst-page-button, .typst-page-number-indicator, #typst-page-selector, .typst-page-selector-divider {
-  font-size: .6rem;
-  font-weight: 500;
-  font-family: 'Segoe UI',Arial,'Microsoft Yahei',sans-serif;
-}
-
-.typst-page-button {
-  width: 1rem;
-  height: 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.typst-page-button:hover {
-  background: rgba(0,0,0,.5);
-  border: 0px solid #000;
-  border-radius: 3px;
-}
-
-.typst-page-selector-content {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: fit-content;
-  height: 1rem;
-}
-
-#typst-page-selector {
-  width: calc(max(2,var(--page-length-digits)) * 1ch + 1px);
-  height: 0.8rem;
-  background: rgba(0,0,0,.5);
-  border: none;
-  color: #fff;
-  font-family: inherit;
-  line-height: inherit;
-  outline: 0;
-  padding: 0 var(--page-selector-spacing);
-  text-align: center;
-}
-
-.typst-page-number-indicator {
-  text-align: center;
-}
-
-#typst-top-toolbar-start {
-  display: flex;
-  overflow: hidden;
-  padding-inline-end: 20px;
-}
-
-#typst-top-toolbar-end {
-  display: flex;
-  overflow: hidden;
-  flex-direction: row-reverse;
-  gap: 0.3rem;
-}
-
-#typst-top-toolbar-center {
-  align-items: center;
-  display: flex;
-}
-
-#typst-top-toolbar-end, #typst-top-toolbar-start {
-  flex: 1;
 }
 
 #typst-app {
@@ -100,31 +22,6 @@ body {
   margin: 0;
   transform-origin: 0 0;
   background-color: #fff;
-}
-
-#typst-container.mode-doc {
-  width: fit-content;
-  height: fit-content;
-  margin: 0 auto;
-  margin-top: -1px;
-}
-
-#typst-container.mode-doc #typst-app {
-  height: fit-content;
-}
-
-#typst-container.mode-slide {
-  width: 100vw;
-  height: 100vh;
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-}
-
-#typst-container.mode-slide #typst-app {
-  flex: 1;
-  display: flex;
-  align-items: center;
 }
 
 .hide-scrollbar-x {

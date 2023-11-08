@@ -1,4 +1,3 @@
-import "./typst.css";
 import { PreviewMode, SvgDocument } from "./svg-doc";
 import {
     rendererBuildInfo,
@@ -16,7 +15,7 @@ const COMMA = enc.encode(",");
 
 function createSvgDocument(wasmDocRef: RenderSession, previewMode: PreviewMode) {
     const hookedElem = document.getElementById("typst-app");
-    const resizeTarget = document.documentElement;
+    const resizeTarget = document.getElementById('typst-container-main')!;
 
     const svgDoc = new SvgDocument(hookedElem!, wasmDocRef, {
         previewMode,
@@ -25,6 +24,8 @@ function createSvgDocument(wasmDocRef: RenderSession, previewMode: PreviewMode) 
             return {
                 // reserving 1px to hide width border
                 width: resizeTarget.clientWidth + 1,
+                // reserving 1px to hide width border
+                height: resizeTarget.offsetHeight,
                 boundingRect: resizeTarget.getBoundingClientRect(),
             };
         },

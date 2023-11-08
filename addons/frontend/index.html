@@ -65,6 +65,21 @@
           '--vscode-sideBar-background',
         ) || defaultBackgroundColor;
 
+      var defaultToolbarFgColor = '#fff';
+      var previewToolbarFgColor =
+        getComputedStyle(document.documentElement).getPropertyValue('--vscode-menu-foreground') ||
+        defaultToolbarFgColor;
+
+      var defaultToolbarBorderColor = 'rgba(0, 0, 0, 0)';
+      var previewToolbarBorderColor =
+        getComputedStyle(document.documentElement).getPropertyValue('--vscode-menu-border') ||
+        defaultToolbarBorderColor;
+
+      var defaultToolbarBgColor = 'rgb(50, 54, 57)';
+      var previewToolbarBgColor =
+        getComputedStyle(document.documentElement).getPropertyValue('--vscode-menu-background') ||
+        defaultToolbarBgColor;
+
       /// Perceptible distance between colors:
       /// 0~1: cannot distinguish by human eyes
       /// 1~2: perceptible through close observation
@@ -77,6 +92,18 @@
       document.documentElement.style.setProperty(
         '--typst-preview-background-color',
         previewBackgroundColor,
+      );
+      document.documentElement.style.setProperty(
+        '--typst-preview-toolbar-fg-color',
+        previewToolbarFgColor,
+      );
+      document.documentElement.style.setProperty(
+        '--typst-preview-toolbar-border-color',
+        previewToolbarBorderColor,
+      );
+      document.documentElement.style.setProperty(
+        '--typst-preview-toolbar-bg-color',
+        previewToolbarBgColor,
       );
     </script>
     <script type="module" src="/src/main.js"></script>
@@ -93,10 +120,17 @@
   >
     <!-- reserving 1px to hide height border, margin-top: -1px; -->
     <div id="typst-container">
-      <div id="typst-container-top" style="width: 100%">
-        <div id="typst-top-toolbar">
-          <div id="typst-top-toolbar-start">
-            <div id="navigator" style="width: 0.75rem; height: 0.75rem; flex: 0 0 20px">
+      <div id="typst-container-top" style="width: 100%; z-index: 1">
+        <div id="typst-top-toolbar" style="width: 100%">
+          <div
+            id="typst-top-toolbar-start"
+            class="flex-row"
+            style="flex: 1; padding-inline-end: 20px"
+          >
+            <div
+              id="typst-top-toolbar-navigator"
+              style="width: 0.75rem; height: 0.75rem; flex: 0 0 20px"
+            >
               <svg
                 viewBox="0 0 20 20"
                 preserveAspectRatio="xMidYMid meet"
@@ -105,15 +139,15 @@
                 style="pointer-events: none; display: block; width: 100%; height: 100%"
               >
                 <g>
-                  <path d="M2 4h16v2H2zM2 9h16v2H2zM2 14h16v2H2z" fill="white"></path>
+                  <path d="M2 4h16v2H2zM2 9h16v2H2zM2 14h16v2H2z"></path>
                 </g>
               </svg>
             </div>
 
-            <span id="title">Typst Preview (slide mode)</span>
+            <span id="typst-toolbar-title"></span>
           </div>
-          <div id="typst-top-toolbar-center"></div>
-          <div id="typst-top-toolbar-end">
+          <div id="typst-top-toolbar-center" class="flex-row" style="align-items: center"></div>
+          <div id="typst-top-toolbar-end" class="flex-row-rev" style="flex: 1; gap: 0.3rem">
             <div id="typst-page-next-selector">
               <div class="typst-page-button">&gt;</div>
             </div>
@@ -132,10 +166,12 @@
           </div>
         </div>
       </div>
-      <div
-        id="typst-app"
-        style="background-color: var(--typst-preview-background-color) !important"
-      ></div>
+      <div id="typst-container-main">
+        <div
+          id="typst-app"
+          style="background-color: var(--typst-preview-background-color) !important"
+        ></div>
+      </div>
     </div>
   </body>
 </html>
