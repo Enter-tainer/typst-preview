@@ -106,7 +106,6 @@
         },
         {
           "id": "typst-preview.outline",
-          "type": "webview",
           "name": "Outline"
         }
       ]

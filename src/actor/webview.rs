@@ -6,9 +6,9 @@ use tokio::{
 };
 use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
 
-use super::{render::RenderActorRequest, typst::TypstActorRequest};
+use super::{outline::Outline, render::RenderActorRequest, typst::TypstActorRequest};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct CursorPosition {
     pub page_no: usize,
     pub x: f64,
@@ -17,7 +17,7 @@ pub struct CursorPosition {
 
 pub type SrcToDocJumpInfo = CursorPosition;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum WebviewActorRequest {
     SrcToDocJump(SrcToDocJumpInfo),
     CursorPosition(CursorPosition),
@@ -38,6 +38,7 @@ pub struct WebviewActor {
 
     doc_to_src_sender: mpsc::UnboundedSender<TypstActorRequest>,
     render_full_latest_sender: mpsc::UnboundedSender<RenderActorRequest>,
+    render_full_latest_outline_sender: mpsc::UnboundedSender<()>,
 }
 
 pub struct Channels {
@@ -45,17 +46,24 @@ pub struct Channels {
         mpsc::UnboundedSender<Vec<u8>>,
         mpsc::UnboundedReceiver<Vec<u8>>,
     ),
+    pub outline: (
+        mpsc::UnboundedSender<Outline>,
+        mpsc::UnboundedReceiver<Outline>,
+    ),
     pub render_full: (
         mpsc::UnboundedSender<RenderActorRequest>,
         mpsc::UnboundedReceiver<RenderActorRequest>,
     ),
+    pub render_outline: (mpsc::UnboundedSender<()>, mpsc::UnboundedReceiver<()>),
 }
 
 impl WebviewActor {
     pub fn set_up_channels() -> Channels {
         Channels {
             svg: mpsc::unbounded_channel(),
+            outline: mpsc::unbounded_channel(),
             render_full: mpsc::unbounded_channel(),
+            render_outline: mpsc::unbounded_channel(),
         }
     }
     pub fn new(
@@ -64,6 +72,7 @@ impl WebviewActor {
         mailbox: broadcast::Receiver<WebviewActorRequest>,
         doc_to_src_sender: mpsc::UnboundedSender<TypstActorRequest>,
         render_full_latest_sender: mpsc::UnboundedSender<RenderActorRequest>,
+        render_full_latest_outline_sender: mpsc::UnboundedSender<()>,
     ) -> Self {
         Self {
             webview_websocket_conn: websocket_conn,
@@ -71,6 +80,7 @@ impl WebviewActor {
             mailbox,
             doc_to_src_sender,
             render_full_latest_sender,
+            render_full_latest_outline_sender,
         }
     }
 
@@ -109,6 +119,7 @@ impl WebviewActor {
                     };
                     if msg == "current" {
                         self.render_full_latest_sender.send(RenderActorRequest::RenderFullLatest).unwrap();
+                        self.render_full_latest_outline_sender.send(()).unwrap();
                     } else if msg.starts_with("srclocation") {
                         let location = msg.split(' ').nth(1).unwrap();
                         let id = u64::from_str_radix(location, 16).unwrap();

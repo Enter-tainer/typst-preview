@@ -4,6 +4,8 @@ use log::{debug, info};
 use tokio::sync::{mpsc, watch};
 use typst::doc::Document;
 use typst_ts_svg_exporter::IncrSvgDocServer;
+
+use super::outline::Outline;
 #[derive(Debug, Clone, Copy)]
 pub enum RenderActorRequest {
     RenderFullLatest,
@@ -79,5 +81,55 @@ impl RenderActor {
             };
         }
         info!("RenderActor: exiting")
+    }
+}
+
+pub struct OutlineRenderActor {
+    signal: mpsc::UnboundedReceiver<()>,
+    document: watch::Receiver<Option<Arc<Document>>>,
+    renderer: IncrSvgDocServer,
+    outline_sender: mpsc::UnboundedSender<Outline>,
+}
+
+impl OutlineRenderActor {
+    pub fn new(
+        signal: mpsc::UnboundedReceiver<()>,
+        document: watch::Receiver<Option<Arc<Document>>>,
+        outline_sender: mpsc::UnboundedSender<Outline>,
+    ) -> Self {
+        let mut res = Self {
+            signal,
+            document,
+            renderer: IncrSvgDocServer::default(),
+            outline_sender,
+        };
+        res.renderer.set_should_attach_debug_info(true);
+        res
+    }
+
+    pub fn run(mut self) {
+        loop {
+            debug!("OutlineRenderActor: waiting for message");
+            let Some(_) = self.signal.blocking_recv() else {
+                info!("OutlineRenderActor: no more messages");
+                break;
+            };
+            // read the queue to empty
+            while self.signal.try_recv().is_ok() {}
+            // if a full render is requested, we render the latest document
+            // otherwise, we render the incremental changes for only once
+            let Some(document) = self.document.borrow().clone() else {
+                info!("OutlineRenderActor: document is not ready");
+                continue;
+            };
+            let data = crate::actor::outline::outline(&document);
+            comemo::evict(30);
+            debug!("OutlineRenderActor: sending outline");
+            let Ok(_) = self.outline_sender.send(data) else {
+                info!("OutlineRenderActor: outline_sender is dropped");
+                break;
+            };
+        }
+        info!("OutlineRenderActor: exiting")
     }
 }

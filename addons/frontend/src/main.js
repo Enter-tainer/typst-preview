@@ -35,6 +35,10 @@ window.addEventListener('message', event => {
             });
             break;
         }
+        case 'outline': {
+            console.log('outline', message);
+            break;
+        }
     }
 });
 

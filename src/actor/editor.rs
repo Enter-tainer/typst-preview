@@ -6,8 +6,8 @@ use tokio::sync::mpsc;
 use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
 
 use crate::{
-    actor::typst::TypstActorRequest, ChangeCursorPositionRequest, DocToSrcJumpInfo, MemoryFiles,
-    MemoryFilesShort, SrcToDocJumpRequest,
+    actor::outline::Outline, actor::typst::TypstActorRequest, ChangeCursorPositionRequest,
+    DocToSrcJumpInfo, MemoryFiles, MemoryFilesShort, SrcToDocJumpRequest,
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -21,6 +21,7 @@ pub enum CompileStatus {
 #[derive(Debug)]
 pub enum EditorActorRequest {
     DocToSrcJump(DocToSrcJumpInfo),
+    Outline(Outline),
     CompileStatus(CompileStatus),
 }
 
@@ -55,6 +56,8 @@ enum ControlPlaneResponse {
     SyncEditorChanges(()),
     #[serde(rename = "compileStatus")]
     CompileStatus(CompileStatus),
+    #[serde(rename = "outline")]
+    Outline(Outline),
 }
 
 impl EditorActor {
@@ -95,6 +98,14 @@ impl EditorActor {
                                 serde_json::to_string(&ControlPlaneResponse::CompileStatus(status)).unwrap(),
                             )).await else {
                                 warn!("EditorActor: failed to send CompileStatus message to editor");
+                                break;
+                            };
+                        },
+                        EditorActorRequest::Outline(outline) => {
+                            let Ok(_) = self.editor_websocket_conn.send(Message::Text(
+                                serde_json::to_string(&ControlPlaneResponse::Outline(outline)).unwrap(),
+                            )).await else {
+                                warn!("EditorActor: failed to send Outline message to editor");
                                 break;
                             };
                         }

@@ -14,6 +14,11 @@ let contentPreviewProvider = new Promise<ContentPreviewProvider>(resolve => {
 	resolveContentPreviewProvider = resolve;
 });
 
+let resolveOutlineProvider: (value: OutlineProvider) => void = () => { };
+let outlineProvider = new Promise<OutlineProvider>(resolve => {
+	resolveOutlineProvider = resolve;
+});
+
 type ScrollSyncMode = "never" | "onSelectionChange";
 
 async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: string) {
@@ -316,6 +321,11 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 				statusBarItemProcess(data.kind);
 				break;
 			}
+			case "outline": {
+				contentPreviewProvider.then((p) => p.postOutlineItem(data /* Outline */));
+				outlineProvider.then((p) => p.postOutlineItem(data /* Outline */));
+				break;
+			}
 			default: {
 				console.warn("unknown message", data);
 				break;
@@ -531,6 +541,10 @@ class ContentPreviewProvider implements vscode.WebviewViewProvider {
 			console.log('postActivateSent', this.current);
 			this._view.webview.postMessage(this.current);
 		}
+		if (this._view && this.currentOutline) {
+			this._view.webview.postMessage(this.currentOutline);
+			this.currentOutline = undefined;
+		}
 	};
 
 	current: any = undefined;
@@ -546,7 +560,21 @@ class ContentPreviewProvider implements vscode.WebviewViewProvider {
 
 	postDeactivate(url: string) {
 		if (this.current && this.current.url === url) {
+			this.currentOutline = undefined;
 			this.postActivate('');
+		}
+	}
+
+	currentOutline: any = undefined;
+	postOutlineItem(outline: any) {
+		this.currentOutline = {
+			type: 'outline',
+			outline,
+			isContentPreview: true,
+		};
+		if (this._view) {
+			this._view.webview.postMessage(this.currentOutline);
+			this.currentOutline = undefined;
 		}
 	}
 }
@@ -571,25 +599,82 @@ class ContentPreviewProvider implements vscode.WebviewViewProvider {
 // -->
 // <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
 
-class OutlineProvider implements vscode.WebviewViewProvider {
+interface CursorPosition {
+	// eslint-disable-next-line @typescript-eslint/naming-convention
+	page_no: number,
+	x: number,
+	y: number,
+}
 
+interface OutlineItemData {
+	title: string,
+	position?: CursorPosition,
+	children: OutlineItemData[],
+}
+
+class OutlineProvider implements vscode.TreeDataProvider<OutlineItem> {
 	constructor(
 		private readonly _extensionUri: vscode.Uri,
 	) { }
 
-	public resolveWebviewView(
-		webviewView: vscode.WebviewView,
-		_context: vscode.WebviewViewResolveContext,
-		_token: vscode.CancellationToken,
-	) {
-		webviewView.webview.options = {
-			localResourceRoots: [
-				this._extensionUri
-			]
-		};
 
-		webviewView.webview.html = `<!DOCTYPE html><html lang="en"><head><title>OutlineProvider</title></head><body></body></html>`;
+	private _onDidChangeTreeData: vscode.EventEmitter<OutlineItem | undefined | void> = new vscode.EventEmitter<OutlineItem | undefined | void>();
+	readonly onDidChangeTreeData: vscode.Event<OutlineItem | undefined | void> = this._onDidChangeTreeData.event;
+
+	refresh(): void {
+		this._onDidChangeTreeData.fire();
 	}
+
+	outline: { items: OutlineItemData[] } | undefined = undefined;
+	postOutlineItem(outline: any) {
+		console.log('postOutlineItemProvider', outline);
+		this.outline = outline;
+		this.refresh();
+	}
+
+	getTreeItem(element: OutlineItem): vscode.TreeItem {
+		return element;
+	}
+
+	getChildren(element?: OutlineItem): Thenable<OutlineItem[]> {
+		if (!this.outline) {
+			vscode.window.showInformationMessage('No dependency in empty workspace');
+			return Promise.resolve([]);
+		}
+
+		const children = (element ? element.data.children : this.outline.items) || [];
+		return Promise.resolve(children.map((item: OutlineItemData) => {
+			return new OutlineItem(item, item.children.length > 0 ? vscode.TreeItemCollapsibleState.Collapsed :
+				vscode.TreeItemCollapsibleState.None);
+		}));
+	}
+}
+
+export class OutlineItem extends vscode.TreeItem {
+
+	constructor(
+		public readonly data: OutlineItemData,
+		public readonly collapsibleState: vscode.TreeItemCollapsibleState,
+		public readonly command?: vscode.Command
+	) {
+		super(data.title, collapsibleState);
+
+		const pos = this.data.position;
+		if (pos) {
+			this.tooltip = `${this.label} in page ${pos.page_no}, at (${pos.x.toFixed(3)} pt, ${pos.y.toFixed(3)} pt)`;
+			this.description = `page: ${pos.page_no}, at (${pos.x.toFixed(1)} pt, ${pos.y.toFixed(1)} pt)`;
+		} else {
+			this.tooltip = `${this.label}`;
+			this.description = `no pos`;
+		}
+	}
+
+	// iconPath = {
+	// 	light: path.join(__filename, '..', '..', 'resources', 'light', 'dependency.svg'),
+	// 	dark: path.join(__filename, '..', '..', 'resources', 'dark', 'dependency.svg')
+	// };
+
+	contextValue = 'outline-item';
 }
 
 let statusBarItem: vscode.StatusBarItem;
@@ -616,8 +701,12 @@ export function activate(context: vscode.ExtensionContext) {
 		context.subscriptions.push(
 			vscode.window.registerWebviewViewProvider('typst-preview.content-preview', provider));
 	});
-	context.subscriptions.push(
-		vscode.window.registerWebviewViewProvider('typst-preview.outline', new OutlineProvider(context.extensionUri)));
+	{
+		const outlineProvider = new OutlineProvider(context.extensionUri);
+		resolveOutlineProvider(outlineProvider);
+		context.subscriptions.push(
+			vscode.window.registerTreeDataProvider('typst-preview.outline', outlineProvider));
+	}
 
 	let webviewDisposable = vscode.commands.registerCommand('typst-preview.preview', launchPrologue('webview', 'doc'));
 	let browserDisposable = vscode.commands.registerCommand('typst-preview.browser', launchPrologue('browser', 'doc'));
