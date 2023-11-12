@@ -1,6 +1,7 @@
 import "./typst.css";
 import "./styles/toolbar.css";
 import "./styles/layout.css";
+import "./styles/help-panel.css";
 
 import { wsMain } from './ws';
 import { PreviewMode } from './svg-doc';

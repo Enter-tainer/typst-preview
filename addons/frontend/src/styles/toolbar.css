@@ -5,8 +5,20 @@
   margin-inline-start: 0.75rem;
 }
 
-#typst-top-toolbar-navigator path {
-  fill: var(--typst-preview-toolbar-fg-color);
+.typst-toolbar-icon svg {
+  pointer-events: none;
+  cursor: pointer;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.typst-toolbar-icon path {
+  pointer-events: bounding-box;
+  cursor: pointer;
+}
+
+.typst-toolbar-icon {
+  --fill-color: var(--typst-preview-toolbar-fg-color);
 }
 
 #typst-toolbar-title,
