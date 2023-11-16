@@ -113,6 +113,9 @@ export class SvgDocument {
       if (event.ctrlKey) {
         event.preventDefault();
 
+        // retrieve dom state before any operation
+        this.cachedDOMState = this.retrieveDOMState();
+
         if (window.onresize !== null) {
           // is auto resizing
           window.onresize = null;
@@ -162,6 +165,9 @@ export class SvgDocument {
 
           const dataHeight = Number.parseFloat(svg.getAttribute("data-height")!);
           const scaledHeight = Math.ceil(dataHeight * scaleRatio);
+
+          // we increase the height by 2 times.
+          // The `2` is only a magic number that is large enough.
           this.hookedElem.style.height = `${scaledHeight * 2}px`;
         }
 
