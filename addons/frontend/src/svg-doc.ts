@@ -535,7 +535,7 @@ export class SvgDocument {
       clearTimeout(this.vpTimeout);
     }
 
-    if (change[0] === "viewport-change") {
+    if (change[0] === "viewport-change" && this.svgUpdating) {
       // delay viewport change a bit
       this.vpTimeout = setTimeout(pushChange, this.sampledRenderTime || 100);
     } else {
