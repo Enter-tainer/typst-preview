@@ -150,7 +150,7 @@ export class SvgDocument {
         const scrollY = event.pageY * (scrollFactor - 1);
 
         // hide scrollbar if scale == 1
-        if (Math.abs(scrollFactor - 1) < 1e-5) {
+        if (Math.abs(this.currentScaleRatio - 1) < 1e-5) {
           this.hookedElem.classList.add("hide-scrollbar-x");
           document.body.classList.add("hide-scrollbar-x");
         } else {
