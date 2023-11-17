@@ -60,6 +60,7 @@ export class SvgDocument {
   /// Cache fields
 
   /// cached state of container, default to retrieve state from `this.hookedElem`
+  /// Note: one should retrieve dom state before rescale
   private cachedDOMState: ContainerDOMState;
 
   private retrieveDOMState: () => ContainerDOMState;
@@ -132,6 +133,9 @@ export class SvgDocument {
       if (event.ctrlKey) {
         event.preventDefault();
 
+        // retrieve dom state before any operation
+        this.cachedDOMState = this.retrieveDOMState();
+
         if (window.onresize !== null) {
           // is auto resizing
           window.onresize = null;
@@ -174,6 +178,19 @@ export class SvgDocument {
           document.body.classList.remove("hide-scrollbar-x");
         }
 
+        // reserve space to scroll down
+        const svg = this.hookedElem.firstElementChild! as SVGElement;
+        if (svg) {
+          const scaleRatio = this.getSvgScaleRatio();
+
+          const dataHeight = Number.parseFloat(svg.getAttribute("data-height")!);
+          const scaledHeight = Math.ceil(dataHeight * scaleRatio);
+
+          // we increase the height by 2 times.
+          // The `2` is only a magic number that is large enough.
+          this.hookedElem.style.height = `${scaledHeight * 2}px`;
+        }
+
         // make sure the cursor is still on the same position
         window.scrollBy(scrollX, scrollY);
         // toggle scale change event
@@ -195,12 +212,15 @@ export class SvgDocument {
     }
   }
 
-  // Note: one should retrieve dom state before rescale
-  rescale() {
+  /// Get current scale from html to svg
+  getSvgScaleRatio() {
+    const svg = this.hookedElem.firstElementChild as SVGElement;
+    if (!svg) {
+      return 0;
+    }
+
     // get dom state from cache, so we are free from layout reflowing
-    // Note: one should retrieve dom state before rescale
     const container = this.cachedDOMState;
-    const svg = this.hookedElem.firstElementChild! as SVGElement;
 
     const svgWidth = Number.parseFloat(
       svg.getAttribute("data-width") || svg.getAttribute("width") || "1"
@@ -213,7 +233,21 @@ export class SvgDocument {
         Math.min(container.width / svgWidth, container.height / svgHeight) :
         container.width / svgWidth;
 
-    const scale = this.currentRealScale * this.currentScaleRatio;
+    return this.currentRealScale * this.currentScaleRatio;
+  }
+
+  // Note: one should retrieve dom state before rescale
+  rescale() {
+    const svg = this.hookedElem.firstElementChild! as SVGElement;
+
+    const scale = this.getSvgScaleRatio();
+    if (scale === 0) {
+      console.warn("determine scale as 0, skip rescale");
+      return;
+    }
+
+    // get dom state from cache, so we are free from layout reflowing
+    const container = this.cachedDOMState;
 
     // apply scale
     const dataWidth = Number.parseFloat(svg.getAttribute("data-width")!);
@@ -238,6 +272,9 @@ export class SvgDocument {
       const heightAdjust = Math.max((container.height - scaledHeight) / 2, 0);
       this.hookedElem.style.transform = `translate(${widthAdjust}px, ${heightAdjust}px)`;
     }
+
+    // change height of the container back from `installCtrlWheelHandler` hack
+    this.hookedElem.style.height = `${scaledHeight}px`;
   }
 
   private decorateSvgElement(svg: SVGElement, mode: PreviewMode) {
@@ -657,7 +694,7 @@ export class SvgDocument {
       clearTimeout(this.vpTimeout);
     }
 
-    if (change[0] === "viewport-change") {
+    if (change[0] === "viewport-change" && this.svgUpdating) {
       // delay viewport change a bit
       this.vpTimeout = setTimeout(pushChange, this.sampledRenderTime || 100);
     } else {

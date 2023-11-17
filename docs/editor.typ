@@ -110,7 +110,7 @@ Example:
 }
 ```
 
-=== Compile Status Reporting
+== Compile Status Reporting
 
 To implement compile status reporting, the editor extension act on `compileStatus` event. The `event` field should be `compileStatus`. The `kind` field is the compile status. The `kind` field can be one of the following values:
 
