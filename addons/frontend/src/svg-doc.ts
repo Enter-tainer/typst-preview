@@ -267,10 +267,16 @@ export class SvgDocument {
       svg.setAttribute("height", `${scaledHeight}`);
     }
 
+    const widthAdjust = Math.max((container.width - scaledWidth) / 2, 0);
+    let transformAttr = '';
     if (this.previewMode === PreviewMode.Slide) {
-      const widthAdjust = Math.max((container.width - scaledWidth) / 2, 0);
       const heightAdjust = Math.max((container.height - scaledHeight) / 2, 0);
-      this.hookedElem.style.transform = `translate(${widthAdjust}px, ${heightAdjust}px)`;
+      transformAttr = `translate(${widthAdjust}px, ${heightAdjust}px)`;
+    } else {
+      transformAttr = `translate(${widthAdjust}px, 0px)`;
+    }
+    if (this.hookedElem.style.transform !== transformAttr) {
+      this.hookedElem.style.transform = transformAttr;
     }
 
     // change height of the container back from `installCtrlWheelHandler` hack
