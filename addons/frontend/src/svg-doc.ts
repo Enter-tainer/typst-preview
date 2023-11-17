@@ -292,9 +292,7 @@ export class SvgDocument {
     }
 
     // change height of the container back from `installCtrlWheelHandler` hack
-    if (this.hookedElem.style.height) {
-      this.hookedElem.style.removeProperty("height");
-    }
+    this.hookedElem.style.height = `${scaledHeight}px`;
   }
 
   private decorateSvgElement(svg: SVGElement, mode: PreviewMode) {
