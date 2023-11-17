@@ -1,7 +1,20 @@
 use std::path::PathBuf;
 
-use clap::{ArgAction, Parser};
+use clap::{ArgAction, Parser, ValueEnum};
 use once_cell::sync::Lazy;
+
+// enum Preview Mode
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum PreviewMode {
+    /// Preview mode for regular document
+    #[clap(name = "document")]
+    Document,
+
+    /// Preview mode for slide
+    #[clap(name = "slide")]
+    Slide,
+}
+
 #[derive(Debug, Clone, Parser)]
 #[clap(name = "typst-preview", author, version, about, long_version(LONG_VERSION.as_str()))]
 pub struct CliArguments {
@@ -12,6 +25,10 @@ pub struct CliArguments {
     /// Root directory for your project
     #[clap(long = "root", value_name = "DIR")]
     pub root: Option<PathBuf>,
+
+    /// Preview mode
+    #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
+    pub preview_mode: PreviewMode,
 
     /// Data plane server will bind to this address
     #[clap(

@@ -1,5 +1,4 @@
-import "./typst.css";
-import { SvgDocument } from "./svg-doc";
+import { PreviewMode, SvgDocument } from "./svg-doc";
 import {
     rendererBuildInfo,
     createTypstRenderer,
@@ -14,16 +13,19 @@ const dec = new TextDecoder();
 const NOT_AVAIABLE = "current not avalible";
 const COMMA = enc.encode(",");
 
-function createSvgDocument(wasmDocRef: RenderSession) {
+function createSvgDocument(wasmDocRef: RenderSession, previewMode: PreviewMode) {
     const hookedElem = document.getElementById("typst-app");
-    const resizeTarget = document.documentElement;
+    const resizeTarget = document.getElementById('typst-container-main')!;
 
     const svgDoc = new SvgDocument(hookedElem!, wasmDocRef, {
+        previewMode,
         // set rescale target to `body`
         retrieveDOMState() {
             return {
                 // reserving 1px to hide width border
                 width: resizeTarget.clientWidth + 1,
+                // reserving 1px to hide width border
+                height: resizeTarget.offsetHeight,
                 boundingRect: resizeTarget.getBoundingClientRect(),
             };
         },
@@ -34,10 +36,128 @@ function createSvgDocument(wasmDocRef: RenderSession) {
     window.addEventListener("resize", () => svgDoc.addViewportChange());
     window.addEventListener("scroll", () => svgDoc.addViewportChange());
 
+    if (previewMode === PreviewMode.Slide) {
+
+        {
+            const inpPageSelector = document.getElementById("typst-page-selector") as HTMLSelectElement | undefined;
+            if (inpPageSelector) {
+                inpPageSelector.addEventListener("input", () => {
+                    if (inpPageSelector.value.length === 0) {
+                        return;
+                    }
+                    const page = Number.parseInt(inpPageSelector.value);
+                    svgDoc.setPartialPageNumber(page);
+                });
+            }
+        }
+
+        const focusInput = () => {
+            const inpPageSelector = document.getElementById("typst-page-selector") as HTMLSelectElement | undefined;
+            if (inpPageSelector) {
+                inpPageSelector.focus();
+            }
+        }
+
+        const blurInput = () => {
+            const inpPageSelector = document.getElementById("typst-page-selector") as HTMLSelectElement | undefined;
+            if (inpPageSelector) {
+                inpPageSelector.blur();
+            }
+        }
+
+        const updateDiff = (diff: number) => () => {
+            const pageSelector = document.getElementById("typst-page-selector") as HTMLSelectElement | undefined;
+
+            if (pageSelector) {
+                console.log("updateDiff", diff);
+                const v = pageSelector.value;
+                if (v.length === 0) {
+                    return;
+                }
+                const page = Number.parseInt(v) + diff;
+                if (page <= 0) {
+                    return;
+                }
+                if (svgDoc.setPartialPageNumber(page)) {
+                    pageSelector.value = page.toString();
+                    blurInput();
+                }
+            }
+        }
+
+        const updatePrev = updateDiff(-1);
+        const updateNext = updateDiff(1);
+
+        const pagePrevSelector = document.getElementById("typst-page-prev-selector");
+        if (pagePrevSelector) {
+            pagePrevSelector.addEventListener("click", updatePrev);
+        }
+        const pageNextSelector = document.getElementById("typst-page-next-selector");
+        if (pageNextSelector) {
+            pageNextSelector.addEventListener("click", updateNext);
+        }
+
+        const toggleHelp = () => {
+            const help = document.getElementById("typst-help-panel");
+            console.log("toggleHelp", help);
+            if (help) {
+                help.classList.toggle("hidden");
+            }
+        };
+
+        const removeHelp = () => {
+            const help = document.getElementById("typst-help-panel");
+            if (help) {
+                help.classList.add("hidden");
+            }
+        }
+
+        const helpButton = document.getElementById("typst-top-help-button");
+        helpButton?.addEventListener('click', toggleHelp);
+
+        window.addEventListener("keydown", (e) => {
+            let handled = true;
+            switch (e.key) {
+                case "ArrowLeft":
+                case "ArrowUp":
+                    blurInput();
+                    removeHelp();
+                    updatePrev();
+                    break;
+                case " ":
+                case "ArrowRight":
+                case "ArrowDown":
+                    blurInput();
+                    removeHelp();
+                    updateNext();
+                    break;
+                case "h":
+                    blurInput();
+                    toggleHelp();
+                    break;
+                case "g":
+                    removeHelp();
+                    focusInput();
+                    break;
+                case "Escape":
+                    removeHelp();
+                    blurInput();
+                    handled = false;
+                    break;
+                default:
+                    handled = false;
+            }
+
+            if (handled) {
+                e.preventDefault();
+            }
+        });
+    }
+
     return svgDoc;
 }
 
-export function wsMain() {
+export function wsMain(previewMode: PreviewMode) {
     function setupSocket(svgDoc: SvgDocument) {
         // todo: reconnect setTimeout(() => setupSocket(svgDoc), 1000);
         const subject = webSocket<ArrayBuffer>({
@@ -106,12 +226,29 @@ export function wsMain() {
                     .decode((message[1] as any).buffer)
                     .split(" ")
                     .map(Number);
+
+                let pageToJump = page;
+
+                if (previewMode === PreviewMode.Slide) {
+                    const pageSelector = document.getElementById("typst-page-selector") as HTMLSelectElement | undefined;
+                    if (svgDoc.setPartialPageNumber(page)) {
+                        if (pageSelector) {
+                            pageSelector.value = page.toString();
+                        }
+                        // pageToJump = 1;
+                        // todo: hint location
+                        return;
+                    } else {
+                        return;
+                    }
+                }
+
                 const rootElem =
                     document.getElementById("typst-app")?.firstElementChild;
                 if (rootElem) {
                     /// Note: when it is really scrolled, it will trigger `svgDoc.addViewportChange`
                     /// via `window.onscroll` event
-                    window.handleTypstLocation(rootElem, page, x, y);
+                    window.handleTypstLocation(rootElem, pageToJump, x, y);
                 }
                 return;
             } else if (message[0] === "cursor") {
@@ -167,7 +304,7 @@ export function wsMain() {
                 console.log("plugin initialized, build info:", await rendererBuildInfo());
 
                 // todo: plugin init and setup socket at the same time
-                setupSocket(createSvgDocument(kModule));
+                setupSocket(createSvgDocument(kModule, previewMode));
 
                 // never dispose session
                 void (dispose);

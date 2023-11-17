@@ -51,6 +51,20 @@
         "when": "resourceLangId == typst && editorTextFocus"
       },
       {
+        "command": "typst-preview.preview-slide",
+        "title": "Typst Preview: Preview current file in slide mode",
+        "description": "Launch typst-preview server in slide mode",
+        "icon": "$(open-preview)",
+        "when": "resourceLangId == typst && editorTextFocus"
+      },
+      {
+        "command": "typst-preview.browser-slide",
+        "title": "Typst Preview: Preview current file in browser and slide mode",
+        "description": "Launch typst-preview server in slide mode and open the preview in your browser",
+        "icon": "$(open-preview)",
+        "when": "resourceLangId == typst && editorTextFocus"
+      },
+      {
         "command": "typst-preview.sync",
         "title": "Typst Preview: Sync preview with current cursor",
         "description": "Scroll preview to current cursor position",

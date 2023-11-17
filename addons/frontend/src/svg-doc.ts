@@ -5,12 +5,19 @@ import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 export interface ContainerDOMState {
   /// cached `hookedElem.offsetWidth` or `hookedElem.innerWidth`
   width: number;
+  /// cached `hookedElem.offsetHeight` or `hookedElem.innerHeight`
+  height: number;
   /// cached `hookedElem.getBoundingClientRect()`
   /// We only use `left` and `top` here.
   boundingRect: {
     left: number;
     top: number;
   };
+}
+
+export enum PreviewMode {
+  Doc,
+  Slide,
 }
 
 export class SvgDocument {
@@ -20,12 +27,12 @@ export class SvgDocument {
   private svgUpdating: boolean;
   /// whether kModule is initialized
   private moduleInitialized: boolean;
-  /// current width of `hookedElem`
-  private currentContainerWidth: number;
   /// patch queue for updating svg.
   private patchQueue: [string, string][];
   /// enable partial rendering
   private partialRendering: boolean;
+  /// preview mode
+  private previewMode: PreviewMode;
 
   /// There are two scales in this class: The real scale is to adjust the size
   /// of `hookedElem` to fit the svg. The virtual scale (scale ratio) is to let
@@ -41,6 +48,8 @@ export class SvgDocument {
   private vpTimeout: any;
   /// sampled by last render time.
   private sampledRenderTime: number;
+  /// page to partial render
+  private partialRenderPage: number;
 
   /// Style fields
 
@@ -51,35 +60,46 @@ export class SvgDocument {
   /// Cache fields
 
   /// cached state of container, default to retrieve state from `this.hookedElem`
+  /// Note: one should retrieve dom state before rescale
   private cachedDOMState: ContainerDOMState;
 
   private retrieveDOMState: () => ContainerDOMState;
 
   constructor(private hookedElem: HTMLElement, public kModule: RenderSession, options?: {
+    previewMode?: PreviewMode,
     retrieveDOMState?: () => ContainerDOMState,
   }) {
     /// Apply option
     this.retrieveDOMState = options?.retrieveDOMState || (() => {
       return {
         width: this.hookedElem.offsetWidth,
+        height: this.hookedElem.offsetHeight,
         boundingRect: this.hookedElem.getBoundingClientRect(),
       }
     });
+    this.partialRendering = false;
+    this.previewMode = PreviewMode.Doc;
+    if (options?.previewMode !== undefined) {
+      this.previewMode = options?.previewMode;
+    }
 
     /// State fields
     this.svgUpdating = false;
     this.moduleInitialized = false;
     this.currentRealScale = 1;
-    this.currentContainerWidth = hookedElem.offsetWidth;
     this.patchQueue = [];
-    this.partialRendering = false;
     this.currentScaleRatio = 1;
     this.vpTimeout = undefined;
     this.sampledRenderTime = 0;
+    this.partialRenderPage = 0;
     // if init scale == 1
     // hide scrollbar if scale == 1
     this.hookedElem.classList.add("hide-scrollbar-x");
     document.body.classList.add("hide-scrollbar-x");
+    if (this.previewMode === PreviewMode.Slide) {
+      this.hookedElem.classList.add("hide-scrollbar-y");
+      document.body.classList.add("hide-scrollbar-y");
+    }
 
     /// Style fields
     this.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--typst-preview-background-color');
@@ -88,8 +108,12 @@ export class SvgDocument {
     /// Cache fields
     this.cachedDOMState = {
       width: 0,
+      height: 0,
       // todo: we should not query dom state here, which may cause layout reflowing
-      boundingRect: hookedElem.getBoundingClientRect(),
+      boundingRect: {
+        left: 0,
+        top: 0,
+      },
     };
 
     installEditorJumpToHandler(this.kModule, this.hookedElem);
@@ -153,9 +177,17 @@ export class SvgDocument {
         if (Math.abs(this.currentScaleRatio - 1) < 1e-5) {
           this.hookedElem.classList.add("hide-scrollbar-x");
           document.body.classList.add("hide-scrollbar-x");
+          if (this.previewMode === PreviewMode.Slide) {
+            this.hookedElem.classList.add("hide-scrollbar-y");
+            document.body.classList.add("hide-scrollbar-y");
+          }
         } else {
           this.hookedElem.classList.remove("hide-scrollbar-x");
           document.body.classList.remove("hide-scrollbar-x");
+          if (this.previewMode === PreviewMode.Slide) {
+            this.hookedElem.classList.remove("hide-scrollbar-y");
+            document.body.classList.remove("hide-scrollbar-y");
+          }
         }
 
         // reserve space to scroll down
@@ -200,13 +232,18 @@ export class SvgDocument {
     }
 
     // get dom state from cache, so we are free from layout reflowing
-    // Note: one should retrieve dom state before rescale
-    const { width: containerWidth } = this.cachedDOMState;
-    this.currentContainerWidth = containerWidth;
+    const container = this.cachedDOMState;
+
     const svgWidth = Number.parseFloat(
       svg.getAttribute("data-width") || svg.getAttribute("width") || "1"
     );
-    this.currentRealScale = this.currentContainerWidth / svgWidth;
+    const svgHeight = Number.parseFloat(
+      svg.getAttribute("data-height") || svg.getAttribute("height") || "1"
+    );
+    this.currentRealScale =
+      this.previewMode === PreviewMode.Slide ?
+        Math.min(container.width / svgWidth, container.height / svgHeight) :
+        container.width / svgWidth;
 
     return this.currentRealScale * this.currentScaleRatio;
   }
@@ -220,6 +257,9 @@ export class SvgDocument {
       console.warn("determine scale as 0, skip rescale");
       return;
     }
+
+    // get dom state from cache, so we are free from layout reflowing
+    const container = this.cachedDOMState;
 
     // apply scale
     const dataWidth = Number.parseFloat(svg.getAttribute("data-width")!);
@@ -239,32 +279,62 @@ export class SvgDocument {
       svg.setAttribute("height", `${scaledHeight}`);
     }
 
+    const widthAdjust = Math.max((container.width - scaledWidth) / 2, 0);
+    let transformAttr = '';
+    if (this.previewMode === PreviewMode.Slide) {
+      const heightAdjust = Math.max((container.height - scaledHeight) / 2, 0);
+      transformAttr = `translate(${widthAdjust}px, ${heightAdjust}px)`;
+    } else {
+      transformAttr = `translate(${widthAdjust}px, 0px)`;
+    }
+    if (this.hookedElem.style.transform !== transformAttr) {
+      this.hookedElem.style.transform = transformAttr;
+    }
+
     // change height of the container back from `installCtrlWheelHandler` hack
     if (this.hookedElem.style.height) {
       this.hookedElem.style.removeProperty("height");
     }
   }
 
-  private decorateSvgElement(svg: SVGElement) {
-    const { width: containerWidth } = this.cachedDOMState;
+  private decorateSvgElement(svg: SVGElement, mode: PreviewMode) {
+    const container = this.cachedDOMState;
 
     // the <rect> could only have integer width and height
     // so we scale it by 100 to make it more accurate
     const INNER_RECT_UNIT = 100;
     const INNER_RECT_SCALE = 'scale(0.01)';
 
-    /// Retrieve original pages
-    const nextPages = Array.from(svg.children).filter(
-      (x) => x.classList.contains("typst-page")
-    );
-
     /// Caclulate width
     let maxWidth = 0;
-    for (let i = 0; i < nextPages.length; i++) {
-      const nextPage = nextPages[i];
-      const pageWidth = Number.parseFloat(nextPage.getAttribute("data-page-width")!);
-      maxWidth = Math.max(maxWidth, pageWidth);
-    }
+
+    const nextPages = (() => {
+      /// Retrieve original pages
+      const filteredNextPages = Array.from(svg.children).filter(
+        (x) => x.classList.contains("typst-page")
+      );
+
+      if (mode === PreviewMode.Doc) {
+        return filteredNextPages;
+      } else if (mode === PreviewMode.Slide) {
+        // already fetched pages info
+        const pageOffset = this.partialRenderPage;
+        return [filteredNextPages[pageOffset]];
+      } else {
+        throw new Error(`unknown preview mode ${mode}`);
+      }
+    })().map((elem) => {
+      const width = Number.parseFloat(elem.getAttribute("data-page-width")!);
+      const height = Number.parseFloat(elem.getAttribute("data-page-height")!);
+      maxWidth = Math.max(maxWidth, width);
+      return {
+        elem,
+        width,
+        height,
+      }
+    });
+
+    /// Adjust width
     if (maxWidth < 1e-5) {
       maxWidth = 1;
     }
@@ -273,8 +343,8 @@ export class SvgDocument {
 
     /// Prepare scale
     // scale derived from svg width and container with.
-    const computedScale = containerWidth
-      ? containerWidth / maxWidth
+    const computedScale = container.width
+      ? container.width / maxWidth
       : 1;
     // respect current scale ratio
     const scale = this.currentScaleRatio * computedScale;
@@ -293,8 +363,7 @@ export class SvgDocument {
     for (let i = 0; i < nextPages.length; i++) {
       /// Retrieve page width, height
       const nextPage = nextPages[i];
-      const pageWidth = Number.parseFloat(nextPage.getAttribute("data-page-width")!);
-      const pageHeight = Number.parseFloat(nextPage.getAttribute("data-page-height")!);
+      const { width: pageWidth, height: pageHeight } = nextPage;
 
       /// center the page and add margin
       const calculatedPaddedX = (newWidth - pageWidth) / 2;
@@ -319,11 +388,11 @@ export class SvgDocument {
       // innerRect.setAttribute("stroke-opacity", "0.4");
 
       /// Move page to the correct position
-      nextPage.setAttribute("transform", translateAttr);
+      nextPage.elem.setAttribute("transform", translateAttr);
 
       /// Insert rectangles
       // todo: this is buggy not preserving order?
-      svg.insertBefore(innerRect, firstPage);
+      svg.insertBefore(innerRect, firstPage.elem);
       if (!firstRect) {
         firstRect = innerRect;
       }
@@ -386,14 +455,13 @@ export class SvgDocument {
     return this.kModule.docWidth;
   }
 
-  private toggleViewportChange() {
+
+  private statSvgFromDom() {
     const { width: containerWidth, boundingRect: containerBRect } = this.cachedDOMState;
     // scale derived from svg width and container with.
     // svg.setAttribute("data-width", `${newWidth}`);
 
-    const computedRevScale = containerWidth
-      ? this.docWidth / containerWidth
-      : 1;
+    const computedRevScale = containerWidth ? this.docWidth / containerWidth : 1;
     // respect current scale ratio
     const revScale = computedRevScale / this.currentScaleRatio;
     const left = (window.screenLeft - containerBRect.left) * revScale;
@@ -401,24 +469,96 @@ export class SvgDocument {
     const width = window.innerWidth * revScale;
     const height = window.innerHeight * revScale;
 
+    return { revScale, left, top, width, height };
+  }
+
+  private toggleViewportChange() {
+    let patchStr: string;
+    const mode = this.previewMode;
+    if (mode === PreviewMode.Doc) {
+      patchStr = this.fetchDataByDocMode();
+    } else if (mode === PreviewMode.Slide) {
+      patchStr = this.fetchDataBySlideMode();
+    } else {
+      throw new Error(`unknown preview mode ${mode}`);
+    }
+
+    const t2 = performance.now();
+    patchSvgToContainer(this.hookedElem, patchStr, elem => this.decorateSvgElement(elem, mode));
+    const t3 = performance.now();
+
+    return [t2, t3];
+  }
+
+  private fetchDataBySlideMode() {
+    const pagesInfo = this.kModule.retrievePagesInfo();
+
+    if (pagesInfo.length === 0) {
+      // svg warning
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+  <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="20">No page found</text>
+</svg>`;
+    }
+
+    if (this.partialRenderPage >= pagesInfo.length) {
+      this.partialRenderPage = pagesInfo.length - 1;
+    }
+
+    const pageOffset = this.partialRenderPage;
+    let lo = { x: 0, y: 0 },
+      hi = { x: 0, y: 0 };
+    for (let i = 0; i < pageOffset; i++) {
+      const pageInfo = pagesInfo[i];
+      lo.y += pageInfo.height;
+    }
+    const page = pagesInfo[pageOffset];
+    hi.y = lo.y + page.height;
+    hi.x = page.width;
+
+    console.log('render_in_window for slide mode', lo.x, lo.y, hi.x, hi.y);
+
+    // with a bit padding to avoid edge error
+    lo.x += 1e-1;
+    lo.y += 1e-1;
+    hi.x -= 1e-1;
+    hi.y -= 1e-1;
+
+    return this.kModule.renderSvgDiff({
+      window: {
+        lo,
+        hi,
+      },
+    });
+  }
+
+  private fetchDataByDocMode() {
+    const { revScale, left, top, width, height } = this.statSvgFromDom();
 
     let patchStr: string;
     // with 1px padding to avoid edge error
     if (this.partialRendering) {
-      console.log("render_in_window with partial rendering enabled", revScale, left, top, width, height);
+      console.log(
+        'render_in_window with partial rendering enabled',
+        revScale,
+        left,
+        top,
+        width,
+        height,
+      );
 
       /// Adjust top and bottom
       const ch = this.hookedElem.firstElementChild?.children;
-      let topEstimate = top - height - 1, bottomEstimate = top + height * 2 + 1;
+      let topEstimate = top - height - 1,
+        bottomEstimate = top + height * 2 + 1;
       if (ch) {
-        const pages = Array.from(ch).filter(
-          (x) => x.classList.contains("typst-page")
-        );
-        let minTop = 1e33, maxBottom = -1e33, accumulatedHeight = 0;
+        const pages = Array.from(ch).filter(x => x.classList.contains('typst-page'));
+        let minTop = 1e33,
+          maxBottom = -1e33,
+          accumulatedHeight = 0;
         const translateRegex = /translate\(([-0-9.]+), ([-0-9.]+)\)/;
         for (const page of pages) {
-          const pageHeight = Number.parseFloat(page.getAttribute("data-page-height")!);
-          const translate = page.getAttribute("transform")!;
+          const pageHeight = Number.parseFloat(page.getAttribute('data-page-height')!);
+          const translate = page.getAttribute('transform')!;
           const translateMatch = translate.match(translateRegex)!;
           const translateY = Number.parseFloat(translateMatch[2]);
           if (translateY + pageHeight > topEstimate) {
@@ -441,20 +581,18 @@ export class SvgDocument {
       // translate
       patchStr = this.kModule.render_in_window(
         // lo.x, lo.y
-        left - 1, topEstimate,
+        left - 1,
+        topEstimate,
         // hi.x, hi.y
-        left + width + 1, bottomEstimate,
+        left + width + 1,
+        bottomEstimate,
       );
     } else {
-      console.log("render_in_window with partial rendering disabled", 0, 0, 1e33, 1e33)
+      console.log('render_in_window with partial rendering disabled', 0, 0, 1e33, 1e33);
       patchStr = this.kModule.render_in_window(0, 0, 1e33, 1e33);
     }
 
-    const t2 = performance.now();
-    patchSvgToContainer(this.hookedElem, patchStr, (elem) => this.decorateSvgElement(elem));
-    const t3 = performance.now();
-
-    return [t2, t3];
+    return patchStr;
   }
 
   private processQueue(svgUpdateEvent: [string, string]) {
@@ -549,6 +687,13 @@ export class SvgDocument {
       window.initTypstSvg(docRoot);
       this.rescale();
     }
+
+    // todo: abstract this
+    if (this.previewMode === PreviewMode.Slide) {
+      document.querySelectorAll('.typst-page-number-indicator').forEach(x => {
+        x.textContent = `${this.kModule.retrievePagesInfo().length}`;
+      });
+    }
   }
 
   addChangement(change: [string, string]) {
@@ -587,5 +732,18 @@ export class SvgDocument {
 
   setCursor(page: number, x: number, y: number) {
     this.cursorPosition = [page, x, y];
+  }
+
+  setPartialPageNumber(page: number): boolean {
+    if (page <= 0 || page > this.kModule.retrievePagesInfo().length) {
+      return false;
+    }
+    this.partialRenderPage = page - 1;
+    this.addViewportChange();
+    return true;
+  }
+
+  getPartialPageNumber(): number {
+    return this.partialRenderPage + 1;
   }
 }

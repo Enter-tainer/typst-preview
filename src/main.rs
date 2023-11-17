@@ -17,7 +17,7 @@ use tokio::net::{TcpListener, TcpStream};
 
 use crate::actor::editor::EditorActor;
 use crate::actor::typst::TypstActor;
-use crate::args::CliArguments;
+use crate::args::{CliArguments, PreviewMode};
 
 use tokio_tungstenite::WebSocketStream;
 
@@ -267,6 +267,16 @@ async fn main() {
                             "ws://127.0.0.1:23625",
                             format!("ws://127.0.0.1:{data_plane_port}").as_str(),
                         );
+                        // previewMode
+                        let mode = match arguments.preview_mode {
+                            PreviewMode::Document => "Doc",
+                            PreviewMode::Slide => "Slide",
+                        };
+                        let html = html.replace(
+                            "preview-arg:previewMode:Doc",
+                            format!("preview-arg:previewMode:{}", mode).as_str(),
+                        );
+                        log::info!("Preview mode: {}", mode);
                         Ok::<_, Error>(hyper::Response::new(hyper::Body::from(html)))
                     } else {
                         // jump to /
