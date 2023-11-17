@@ -188,3 +188,13 @@ Add preview button
 - Bug fixes:
   - #143 Scrolling is not that laggy now
   - #159 Fix a clip path bug
+
+## v0.9.1
+
+- Features:
+  - #160: Slides mode is available now! You can enable use `typst-preview.preview-slide` command.
+  - Allow adjust the status bar item
+
+- Bug fixes:
+  - Previously the `Compiling` status is never sent to the status bar item. This is now fixed.
+  - #183 #128 Various rendering fix.
