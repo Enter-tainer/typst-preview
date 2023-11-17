@@ -96,6 +96,10 @@ export class SvgDocument {
     // hide scrollbar if scale == 1
     this.hookedElem.classList.add("hide-scrollbar-x");
     document.body.classList.add("hide-scrollbar-x");
+    if (this.previewMode === PreviewMode.Slide) {
+      this.hookedElem.classList.add("hide-scrollbar-y");
+      document.body.classList.add("hide-scrollbar-y");
+    }
 
     /// Style fields
     this.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--typst-preview-background-color');
@@ -173,9 +177,17 @@ export class SvgDocument {
         if (Math.abs(this.currentScaleRatio - 1) < 1e-5) {
           this.hookedElem.classList.add("hide-scrollbar-x");
           document.body.classList.add("hide-scrollbar-x");
+          if (this.previewMode === PreviewMode.Slide) {
+            this.hookedElem.classList.add("hide-scrollbar-y");
+            document.body.classList.add("hide-scrollbar-y");
+          }
         } else {
           this.hookedElem.classList.remove("hide-scrollbar-x");
           document.body.classList.remove("hide-scrollbar-x");
+          if (this.previewMode === PreviewMode.Slide) {
+            this.hookedElem.classList.remove("hide-scrollbar-y");
+            document.body.classList.remove("hide-scrollbar-y");
+          }
         }
 
         // reserve space to scroll down

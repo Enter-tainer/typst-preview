@@ -42,6 +42,10 @@ body {
   overflow-x: hidden;
 }
 
+.hide-scrollbar-y {
+  overflow-y: hidden;
+}
+
 .typst-text {
   pointer-events: bounding-box;
 }

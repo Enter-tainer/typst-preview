@@ -48,14 +48,9 @@
   height: 100%;
   flex: 1;
   max-height: calc(100vh - 35px);
-  overflow: hidden;
 }
 
 #typst-container.mode-slide #typst-container-top {
   flex: 0 0 35px;
   display: flex;
-}
-
-#typst-container.mode-slide #typst-app {
-  overflow: hidden;
 }
