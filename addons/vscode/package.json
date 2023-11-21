@@ -157,7 +157,15 @@
           ]
         }
       }
-    }
+    },
+    "keybindings": [
+      {
+        "command": "typst-preview.preview",
+        "key": "ctrl+k v",
+        "mac": "cmd+k v",
+        "when": "editorLangId == typst"
+      }
+    ]
   },
   "scripts": {
     "build:frontend": "cd ../frontend && yarn run build && cd ../vscode && rimraf ./out/frontend/ && cpr ../frontend/dist/ ./out/frontend/",
