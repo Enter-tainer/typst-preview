@@ -168,7 +168,7 @@
           "default": false
         },
         "typst-preview.showInActivityBar": {
-          "description": "(Experimental) Show typst preview's view containers in activity bar.",
+          "description": "(Experimental) Show a preview panel in activity bar.",
           "type": "boolean",
           "default": false
         },
