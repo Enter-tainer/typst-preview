@@ -1,5 +1,5 @@
 import { patchSvgToContainer } from "./svg-patch";
-import { installEditorJumpToHandler } from "./svg-debug-info";
+import { installEditorJumpToHandler, removeSourceMappingHandler } from "./svg-debug-info";
 import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 
 export interface ContainerDOMState {
@@ -51,6 +51,8 @@ export class SvgDocument {
   private sampledRenderTime: number;
   /// page to partial render
   private partialRenderPage: number;
+
+  private disposeList: (() => void)[] = [];
 
   /// Style fields
 
@@ -224,9 +226,15 @@ export class SvgDocument {
       window.addEventListener("wheel", wheelEventHandler, {
         passive: false,
       });
+      this.disposeList.push(() => {
+        window.removeEventListener("wheel", wheelEventHandler);
+      });
     } else {
       document.body.addEventListener("wheel", wheelEventHandler, {
         passive: false,
+      });
+      this.disposeList.push(() => {
+        document.body.removeEventListener("wheel", wheelEventHandler);
       });
     }
   }
@@ -775,5 +783,12 @@ export class SvgDocument {
 
   getPartialPageNumber(): number {
     return this.partialRenderPage + 1;
+  }
+
+  dispose() {
+    if (this.hookedElem) {
+      removeSourceMappingHandler(this.hookedElem);
+    }
+    this.disposeList.forEach(x => x());
   }
 }

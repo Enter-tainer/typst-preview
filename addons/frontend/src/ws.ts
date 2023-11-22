@@ -2,11 +2,18 @@ import { PreviewMode, SvgDocument } from "./svg-doc";
 import {
     rendererBuildInfo,
     createTypstRenderer,
-} from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
+} from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs"; 0
 import renderModule from "@myriaddreamin/typst-ts-renderer/pkg/typst_ts_renderer_bg.wasm?url";
+// @ts-ignore
+// import { RenderSession as RenderSession2 } from "@myriaddreamin/typst-ts-renderer/pkg/wasm-pack-shim.mjs";
 import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 import { WebSocketSubject, webSocket } from 'rxjs/webSocket';
 import { Subject, buffer, debounceTime, tap } from "rxjs";
+
+// for debug propose
+// queryObjects((window as any).TypstRenderSession);
+(window as any).TypstRenderSession = RenderSession;
+// (window as any).TypstRenderSessionKernel = RenderSession2;
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -30,6 +37,17 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         }
         return () => { };
     }
+
+    let disposed = false;
+    let subject: WebSocketSubject<ArrayBuffer> | undefined = undefined;
+    const listeners: [any, string, any][] = [];
+    function addWindowEventListener<K extends keyof WindowEventMap>(
+        type: K, listener: (this: Window, ev: WindowEventMap[K]) => any): void;
+    function addWindowEventListener(event: string, listener: any) {
+        window.addEventListener(event, listener);
+        listeners.push([window, event, listener]);
+    }
+
 
     function createSvgDocument(wasmDocRef: RenderSession) {
         const hookedElem = document.getElementById("typst-app")!;
@@ -55,8 +73,8 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
 
         // drag (panal resizing) -> rescaling
         // window.onresize = () => svgDoc.rescale();
-        window.addEventListener("resize", () => svgDoc.addViewportChange());
-        window.addEventListener("scroll", () => svgDoc.addViewportChange());
+        addWindowEventListener("resize", () => svgDoc.addViewportChange());
+        addWindowEventListener("scroll", () => svgDoc.addViewportChange());
 
         if (previewMode === PreviewMode.Slide) {
             {
@@ -178,8 +196,6 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         return svgDoc;
     }
 
-    let disposed = false;
-    let subject: WebSocketSubject<ArrayBuffer> | undefined = undefined;
     function setupSocket(svgDoc: SvgDocument): () => void {
         // todo: reconnect setTimeout(() => setupSocket(svgDoc), 1000);
         subject = webSocket<ArrayBuffer>({
@@ -208,6 +224,10 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         });
         const dispose = () => {
             disposed = true;
+            svgDoc.dispose();
+            for (const [target, evt, listener] of listeners.splice(0, listeners.length)) {
+                target.removeEventListener(evt, listener);
+            }
             subject?.complete();
         };
 
@@ -338,14 +358,18 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
 
     return new Promise<() => void>((resolveDispose) =>
         plugin.runWithSession(kModule /* module kernel from wasm */ => {
-            return new Promise(async (dispose) => {
+            return new Promise(async (kernelDispose) => {
                 console.log("plugin initialized, build info:", await rendererBuildInfo());
 
-                // todo: plugin init and setup socket at the same time
-                resolveDispose(setupSocket(createSvgDocument(kModule)));
+                const wsDispose = setupSocket(createSvgDocument(kModule));
 
-                // never dispose session
-                void (dispose);
+                // todo: plugin init and setup socket at the same time
+                resolveDispose(() => {
+                    // dispose ws first
+                    wsDispose();
+                    // dispose kernel then
+                    kernelDispose(undefined);
+                });
             })
         }));
 };
