@@ -48,6 +48,7 @@
 
 #typst-container.mode-doc #typst-container-main {
   width: calc(100% - (2 * var(--main-margin)));
+  margin: 0 calc(var(--main-margin));
 }
 
 #typst-container.mode-slide {

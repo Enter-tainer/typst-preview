@@ -85,7 +85,10 @@ export class SvgDocument {
       this.previewMode = options?.previewMode;
     }
     this.isContentPreview = options?.isContentPreview || false;
-    void (this.isContentPreview);
+    if (this.isContentPreview) {
+      // content preview has very bad performance without partial rendering
+      this.partialRendering = true;
+    }
 
     /// State fields
     this.svgUpdating = false;
@@ -727,9 +730,6 @@ export class SvgDocument {
   }
 
   addChangement(change: [string, string]) {
-    if (!this.partialRendering && change[0] === "viewport-change") {
-      return;
-    }
     if (change[0] === "new") {
       this.patchQueue.splice(0, this.patchQueue.length);
     }
