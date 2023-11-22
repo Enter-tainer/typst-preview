@@ -102,7 +102,7 @@
         {
           "id": "typst-preview.content-preview",
           "type": "webview",
-          "name": "Content Preview",
+          "name": "Content",
           "when": "config.typst-preview.showInActivityBar"
         },
         {
