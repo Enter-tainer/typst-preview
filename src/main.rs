@@ -179,7 +179,7 @@ async fn main() {
         typst_mailbox.1,
         doc_watch.0,
         renderer_mailbox.0.clone(),
-        editor_conn.0,
+        editor_conn.0.clone(),
         webview_conn.0.clone(),
     );
 
@@ -209,30 +209,57 @@ async fn main() {
                         .await
                         .unwrap();
                 }
-                let actor::webview::Channels { svg, render_full } =
-                    actor::webview::WebviewActor::set_up_channels();
+                let actor::webview::Channels {
+                    svg,
+                    mut outline,
+                    render_full,
+                    render_outline,
+                } = actor::webview::WebviewActor::set_up_channels();
                 let render_tx = render_full.0.clone();
+                let render_outline_tx = render_outline.0.clone();
                 let webview_actor = actor::webview::WebviewActor::new(
                     conn,
                     svg.1,
                     src_to_doc_rx,
                     typst_tx,
                     render_full.0,
+                    render_outline_tx,
                 );
                 tokio::spawn(async move {
                     webview_actor.run().await;
                 });
                 let render_actor =
-                    actor::render::RenderActor::new(render_full.1, doc_watch_rx, svg.0);
+                    actor::render::RenderActor::new(render_full.1, doc_watch_rx.clone(), svg.0);
                 std::thread::spawn(move || {
                     render_actor.run();
                 });
+                let outline_render_actor = actor::render::OutlineRenderActor::new(
+                    render_outline.1,
+                    doc_watch_rx,
+                    outline.0,
+                );
+                std::thread::spawn(move || {
+                    outline_render_actor.run();
+                });
                 let mut renderer_rx = renderer_mailbox.0.subscribe();
+                let renderer_outline_rx = render_outline.0;
                 tokio::spawn(async move {
                     while let Ok(msg) = renderer_rx.recv().await {
                         let Ok(_) = render_tx.send(msg) else {
                             break;
                         };
+                        let Ok(_) = renderer_outline_rx.send(()) else {
+                            break;
+                        };
+                    }
+                });
+
+                let editor_tx = editor_conn.0.clone();
+                tokio::spawn(async move {
+                    while let Some(msg) = outline.1.recv().await {
+                        editor_tx
+                            .send(actor::editor::EditorActorRequest::Outline(msg))
+                            .unwrap();
                     }
                 });
             }

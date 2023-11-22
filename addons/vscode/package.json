@@ -88,6 +88,30 @@
         }
       ]
     },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "typst-preview-activitybar",
+          "title": "Typst Preview",
+          "icon": "./icons/activity-bar.svg"
+        }
+      ]
+    },
+    "views": {
+      "typst-preview-activitybar": [
+        {
+          "id": "typst-preview.content-preview",
+          "type": "webview",
+          "name": "Content",
+          "when": "config.typst-preview.showInActivityBar"
+        },
+        {
+          "id": "typst-preview.outline",
+          "name": "Outline",
+          "when": "config.typst-preview.showInActivityBar"
+        }
+      ]
+    },
     "configuration": {
       "title": "Typst Preview",
       "properties": {
@@ -140,6 +164,11 @@
         },
         "typst-preview.cursorIndicator": {
           "description": "(Experimental) Show typst cursor indicator in preview.",
+          "type": "boolean",
+          "default": false
+        },
+        "typst-preview.showInActivityBar": {
+          "description": "(Experimental) Show a preview panel in activity bar.",
           "type": "boolean",
           "default": false
         },

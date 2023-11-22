@@ -2,166 +2,204 @@ import { PreviewMode, SvgDocument } from "./svg-doc";
 import {
     rendererBuildInfo,
     createTypstRenderer,
-} from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
+} from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs"; 0
 import renderModule from "@myriaddreamin/typst-ts-renderer/pkg/typst_ts_renderer_bg.wasm?url";
+// @ts-ignore
+// import { RenderSession as RenderSession2 } from "@myriaddreamin/typst-ts-renderer/pkg/wasm-pack-shim.mjs";
 import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
-import { webSocket } from 'rxjs/webSocket';
+import { WebSocketSubject, webSocket } from 'rxjs/webSocket';
 import { Subject, buffer, debounceTime, tap } from "rxjs";
+
+// for debug propose
+// queryObjects((window as any).TypstRenderSession);
+(window as any).TypstRenderSession = RenderSession;
+// (window as any).TypstRenderSessionKernel = RenderSession2;
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 const NOT_AVAIABLE = "current not avalible";
 const COMMA = enc.encode(",");
-
-function createSvgDocument(wasmDocRef: RenderSession, previewMode: PreviewMode) {
-    const hookedElem = document.getElementById("typst-app");
-    const resizeTarget = document.getElementById('typst-container-main')!;
-
-    const svgDoc = new SvgDocument(hookedElem!, wasmDocRef, {
-        previewMode,
-        // set rescale target to `body`
-        retrieveDOMState() {
-            return {
-                // reserving 1px to hide width border
-                width: resizeTarget.clientWidth + 1,
-                // reserving 1px to hide width border
-                height: resizeTarget.offsetHeight,
-                boundingRect: resizeTarget.getBoundingClientRect(),
-            };
-        },
-    });
-
-    // drag (panal resizing) -> rescaling
-    // window.onresize = () => svgDoc.rescale();
-    window.addEventListener("resize", () => svgDoc.addViewportChange());
-    window.addEventListener("scroll", () => svgDoc.addViewportChange());
-
-    if (previewMode === PreviewMode.Slide) {
-
-        {
-            const inpPageSelector = document.getElementById("typst-page-selector") as HTMLSelectElement | undefined;
-            if (inpPageSelector) {
-                inpPageSelector.addEventListener("input", () => {
-                    if (inpPageSelector.value.length === 0) {
-                        return;
-                    }
-                    const page = Number.parseInt(inpPageSelector.value);
-                    svgDoc.setPartialPageNumber(page);
-                });
-            }
-        }
-
-        const focusInput = () => {
-            const inpPageSelector = document.getElementById("typst-page-selector") as HTMLSelectElement | undefined;
-            if (inpPageSelector) {
-                inpPageSelector.focus();
-            }
-        }
-
-        const blurInput = () => {
-            const inpPageSelector = document.getElementById("typst-page-selector") as HTMLSelectElement | undefined;
-            if (inpPageSelector) {
-                inpPageSelector.blur();
-            }
-        }
-
-        const updateDiff = (diff: number) => () => {
-            const pageSelector = document.getElementById("typst-page-selector") as HTMLSelectElement | undefined;
-
-            if (pageSelector) {
-                console.log("updateDiff", diff);
-                const v = pageSelector.value;
-                if (v.length === 0) {
-                    return;
-                }
-                const page = Number.parseInt(v) + diff;
-                if (page <= 0) {
-                    return;
-                }
-                if (svgDoc.setPartialPageNumber(page)) {
-                    pageSelector.value = page.toString();
-                    blurInput();
-                }
-            }
-        }
-
-        const updatePrev = updateDiff(-1);
-        const updateNext = updateDiff(1);
-
-        const pagePrevSelector = document.getElementById("typst-page-prev-selector");
-        if (pagePrevSelector) {
-            pagePrevSelector.addEventListener("click", updatePrev);
-        }
-        const pageNextSelector = document.getElementById("typst-page-next-selector");
-        if (pageNextSelector) {
-            pageNextSelector.addEventListener("click", updateNext);
-        }
-
-        const toggleHelp = () => {
-            const help = document.getElementById("typst-help-panel");
-            console.log("toggleHelp", help);
-            if (help) {
-                help.classList.toggle("hidden");
-            }
-        };
-
-        const removeHelp = () => {
-            const help = document.getElementById("typst-help-panel");
-            if (help) {
-                help.classList.add("hidden");
-            }
-        }
-
-        const helpButton = document.getElementById("typst-top-help-button");
-        helpButton?.addEventListener('click', toggleHelp);
-
-        window.addEventListener("keydown", (e) => {
-            let handled = true;
-            switch (e.key) {
-                case "ArrowLeft":
-                case "ArrowUp":
-                    blurInput();
-                    removeHelp();
-                    updatePrev();
-                    break;
-                case " ":
-                case "ArrowRight":
-                case "ArrowDown":
-                    blurInput();
-                    removeHelp();
-                    updateNext();
-                    break;
-                case "h":
-                    blurInput();
-                    toggleHelp();
-                    break;
-                case "g":
-                    removeHelp();
-                    focusInput();
-                    break;
-                case "Escape":
-                    removeHelp();
-                    blurInput();
-                    handled = false;
-                    break;
-                default:
-                    handled = false;
-            }
-
-            if (handled) {
-                e.preventDefault();
-            }
-        });
-    }
-
-    return svgDoc;
+export interface WsArgs {
+    url: string;
+    previewMode: PreviewMode;
+    isContentPreview: boolean;
 }
 
-export function wsMain(previewMode: PreviewMode) {
-    function setupSocket(svgDoc: SvgDocument) {
+export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
+    if (!url) {
+        const hookedElem = document.getElementById("typst-app");
+        if (hookedElem) {
+            if (isContentPreview) {
+                hookedElem.innerHTML = `<span style="margin: 0px 5px">No Content</span>`;
+            } else {
+                hookedElem.innerHTML = "";
+            }
+        }
+        return () => { };
+    }
+
+    let disposed = false;
+    let subject: WebSocketSubject<ArrayBuffer> | undefined = undefined;
+    const listeners: [any, string, any][] = [];
+    function addWindowEventListener<K extends keyof WindowEventMap>(
+        type: K, listener: (this: Window, ev: WindowEventMap[K]) => any): void;
+    function addWindowEventListener(event: string, listener: any) {
+        window.addEventListener(event, listener);
+        listeners.push([window, event, listener]);
+    }
+
+
+    function createSvgDocument(wasmDocRef: RenderSession) {
+        const hookedElem = document.getElementById("typst-app")!;
+        if (hookedElem.firstElementChild?.tagName !== "svg") {
+            hookedElem.innerHTML = "";
+        }
+        const resizeTarget = document.getElementById('typst-container-main')!;
+
+        const svgDoc = new SvgDocument(hookedElem!, wasmDocRef, {
+            previewMode,
+            isContentPreview,
+            // set rescale target to `body`
+            retrieveDOMState() {
+                return {
+                    // reserving 1px to hide width border
+                    width: resizeTarget.clientWidth + 1,
+                    // reserving 1px to hide width border
+                    height: resizeTarget.offsetHeight,
+                    boundingRect: resizeTarget.getBoundingClientRect(),
+                };
+            },
+        });
+
+        // drag (panal resizing) -> rescaling
+        // window.onresize = () => svgDoc.rescale();
+        addWindowEventListener("resize", () => svgDoc.addViewportChange());
+        addWindowEventListener("scroll", () => svgDoc.addViewportChange());
+
+        if (previewMode === PreviewMode.Slide) {
+            {
+                const inpPageSelector = document.getElementById("typst-page-selector") as HTMLSelectElement | undefined;
+                if (inpPageSelector) {
+                    inpPageSelector.addEventListener("input", () => {
+                        if (inpPageSelector.value.length === 0) {
+                            return;
+                        }
+                        const page = Number.parseInt(inpPageSelector.value);
+                        svgDoc.setPartialPageNumber(page);
+                    });
+                }
+            }
+
+            const focusInput = () => {
+                const inpPageSelector = document.getElementById("typst-page-selector") as HTMLSelectElement | undefined;
+                if (inpPageSelector) {
+                    inpPageSelector.focus();
+                }
+            }
+
+            const blurInput = () => {
+                const inpPageSelector = document.getElementById("typst-page-selector") as HTMLSelectElement | undefined;
+                if (inpPageSelector) {
+                    inpPageSelector.blur();
+                }
+            }
+
+            const updateDiff = (diff: number) => () => {
+                const pageSelector = document.getElementById("typst-page-selector") as HTMLSelectElement | undefined;
+
+                if (pageSelector) {
+                    console.log("updateDiff", diff);
+                    const v = pageSelector.value;
+                    if (v.length === 0) {
+                        return;
+                    }
+                    const page = Number.parseInt(v) + diff;
+                    if (page <= 0) {
+                        return;
+                    }
+                    if (svgDoc.setPartialPageNumber(page)) {
+                        pageSelector.value = page.toString();
+                        blurInput();
+                    }
+                }
+            }
+
+            const updatePrev = updateDiff(-1);
+            const updateNext = updateDiff(1);
+
+            const pagePrevSelector = document.getElementById("typst-page-prev-selector");
+            if (pagePrevSelector) {
+                pagePrevSelector.addEventListener("click", updatePrev);
+            }
+            const pageNextSelector = document.getElementById("typst-page-next-selector");
+            if (pageNextSelector) {
+                pageNextSelector.addEventListener("click", updateNext);
+            }
+
+            const toggleHelp = () => {
+                const help = document.getElementById("typst-help-panel");
+                console.log("toggleHelp", help);
+                if (help) {
+                    help.classList.toggle("hidden");
+                }
+            };
+
+            const removeHelp = () => {
+                const help = document.getElementById("typst-help-panel");
+                if (help) {
+                    help.classList.add("hidden");
+                }
+            }
+
+            const helpButton = document.getElementById("typst-top-help-button");
+            helpButton?.addEventListener('click', toggleHelp);
+
+            window.addEventListener("keydown", (e) => {
+                let handled = true;
+                switch (e.key) {
+                    case "ArrowLeft":
+                    case "ArrowUp":
+                        blurInput();
+                        removeHelp();
+                        updatePrev();
+                        break;
+                    case " ":
+                    case "ArrowRight":
+                    case "ArrowDown":
+                        blurInput();
+                        removeHelp();
+                        updateNext();
+                        break;
+                    case "h":
+                        blurInput();
+                        toggleHelp();
+                        break;
+                    case "g":
+                        removeHelp();
+                        focusInput();
+                        break;
+                    case "Escape":
+                        removeHelp();
+                        blurInput();
+                        handled = false;
+                        break;
+                    default:
+                        handled = false;
+                }
+
+                if (handled) {
+                    e.preventDefault();
+                }
+            });
+        }
+
+        return svgDoc;
+    }
+
+    function setupSocket(svgDoc: SvgDocument): () => void {
         // todo: reconnect setTimeout(() => setupSocket(svgDoc), 1000);
-        const subject = webSocket<ArrayBuffer>({
-            url: "ws://127.0.0.1:23625",
+        subject = webSocket<ArrayBuffer>({
+            url,
             binaryType: "arraybuffer",
             serializer: t => t,
             deserializer: (event) => event.data,
@@ -177,11 +215,22 @@ export function wsMain(previewMode: PreviewMode) {
             closeObserver: {
                 next: (e) => {
                     console.log('WebSocket connection closed', e);
-                    subject.unsubscribe();
-                    setTimeout(() => setupSocket(svgDoc), 1000);
+                    subject?.unsubscribe();
+                    if (!disposed) {
+                        setTimeout(() => setupSocket(svgDoc), 1000);
+                    }
                 }
             }
         });
+        const dispose = () => {
+            disposed = true;
+            svgDoc.dispose();
+            for (const [target, evt, listener] of listeners.splice(0, listeners.length)) {
+                target.removeEventListener(evt, listener);
+            }
+            subject?.complete();
+        };
+
         // window.typstWebsocket = new WebSocket("ws://127.0.0.1:23625");
 
         const batchMessageChannel = new Subject<ArrayBuffer>();
@@ -219,6 +268,11 @@ export function wsMain(previewMode: PreviewMode) {
                 messageData.slice(message_idx + 1),
             ];
             // console.log(message[0], message[1].length);
+            if (isContentPreview) {
+                if ((message[0] === "jump" || message[0] === "partial-rendering" || message[0] === "cursor")) {
+                    return;
+                }
+            }
 
             if (message[0] === "jump") {
                 // todo: aware height padding
@@ -265,6 +319,9 @@ export function wsMain(previewMode: PreviewMode) {
                 console.log("Experimental feature: partial rendering enabled");
                 svgDoc.setPartialRendering(true);
                 return;
+            } else if (message[0] === "outline") {
+                console.log("Experimental feature: outline rendering");
+                return;
             }
 
             svgDoc.addChangement(message as any);
@@ -292,22 +349,27 @@ export function wsMain(previewMode: PreviewMode) {
 
         // 当收到WebSocket数据时
         // window.typstWebsocket.addEventListener("message", event => processMessage(event.data));
+
+        return dispose;
     }
 
     let plugin = createTypstRenderer();
-    plugin
-        .init({
-            getModule: () => renderModule,
-        })
-        .then(() => plugin.runWithSession(kModule /* module kernel from wasm */ => {
-            return new Promise(async (dispose) => {
+    await plugin.init({ getModule: () => renderModule });
+
+    return new Promise<() => void>((resolveDispose) =>
+        plugin.runWithSession(kModule /* module kernel from wasm */ => {
+            return new Promise(async (kernelDispose) => {
                 console.log("plugin initialized, build info:", await rendererBuildInfo());
 
-                // todo: plugin init and setup socket at the same time
-                setupSocket(createSvgDocument(kModule, previewMode));
+                const wsDispose = setupSocket(createSvgDocument(kModule));
 
-                // never dispose session
-                void (dispose);
+                // todo: plugin init and setup socket at the same time
+                resolveDispose(() => {
+                    // dispose ws first
+                    wsDispose();
+                    // dispose kernel then
+                    kernelDispose(undefined);
+                });
             })
         }));
 };

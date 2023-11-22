@@ -66,6 +66,7 @@ export function removeSourceMappingHandler(docRoot: HTMLElement) {
   const prevSourceMappingHandler = (docRoot as any).sourceMappingHandler;
   if (prevSourceMappingHandler) {
     docRoot.removeEventListener("click", prevSourceMappingHandler);
+    delete (docRoot as any).sourceMappingHandler;
     // console.log("remove removeSourceMappingHandler");
   }
 }
