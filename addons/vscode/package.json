@@ -102,11 +102,13 @@
         {
           "id": "typst-preview.content-preview",
           "type": "webview",
-          "name": "Content Preview"
+          "name": "Content Preview",
+          "when": "config.typst-preview.showInActivityBar"
         },
         {
           "id": "typst-preview.outline",
-          "name": "Outline"
+          "name": "Outline",
+          "when": "config.typst-preview.showInActivityBar"
         }
       ]
     },
@@ -162,6 +164,11 @@
         },
         "typst-preview.cursorIndicator": {
           "description": "(Experimental) Show typst cursor indicator in preview.",
+          "type": "boolean",
+          "default": false
+        },
+        "typst-preview.showInActivityBar": {
+          "description": "(Experimental) Show typst preview's view containers in activity bar.",
           "type": "boolean",
           "default": false
         },
