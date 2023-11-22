@@ -88,6 +88,29 @@
         }
       ]
     },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "typst-preview-activitybar",
+          "title": "Typst Preview",
+          "icon": "./icons/activity-bar.svg"
+        }
+      ]
+    },
+    "views": {
+      "typst-preview-activitybar": [
+        {
+          "id": "typst-preview.content-preview",
+          "type": "webview",
+          "name": "Content Preview"
+        },
+        {
+          "id": "typst-preview.outline",
+          "type": "webview",
+          "name": "Outline"
+        }
+      ]
+    },
     "configuration": {
       "title": "Typst Preview",
       "properties": {

@@ -15,11 +15,26 @@
   overflow: hidden;
 }
 
+#typst-container {
+  --main-margin: 0px;
+}
+
 #typst-container.mode-doc {
   width: fit-content;
   height: fit-content;
   margin: 0 auto;
   margin-top: -1px;
+}
+
+#typst-container.content-preview {
+  --main-margin: 20px;
+  margin-top: calc(var(--main-margin) / 2);
+}
+
+#typst-container.content-preview svg {
+  image-rendering: optimizeSpeed;
+  shape-rendering: optimizeSpeed;
+  text-rendering: optimizeSpeed;
 }
 
 #typst-container.mode-doc #typst-top-toolbar {

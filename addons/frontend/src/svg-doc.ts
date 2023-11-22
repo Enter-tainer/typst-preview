@@ -33,6 +33,7 @@ export class SvgDocument {
   private partialRendering: boolean;
   /// preview mode
   private previewMode: PreviewMode;
+  private isContentPreview: boolean;
 
   /// There are two scales in this class: The real scale is to adjust the size
   /// of `hookedElem` to fit the svg. The virtual scale (scale ratio) is to let
@@ -67,6 +68,7 @@ export class SvgDocument {
 
   constructor(private hookedElem: HTMLElement, public kModule: RenderSession, options?: {
     previewMode?: PreviewMode,
+    isContentPreview?: boolean,
     retrieveDOMState?: () => ContainerDOMState,
   }) {
     /// Apply option
@@ -82,6 +84,8 @@ export class SvgDocument {
     if (options?.previewMode !== undefined) {
       this.previewMode = options?.previewMode;
     }
+    this.isContentPreview = options?.isContentPreview || false;
+    void (this.isContentPreview);
 
     /// State fields
     this.svgUpdating = false;
@@ -347,11 +351,12 @@ export class SvgDocument {
       ? container.width / maxWidth
       : 1;
     // respect current scale ratio
-    const scale = this.currentScaleRatio * computedScale;
+    const scale = 1 / (this.currentScaleRatio * computedScale);
+    const fontSize = 12 * scale;
 
     /// Calculate new width, height
     // 5pt height margin, 0pt width margin (it is buggy to add width margin)
-    const heightMargin = 5 * scale;
+    const heightMargin = this.isContentPreview ? (6 * scale) : (5 * scale);
     const widthMargin = 0;
     const newWidth = maxWidth + 2 * widthMargin;
 
@@ -397,18 +402,43 @@ export class SvgDocument {
         firstRect = innerRect;
       }
 
-      if (this.cursorPosition && this.cursorPosition[0] === i + 1) {
-        const [_, x, y] = this.cursorPosition;
-        const cursor = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-        cursor.setAttribute("cx", (x * INNER_RECT_UNIT).toString());
-        cursor.setAttribute("cy", (y * INNER_RECT_UNIT).toString());
-        cursor.setAttribute("r", (5 * scale * INNER_RECT_UNIT).toString());
-        cursor.setAttribute("fill", "#86C166CC");
-        cursor.setAttribute("transform", `${translateAttr} ${INNER_RECT_SCALE}`);
-        svg.appendChild(cursor);
+      let pageHeightEnd = pageHeight + (i + 1 === nextPages.length ? 0 : heightMargin);
+
+      if (this.isContentPreview) {
+        // --typst-preview-toolbar-fg-color
+        // create page number indicator
+        console.log('create page number indicator', scale);
+        const pageNumberIndicator = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        pageNumberIndicator.setAttribute("class", "typst-preview-page-number");
+        pageNumberIndicator.setAttribute("x", "0");
+        pageNumberIndicator.setAttribute("y", "0");
+        const pnPaddedX = calculatedPaddedX + pageWidth / 2;
+        const pnPaddedY = calculatedPaddedY + pageHeight + heightMargin + fontSize / 2;
+        pageNumberIndicator.setAttribute("transform", `translate(${pnPaddedX}, ${pnPaddedY})`);
+        pageNumberIndicator.setAttribute("font-size", fontSize.toString());
+        pageNumberIndicator.textContent = `${i + 1}`;
+        svg.append(pageNumberIndicator);
+
+        pageHeightEnd += fontSize;
+
+      } else {
+        if (this.cursorPosition && this.cursorPosition[0] === i + 1) {
+          const [_, x, y] = this.cursorPosition;
+          const cursor = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+          cursor.setAttribute("cx", (x * INNER_RECT_UNIT).toString());
+          cursor.setAttribute("cy", (y * INNER_RECT_UNIT).toString());
+          cursor.setAttribute("r", (5 * scale * INNER_RECT_UNIT).toString());
+          cursor.setAttribute("fill", "#86C166CC");
+          cursor.setAttribute("transform", `${translateAttr} ${INNER_RECT_SCALE}`);
+          svg.appendChild(cursor);
+        }
       }
 
-      accumulatedHeight = calculatedPaddedY + pageHeight + (i + 1 === nextPages.length ? 0 : heightMargin);
+      accumulatedHeight = calculatedPaddedY + pageHeightEnd;
+    }
+
+    if (this.isContentPreview) {
+      accumulatedHeight += fontSize; // always add a bottom margin for last page number
     }
 
     /// Apply new width, height

@@ -6,8 +6,13 @@ import { spawn } from 'cross-spawn';
 import { readFile } from 'fs/promises';
 import * as path from 'path';
 import { WebSocket } from 'ws';
+
 const vscodeVariables = require('vscode-variables');
 
+let resolveContentPreviewProvider: (value: ContentPreviewProvider) => void = () => { };
+let contentPreviewProvider = new Promise<ContentPreviewProvider>(resolve => {
+	resolveContentPreviewProvider = resolve;
+});
 
 type ScrollSyncMode = "never" | "onSelectionChange";
 
@@ -357,6 +362,8 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		shadowDisposeClose?.dispose();
 	});
 
+	let connectUrl = `ws://127.0.0.1:${dataPlanePort}`;
+	contentPreviewProvider.then((p) => p.postActivate(connectUrl));
 	switch (task.kind) {
 		case 'browser': return launchPreviewInBrowser();
 		case 'webview': return launchPreviewInWebView();
@@ -386,6 +393,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 			// todo: bindDocument.onDidDispose, but we did not find a similar way.
 			activeTask.delete(bindDocument);
 			serverProcess.kill();
+			contentPreviewProvider.then((p) => p.postDeactivate(connectUrl));
 			console.log('killed preview services');
 			panel.dispose();
 		});
@@ -470,9 +478,124 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 	};
 };
 
+class ContentPreviewProvider implements vscode.WebviewViewProvider {
+
+	private _view?: vscode.WebviewView;
+
+	constructor(
+		private readonly context: vscode.ExtensionContext,
+		private readonly extensionUri: vscode.Uri,
+		private readonly htmlContent: string,
+	) { }
+
+	public resolveWebviewView(
+		webviewView: vscode.WebviewView,
+		_context: vscode.WebviewViewResolveContext,
+		_token: vscode.CancellationToken,
+	) {
+		this._view = webviewView;// 将已经准备好的 HTML 设置为 Webview 内容
+
+		const fontendPath = path.resolve(this.context.extensionPath, "out/frontend");
+		let html = this.htmlContent.replace(
+			/\/typst-webview-assets/g,
+			`${this._view.webview.asWebviewUri(vscode.Uri.file(fontendPath))
+				.toString()}/typst-webview-assets`
+		);
+
+		html = html.replace("ws://127.0.0.1:23625", ``);
+
+		webviewView.webview.options = {
+			// Allow scripts in the webview
+			enableScripts: true,
+
+			localResourceRoots: [
+				this.extensionUri
+			]
+		};
+
+		webviewView.webview.html = html;
+
+		webviewView.webview.onDidReceiveMessage(data => {
+			switch (data.type) {
+				case 'started': // on content preview restarted
+					{
+						this.resetHost();
+						break;
+					}
+			}
+		});
+	}
+
+	resetHost() {
+		if (this._view && this.current) {
+			console.log('postActivateSent', this.current);
+			this._view.webview.postMessage(this.current);
+		}
+	};
+
+	current: any = undefined;
+	postActivate(url: string) {
+		this.current = {
+			type: 'reconnect',
+			url,
+			mode: "Doc",
+			isContentPreview: true,
+		};
+		this.resetHost();
+	}
+
+	postDeactivate(url: string) {
+		if (this.current && this.current.url === url) {
+			this.postActivate('');
+		}
+	}
+}
+
+// todo: useful content security policy but we don't set
+// Use a nonce to only allow a specific script to be run.
+// const nonce = getNonce();
+
+// function getNonce() {
+// 	let text = '';
+// 	const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+// 	for (let i = 0; i < 32; i++) {
+// 		text += possible.charAt(Math.floor(Math.random() * possible.length));
+// 	}
+// 	return text;
+// }
+
+// <!--
+// Use a content security policy to only allow loading styles from our extension directory,
+// and only allow scripts that have a specific nonce.
+// (See the 'webview-sample' extension sample for img-src content security policy examples)
+// -->
+// <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+
+class OutlineProvider implements vscode.WebviewViewProvider {
+
+	constructor(
+		private readonly _extensionUri: vscode.Uri,
+	) { }
+
+	public resolveWebviewView(
+		webviewView: vscode.WebviewView,
+		_context: vscode.WebviewViewResolveContext,
+		_token: vscode.CancellationToken,
+	) {
+		webviewView.webview.options = {
+			localResourceRoots: [
+				this._extensionUri
+			]
+		};
+
+		webviewView.webview.html = `<!DOCTYPE html><html lang="en"><head><title>OutlineProvider</title></head><body></body></html>`;
+	}
+}
+
 let statusBarItem: vscode.StatusBarItem;
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
+// todo: is global state safe?
 export function activate(context: vscode.ExtensionContext) {
 	// Use the console to output diagnostic information (console.log) and errors (console.error)
 	// This line of code will only be executed once when your extension is activated
@@ -484,6 +607,17 @@ export function activate(context: vscode.ExtensionContext) {
 	statusBarItem.name = 'typst-preview';
 	statusBarItem.command = 'typst-preview.showLog';
 	statusBarItem.tooltip = 'Typst Preview Status: Click to show logs';
+
+	// https://github.com/microsoft/vscode-extension-samples/blob/4721ef0c450f36b5bce2ecd5be4f0352ed9e28ab/webview-view-sample/src/extension.ts#L3
+	let contentPreviewHtml = loadHTMLFile(context, "./out/frontend/index.html");
+	contentPreviewHtml.then(html => {
+		const provider = new ContentPreviewProvider(context, context.extensionUri, html);
+		resolveContentPreviewProvider(provider);
+		context.subscriptions.push(
+			vscode.window.registerWebviewViewProvider('typst-preview.content-preview', provider));
+	});
+	context.subscriptions.push(
+		vscode.window.registerWebviewViewProvider('typst-preview.outline', new OutlineProvider(context.extensionUri)));
 
 	let webviewDisposable = vscode.commands.registerCommand('typst-preview.preview', launchPrologue('webview', 'doc'));
 	let browserDisposable = vscode.commands.registerCommand('typst-preview.browser', launchPrologue('browser', 'doc'));
