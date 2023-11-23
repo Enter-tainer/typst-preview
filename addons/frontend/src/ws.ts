@@ -1,4 +1,4 @@
-import { PreviewMode, SvgDocument } from "./svg-doc";
+import { PreviewMode, TypstDocument } from "./svg-doc";
 import {
     rendererBuildInfo,
     createTypstRenderer,
@@ -56,7 +56,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         }
         const resizeTarget = document.getElementById('typst-container-main')!;
 
-        const svgDoc = new SvgDocument(hookedElem!, wasmDocRef, {
+        const svgDoc = new TypstDocument(hookedElem!, wasmDocRef, {
             previewMode,
             isContentPreview,
             // set rescale target to `body`
@@ -196,7 +196,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         return svgDoc;
     }
 
-    function setupSocket(svgDoc: SvgDocument): () => void {
+    function setupSocket(svgDoc: TypstDocument): () => void {
         // todo: reconnect setTimeout(() => setupSocket(svgDoc), 1000);
         subject = webSocket<ArrayBuffer>({
             url,

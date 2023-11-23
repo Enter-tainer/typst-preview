@@ -15,25 +15,42 @@ export interface ContainerDOMState {
   };
 }
 
+export enum RenderMode {
+  Svg,
+  Canvas,
+}
+
 export enum PreviewMode {
   Doc,
   Slide,
 }
 
-export class SvgDocument {
+class TypstDocumentImpl {
+  /// Configuration fields
+
+  /// enable partial rendering
+  partialRendering: boolean;
+  /// render mode
+  renderMode: RenderMode = RenderMode.Svg;
+  /// preview mode
+  previewMode: PreviewMode;
+  /// whether this is a content preview
+  isContentPreview: boolean;
+  /// background color
+  backgroundColor: string;
+  /// customized way to retrieving dom state
+  retrieveDOMState: () => ContainerDOMState;
+
   /// State fields
 
   /// whether svg is updating (in triggerSvgUpdate)
-  private svgUpdating: boolean;
+  isRendering: boolean = false;
   /// whether kModule is initialized
-  private moduleInitialized: boolean;
-  /// patch queue for updating svg.
-  private patchQueue: [string, string][];
-  /// enable partial rendering
-  private partialRendering: boolean;
-  /// preview mode
-  private previewMode: PreviewMode;
-  private isContentPreview: boolean;
+  moduleInitialized: boolean = false;
+  /// patch queue for updating data.
+  patchQueue: [string, string][] = [];
+  /// resources to dispose
+  private disposeList: (() => void)[] = [];
 
   /// There are two scales in this class: The real scale is to adjust the size
   /// of `hookedElem` to fit the svg. The virtual scale (scale ratio) is to let
@@ -42,65 +59,57 @@ export class SvgDocument {
   ///   fit in `hookedElem`.
   /// + if user set virtual scale to 0.5, then the svg will be zoomed out to fit
   ///   in half width of `hookedElem`. "real" current scale of `hookedElem`
-  private currentRealScale: number;
+  currentRealScale: number = 1;
   /// "virtual" current scale of `hookedElem`
-  private currentScaleRatio: number;
+  currentScaleRatio: number = 1;
   /// timeout for delayed viewport change
-  private vpTimeout: any;
+  vpTimeout: any = undefined;
   /// sampled by last render time.
-  private sampledRenderTime: number;
+  sampledRenderTime: number = 0;
   /// page to partial render
-  private partialRenderPage: number;
+  partialRenderPage: number = 0;
+  /// cursor position in form of [page, x, y]
+  cursorPosition?: [number, number, number] = undefined;
 
-  private disposeList: (() => void)[] = [];
-
-  /// Style fields
-
-  backgroundColor: string;
-
-  private cursorPosition: [number, number, number] | undefined;
 
   /// Cache fields
 
   /// cached state of container, default to retrieve state from `this.hookedElem`
-  /// Note: one should retrieve dom state before rescale
-  private cachedDOMState: ContainerDOMState;
+  cachedDOMState: ContainerDOMState = {
+    width: 0,
+    height: 0,
+    boundingRect: {
+      left: 0,
+      top: 0,
+    },
+  };
 
-  private retrieveDOMState: () => ContainerDOMState;
+  constructor(private hookedElem: HTMLElement, public kModule: RenderSession, options?: Options) {
 
-  constructor(private hookedElem: HTMLElement, public kModule: RenderSession, options?: {
-    previewMode?: PreviewMode,
-    isContentPreview?: boolean,
-    retrieveDOMState?: () => ContainerDOMState,
-  }) {
-    /// Apply option
-    this.retrieveDOMState = options?.retrieveDOMState || (() => {
-      return {
-        width: this.hookedElem.offsetWidth,
-        height: this.hookedElem.offsetHeight,
-        boundingRect: this.hookedElem.getBoundingClientRect(),
+    /// Apply configuration
+    {
+      const { previewMode, isContentPreview, retrieveDOMState } = options || {};
+      this.partialRendering = false;
+      this.previewMode = PreviewMode.Doc;
+      if (previewMode !== undefined) {
+        this.previewMode = previewMode;
       }
-    });
-    this.partialRendering = false;
-    this.previewMode = PreviewMode.Doc;
-    if (options?.previewMode !== undefined) {
-      this.previewMode = options?.previewMode;
+      this.isContentPreview = isContentPreview || false;
+      this.retrieveDOMState = retrieveDOMState || (() => {
+        return {
+          width: this.hookedElem.offsetWidth,
+          height: this.hookedElem.offsetHeight,
+          boundingRect: this.hookedElem.getBoundingClientRect(),
+        }
+      });
+      this.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue(
+        '--typst-preview-background-color');
     }
-    this.isContentPreview = options?.isContentPreview || false;
     if (this.isContentPreview) {
       // content preview has very bad performance without partial rendering
       this.partialRendering = true;
     }
 
-    /// State fields
-    this.svgUpdating = false;
-    this.moduleInitialized = false;
-    this.currentRealScale = 1;
-    this.patchQueue = [];
-    this.currentScaleRatio = 1;
-    this.vpTimeout = undefined;
-    this.sampledRenderTime = 0;
-    this.partialRenderPage = 0;
     // if init scale == 1
     // hide scrollbar if scale == 1
     this.hookedElem.classList.add("hide-scrollbar-x");
@@ -110,22 +119,9 @@ export class SvgDocument {
       document.body.classList.add("hide-scrollbar-y");
     }
 
-    /// Style fields
-    this.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--typst-preview-background-color');
-    this.cursorPosition = undefined;
-
-    /// Cache fields
-    this.cachedDOMState = {
-      width: 0,
-      height: 0,
-      // todo: we should not query dom state here, which may cause layout reflowing
-      boundingRect: {
-        left: 0,
-        top: 0,
-      },
-    };
-
-    installEditorJumpToHandler(this.kModule, this.hookedElem);
+    if (this.renderMode === RenderMode.Svg) {
+      installEditorJumpToHandler(this.kModule, this.hookedElem);
+    }
     this.installCtrlWheelHandler();
   }
 
@@ -134,7 +130,7 @@ export class SvgDocument {
     this.moduleInitialized = false;
   }
 
-  installCtrlWheelHandler() {
+  private installCtrlWheelHandler() {
     // Ctrl+scroll rescaling
     // will disable auto resizing
     // fixed factors, same as pdf.js
@@ -240,6 +236,7 @@ export class SvgDocument {
   }
 
   /// Get current scale from html to svg
+  // Note: one should retrieve dom state before rescale
   getSvgScaleRatio() {
     const svg = this.hookedElem.firstElementChild as SVGElement;
     if (!svg) {
@@ -514,12 +511,33 @@ export class SvgDocument {
   }
 
   private toggleViewportChange() {
+    switch (this.renderMode) {
+      case RenderMode.Svg: {
+        return this.toggleSvgViewportChange();
+      }
+      case RenderMode.Canvas: {
+        return this.toggleCanvasViewportChange();
+      }
+      default: {
+        throw new Error(`unknown render mode ${this.renderMode}`);
+      }
+    }
+  }
+
+  private toggleCanvasViewportChange() {
+    const t2 = performance.now();
+    const t3 = performance.now();
+
+    return [t2, t3];
+  }
+
+  private toggleSvgViewportChange() {
     let patchStr: string;
     const mode = this.previewMode;
     if (mode === PreviewMode.Doc) {
-      patchStr = this.fetchDataByDocMode();
+      patchStr = this.fetchSvgDataByDocMode();
     } else if (mode === PreviewMode.Slide) {
-      patchStr = this.fetchDataBySlideMode();
+      patchStr = this.fetchSvgDataBySlideMode();
     } else {
       throw new Error(`unknown preview mode ${mode}`);
     }
@@ -531,7 +549,7 @@ export class SvgDocument {
     return [t2, t3];
   }
 
-  private fetchDataBySlideMode() {
+  private fetchSvgDataBySlideMode() {
     const pagesInfo = this.kModule.retrievePagesInfo();
 
     if (pagesInfo.length === 0) {
@@ -572,7 +590,7 @@ export class SvgDocument {
     });
   }
 
-  private fetchDataByDocMode() {
+  private fetchSvgDataByDocMode() {
     const { revScale, left, top, width, height } = this.statSvgFromDom();
 
     let patchStr: string;
@@ -691,17 +709,17 @@ export class SvgDocument {
     );
   }
 
-  private triggerSvgUpdate() {
-    if (this.svgUpdating) {
+  private triggerUpdate() {
+    if (this.isRendering) {
       return;
     }
 
-    this.svgUpdating = true;
-    const doSvgUpdate = () => {
+    this.isRendering = true;
+    const doUpdate = () => {
       this.cachedDOMState = this.retrieveDOMState();
 
       if (this.patchQueue.length === 0) {
-        this.svgUpdating = false;
+        this.isRendering = false;
         this.postprocessChanges();
         return;
       }
@@ -712,21 +730,29 @@ export class SvgDocument {
           this.rescale();
         }
 
-        requestAnimationFrame(doSvgUpdate);
+        requestAnimationFrame(doUpdate);
       } catch (e) {
         console.error(e);
-        this.svgUpdating = false;
+        this.isRendering = false;
         this.postprocessChanges();
       }
     };
-    requestAnimationFrame(doSvgUpdate);
+    requestAnimationFrame(doUpdate);
   }
 
   private postprocessChanges() {
-    const docRoot = this.hookedElem.firstElementChild as SVGElement;
-    if (docRoot) {
-      window.initTypstSvg(docRoot);
-      this.rescale();
+    switch (this.renderMode) {
+      case RenderMode.Svg: {
+        const docRoot = this.hookedElem.firstElementChild as SVGElement;
+        if (docRoot) {
+          window.initTypstSvg(docRoot);
+          this.rescale();
+        }
+        break;
+      }
+      default: {
+        throw new Error(`unknown render mode ${this.renderMode}`);
+      }
     }
 
     // todo: abstract this
@@ -745,14 +771,14 @@ export class SvgDocument {
     const pushChange = () => {
       this.vpTimeout = undefined;
       this.patchQueue.push(change);
-      this.triggerSvgUpdate();
+      this.triggerUpdate();
     };
 
     if (this.vpTimeout !== undefined) {
       clearTimeout(this.vpTimeout);
     }
 
-    if (change[0] === "viewport-change" && this.svgUpdating) {
+    if (change[0] === "viewport-change" && this.isRendering) {
       // delay viewport change a bit
       this.vpTimeout = setTimeout(pushChange, this.sampledRenderTime || 100);
     } else {
@@ -764,31 +790,61 @@ export class SvgDocument {
     this.addChangement(["viewport-change", ""]);
   }
 
+  dispose() {
+    if (this.hookedElem) {
+      removeSourceMappingHandler(this.hookedElem);
+    }
+    this.disposeList.forEach(x => x());
+  }
+}
+
+interface Options {
+  previewMode?: PreviewMode,
+  isContentPreview?: boolean,
+  retrieveDOMState?: () => ContainerDOMState,
+}
+
+export class TypstDocument {
+  private impl: TypstDocumentImpl;
+
+  constructor(hookedElem: HTMLElement, public kModule: RenderSession, options?: Options) {
+    this.impl = new TypstDocumentImpl(hookedElem, kModule, options);
+  }
+
+  reset() {
+    this.impl.reset();
+  }
+
+  addChangement(change: [string, string]) {
+    this.impl.addChangement(change);
+  }
+
+  addViewportChange() {
+    this.impl.addViewportChange();
+  }
+
   setPartialRendering(partialRendering: boolean) {
-    this.partialRendering = partialRendering;
+    this.impl.partialRendering = partialRendering;
   }
 
   setCursor(page: number, x: number, y: number) {
-    this.cursorPosition = [page, x, y];
+    this.impl.cursorPosition = [page, x, y];
   }
 
   setPartialPageNumber(page: number): boolean {
     if (page <= 0 || page > this.kModule.retrievePagesInfo().length) {
       return false;
     }
-    this.partialRenderPage = page - 1;
+    this.impl.partialRenderPage = page - 1;
     this.addViewportChange();
     return true;
   }
 
   getPartialPageNumber(): number {
-    return this.partialRenderPage + 1;
+    return this.impl.partialRenderPage + 1;
   }
 
   dispose() {
-    if (this.hookedElem) {
-      removeSourceMappingHandler(this.hookedElem);
-    }
-    this.disposeList.forEach(x => x());
+    this.impl.dispose();
   }
 }
