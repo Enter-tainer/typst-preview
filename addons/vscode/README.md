@@ -231,3 +231,12 @@ Add preview button
 - Bug fixes:
   - Previously the `Compiling` status is never sent to the status bar item. This is now fixed.
   - #183 #128 Various rendering fix.
+
+### v0.9.2
+
+- Features:
+  - You can now enable a preview panel in the sidebar. See `typst-preview.showInActivityBar`.
+  - A new keybinding is added. You can trigger preview by using `Ctrl`/`Cmd` + `k` `v` now.
+
+- Bug fix:
+  - Scroll to cursor on 2-column documents is now improved.
