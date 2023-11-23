@@ -38,7 +38,14 @@ body {
   background-color: #fff;
 }
 
-.typst-preview-page-number {
+.typst-preview-canvas-page-number {
+  color: var(--typst-preview-toolbar-fg-color);
+  font-family: sans-serif;
+  text-align: center;
+  width: 100%;
+}
+
+.typst-preview-svg-page-number {
   fill: var(--typst-preview-toolbar-fg-color);
   font-family: sans-serif;
   /* set to alignment center */

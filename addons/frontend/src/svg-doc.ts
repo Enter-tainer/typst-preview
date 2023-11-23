@@ -114,10 +114,16 @@ class TypstDocumentImpl {
       this.partialRendering = true;
     }
 
+    if (this.isContentPreview) {
+      this.renderMode = RenderMode.Canvas;
+      this.pixelPerPt = 0.5;
+    }
+
     // if init scale == 1
     // hide scrollbar if scale == 1
+
     this.hookedElem.classList.add("hide-scrollbar-x");
-    document.body.classList.add("hide-scrollbar-x");
+    this.hookedElem.parentElement?.classList.add("hide-scrollbar-x");
     if (this.previewMode === PreviewMode.Slide) {
       this.hookedElem.classList.add("hide-scrollbar-y");
       document.body.classList.add("hide-scrollbar-y");
@@ -493,7 +499,7 @@ class TypstDocumentImpl {
         // create page number indicator
         console.log('create page number indicator', scale);
         const pageNumberIndicator = document.createElementNS("http://www.w3.org/2000/svg", "text");
-        pageNumberIndicator.setAttribute("class", "typst-preview-page-number");
+        pageNumberIndicator.setAttribute("class", "typst-preview-svg-page-number");
         pageNumberIndicator.setAttribute("x", "0");
         pageNumberIndicator.setAttribute("y", "0");
         const pnPaddedX = calculatedPaddedX + pageWidth / 2;
