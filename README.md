@@ -4,6 +4,9 @@ Preview your Typst files in vscode instantly!
 
 Install this extension from [marketplace](https://marketplace.visualstudio.com/items?itemName=mgt19937.typst-preview), open command palette (Ctrl+Shift+P), and type `>Typst Preview:`.
 
+
+https://github.com/Enter-tainer/typst-preview/assets/25521218/7a151b3d-fe50-4440-8aab-2cc9a9abcf37
+
 https://github.com/Enter-tainer/typst-preview/assets/25521218/600529ce-8f42-4c2f-a224-b6b73e6ad017
 
 This repo contains:
