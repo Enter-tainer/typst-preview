@@ -1,3 +1,4 @@
+pub mod debug_loc;
 pub mod editor;
 mod outline;
 pub mod render;

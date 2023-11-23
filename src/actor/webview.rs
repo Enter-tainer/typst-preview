@@ -6,16 +6,13 @@ use tokio::{
 };
 use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
 
-use super::{outline::Outline, render::RenderActorRequest, typst::TypstActorRequest};
+use super::{
+    debug_loc::DocumentPosition, outline::Outline, render::RenderActorRequest,
+    typst::TypstActorRequest,
+};
 
-#[derive(Debug, Clone, Copy, serde::Serialize)]
-pub struct CursorPosition {
-    pub page_no: usize,
-    pub x: f64,
-    pub y: f64,
-}
-
-pub type SrcToDocJumpInfo = CursorPosition;
+pub type CursorPosition = DocumentPosition;
+pub type SrcToDocJumpInfo = DocumentPosition;
 
 #[derive(Debug, Clone)]
 pub enum WebviewActorRequest {
@@ -23,11 +20,11 @@ pub enum WebviewActorRequest {
     CursorPosition(CursorPosition),
 }
 
-fn src_to_doc_jump_to_string(page_no: usize, x: f64, y: f64) -> String {
+fn src_to_doc_jump_to_string(page_no: usize, x: f32, y: f32) -> String {
     format!("jump,{page_no} {x} {y}")
 }
 
-fn cursor_position_to_string(page_no: usize, x: f64, y: f64) -> String {
+fn cursor_position_to_string(page_no: usize, x: f32, y: f32) -> String {
     format!("cursor,{page_no} {x} {y}")
 }
 

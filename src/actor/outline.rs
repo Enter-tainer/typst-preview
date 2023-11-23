@@ -7,7 +7,7 @@ use typst::{
 };
 use typst_ts_core::TypstDocument;
 
-use super::webview::CursorPosition;
+use super::debug_loc::DocumentPosition;
 
 /// A heading in the outline panel.
 #[derive(Debug, Clone)]
@@ -122,7 +122,7 @@ pub struct Outline {
 #[derive(Debug, Clone, serde::Serialize)]
 struct OutlineItem {
     title: String,
-    position: Option<CursorPosition>,
+    position: Option<DocumentPosition>,
     children: Vec<OutlineItem>,
 }
 
@@ -142,11 +142,7 @@ fn outline_item(src: &HeadingNode, res: &mut Vec<OutlineItem>) {
     let body = src.element.expect_field::<Content>("body");
     let title = body.plain_text().trim().to_owned();
 
-    let position = Some(CursorPosition {
-        page_no: src.position.page.into(),
-        x: src.position.point.x.to_pt(),
-        y: src.position.point.y.to_pt(),
-    });
+    let position = Some(src.position.into());
 
     let mut children = Vec::with_capacity(src.children.len());
     for child in src.children.iter() {
