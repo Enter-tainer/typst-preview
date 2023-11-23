@@ -48,7 +48,6 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         listeners.push([window, event, listener]);
     }
 
-
     function createSvgDocument(wasmDocRef: RenderSession) {
         const hookedElem = document.getElementById("typst-app")!;
         if (hookedElem.firstElementChild?.tagName !== "svg") {
@@ -74,7 +73,20 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         // drag (panal resizing) -> rescaling
         // window.onresize = () => svgDoc.rescale();
         addWindowEventListener("resize", () => svgDoc.addViewportChange());
-        addWindowEventListener("scroll", () => svgDoc.addViewportChange());
+        if (!isContentPreview) {
+            addWindowEventListener("scroll", () => svgDoc.addViewportChange());
+        }
+
+        // Handle messages sent from the extension to the webview
+        addWindowEventListener('message', event => {
+            const message = event.data; // The json data that the extension sent
+            switch (message.type) {
+                case 'outline': {
+                    svgDoc.setOutineData(message.outline);
+                    break;
+                }
+            }
+        });
 
         if (previewMode === PreviewMode.Slide) {
             {

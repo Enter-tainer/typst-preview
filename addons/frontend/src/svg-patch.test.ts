@@ -85,6 +85,7 @@ const indexTargetView = (init: number | (number | null)[], rearrange: (number | 
   interpretTargetView<MockElement>(
     injectOffsets("o", repeatOrJust(init)),
     injectOffsets("t", rearrange.map(reuseStub)),
+    true,
     hasTid,
   );
 const indexOriginView = (init: number | (number | null)[], rearrange: (number | null)[]) =>
@@ -286,6 +287,7 @@ describe("interpretView", () => {
     target[1].attrs["data-tid"] = "0";
     const result = interpretTargetView<MockElement>(
       origin, target,
+      true,
       hasTid,
     );
     const result2 = changeViewPerspective<MockElement>(origin,
@@ -310,6 +312,7 @@ describe("interpretView", () => {
     const target = injectOffsets("t", [0, 1].map(reuseStub));
     const result = interpretTargetView<MockElement>(
       origin, target,
+      true,
       hasTid,
     );
     const result2 = changeViewPerspective<MockElement>(
@@ -333,6 +336,7 @@ describe("interpretView", () => {
     const target = injectOffsets("t", [1, null, 0, null, 1].map(reuseStub));
     const result = interpretTargetView<MockElement>(
       origin, target,
+      true,
       hasTid,
     );
     const result2 = changeViewPerspective<MockElement>(origin,
