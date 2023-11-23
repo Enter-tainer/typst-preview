@@ -608,6 +608,7 @@ interface CursorPosition {
 
 interface OutlineItemData {
 	title: string,
+	span?: string,
 	position?: CursorPosition,
 	children: OutlineItemData[],
 }
@@ -657,13 +658,15 @@ export class OutlineItem extends vscode.TreeItem {
 		public readonly command?: vscode.Command
 	) {
 		super(data.title, collapsibleState);
+		const span = this.data.span;
+		let detachedHint = span ? `` : `, detached`;
 
 		const pos = this.data.position;
 		if (pos) {
-			this.tooltip = `${this.label} in page ${pos.page_no}, at (${pos.x.toFixed(3)} pt, ${pos.y.toFixed(3)} pt)`;
-			this.description = `page: ${pos.page_no}, at (${pos.x.toFixed(1)} pt, ${pos.y.toFixed(1)} pt)`;
+			this.tooltip = `${this.label} in page ${pos.page_no}, at (${pos.x.toFixed(3)} pt, ${pos.y.toFixed(3)} pt)${detachedHint}`;
+			this.description = `page: ${pos.page_no}, at (${pos.x.toFixed(1)} pt, ${pos.y.toFixed(1)} pt)${detachedHint}`;
 		} else {
-			this.tooltip = `${this.label}`;
+			this.tooltip = `${this.label}${detachedHint}`;
 			this.description = `no pos`;
 		}
 	}

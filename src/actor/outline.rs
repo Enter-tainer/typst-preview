@@ -1,11 +1,10 @@
 use std::num::NonZeroUsize;
 
 use typst::{
-    doc::Position,
     geom::Smart,
     model::{Content, Introspector},
 };
-use typst_ts_core::TypstDocument;
+use typst_ts_core::{vector::span_id_to_u64, TypstDocument};
 
 use super::debug_loc::DocumentPosition;
 
@@ -13,7 +12,7 @@ use super::debug_loc::DocumentPosition;
 #[derive(Debug, Clone)]
 pub(crate) struct HeadingNode {
     element: Content,
-    position: Position,
+    position: DocumentPosition,
     level: NonZeroUsize,
     bookmarked: bool,
     children: Vec<HeadingNode>,
@@ -98,7 +97,7 @@ impl HeadingNode {
     fn leaf(introspector: &mut Introspector, element: Content) -> Self {
         let position = {
             let loc = element.location().unwrap();
-            introspector.position(loc)
+            introspector.position(loc).into()
         };
 
         HeadingNode {
@@ -121,14 +120,19 @@ pub struct Outline {
 
 #[derive(Debug, Clone, serde::Serialize)]
 struct OutlineItem {
+    /// Plain text title.
     title: String,
+    /// Span id in hex-format.
+    span: Option<String>,
+    /// The resolved position in the document.
     position: Option<DocumentPosition>,
+    /// The children of the outline item.
     children: Vec<OutlineItem>,
 }
 
 pub fn outline(document: &TypstDocument) -> Outline {
     let mut introspector = Introspector::new(&document.pages);
-    let outline = crate::actor::outline::get_outline(&mut introspector);
+    let outline = get_outline(&mut introspector);
     let mut items = Vec::with_capacity(outline.as_ref().map_or(0, Vec::len));
 
     for heading in outline.iter().flatten() {
@@ -139,10 +143,10 @@ pub fn outline(document: &TypstDocument) -> Outline {
 }
 
 fn outline_item(src: &HeadingNode, res: &mut Vec<OutlineItem>) {
-    let body = src.element.expect_field::<Content>("body");
-    let title = body.plain_text().trim().to_owned();
-
-    let position = Some(src.position.into());
+    let title = {
+        let body = src.element.expect_field::<Content>("body");
+        body.plain_text().trim().to_owned()
+    };
 
     let mut children = Vec::with_capacity(src.children.len());
     for child in src.children.iter() {
@@ -151,7 +155,8 @@ fn outline_item(src: &HeadingNode, res: &mut Vec<OutlineItem>) {
 
     res.push(OutlineItem {
         title,
-        position,
+        span: Some(format!("{:x}", span_id_to_u64(&src.element.span()))),
+        position: Some(src.position),
         children,
     });
 }
