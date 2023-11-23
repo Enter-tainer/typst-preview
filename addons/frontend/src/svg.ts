@@ -205,31 +205,89 @@ window.handleTypstLocation = function (
       nthPage++;
     }
     if (nthPage == page) {
-      const page = children[i];
+      // evaluate window viewport 1vw
+      const pw = window.innerWidth * 0.01;
+      const ph = window.innerHeight * 0.01;
+
+      const page = children[i] as SVGGElement;
       const dataWidth =
-        Number.parseFloat(page.getAttribute("data-page-width") || "0") || 0;
+        Number.parseFloat(docRoot.getAttribute("data-width") || "0") || 0;
       const dataHeight =
-        Number.parseFloat(page.getAttribute("data-page-height") || "0") || 0;
-      const rect = page.getBoundingClientRect();
-      const xOffsetInner = Math.max(0, x / dataWidth - 0.05) * rect.width;
-      const yOffsetInner = Math.max(0, y / dataHeight - 0.05) * rect.height;
-      const xOffsetInnerFix = (x / dataWidth) * rect.width - xOffsetInner;
-      const yOffsetInnerFix = (y / dataHeight) * rect.height - yOffsetInner;
+        Number.parseFloat(docRoot.getAttribute("data-height") || "0") || 0;
+      // console.log(page, vw, vh, x, y, dataWidth, dataHeight, docRoot);
+      const svgRectBase = docRoot.getBoundingClientRect();
+      const svgRect = {
+        left: svgRectBase.left,
+        top: svgRectBase.top,
+        width: svgRectBase.width,
+        height: svgRectBase.height,
+      }
+      const xOffsetInnerFix = 7 * pw;
+      const yOffsetInnerFix = 38.2 * ph;
 
-      const docRoot = document.body || document.firstElementChild;
-      const basePos = docRoot.getBoundingClientRect();
+      const transform = page.transform.baseVal.consolidate()?.matrix;
+      if (transform) {
+        // console.log(transform.e, transform.f);
+        svgRect.left += (transform.e / dataWidth) * svgRect.width;
+        svgRect.top += (transform.f / dataHeight) * svgRect.height;
+      }
 
-      const xOffset = rect.left - basePos.left + xOffsetInner;
-      const yOffset = rect.top - basePos.top + yOffsetInner;
+      const pageRect = page.getBoundingClientRect();
+
+      const windowRoot = document.body || document.firstElementChild;
+      const basePos = windowRoot.getBoundingClientRect();
+
+      const xOffset = svgRect.left - basePos.left + (x / dataWidth) * svgRect.width - xOffsetInnerFix;
+      const yOffset = svgRect.top - basePos.top + (y / dataHeight) * svgRect.height - yOffsetInnerFix;
       const left = xOffset + xOffsetInnerFix;
       const top = yOffset + yOffsetInnerFix;
 
-      // window.scrollTo(xOffset, yOffset);
-      /// this would be better for preview svg
-      window.scrollTo({ behavior: "smooth", left: basePos.left, top: yOffset });
+      const widthOccupied = 100 * 100 * pw / pageRect.width;
+
+      const pageAdjustLeft = pageRect.left - basePos.left - 5 * pw;
+      const pageAdjust = pageRect.left - basePos.left + pageRect.width - 95 * pw;
+
+      // default single-column or multi-column layout
+      if (widthOccupied >= 90 || widthOccupied < 50) {
+        window.scrollTo({ behavior: "smooth", left: xOffset, top: yOffset });
+      } else { // for double-column layout
+        // console.log('occupied adjustment', widthOccupied, page);
+
+        const xOffsetAdjsut = xOffset > pageAdjust ? pageAdjust : pageAdjustLeft;
+
+        window.scrollTo({ behavior: "smooth", left: xOffsetAdjsut, top: yOffset });
+      }
+
+      // grid ripple for debug vw
+      // triggerRipple(
+      //   windowRoot,
+      //   svgRect.left + 50 * vw,
+      //   svgRect.top + 1 * vh,
+      //   "typst-jump-ripple",
+      //   "typst-jump-ripple-effect .4s linear",
+      //   "green",
+      // );
+
+      // triggerRipple(
+      //   windowRoot,
+      //   pageRect.left - basePos.left + vw,
+      //   pageRect.top - basePos.top + vh,
+      //   "typst-jump-ripple",
+      //   "typst-jump-ripple-effect .4s linear",
+      //   "red",
+      // );
+
+      // triggerRipple(
+      //   windowRoot,
+      //   pageAdjust,
+      //   pageRect.top - basePos.top + vh,
+      //   "typst-jump-ripple",
+      //   "typst-jump-ripple-effect .4s linear",
+      //   "red",
+      // );
 
       triggerRipple(
-        docRoot,
+        windowRoot,
         left,
         top,
         "typst-jump-ripple",
