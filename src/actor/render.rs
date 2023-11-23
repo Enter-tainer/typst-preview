@@ -87,7 +87,6 @@ impl RenderActor {
 pub struct OutlineRenderActor {
     signal: mpsc::UnboundedReceiver<()>,
     document: watch::Receiver<Option<Arc<Document>>>,
-    renderer: IncrSvgDocServer,
     outline_sender: mpsc::UnboundedSender<Outline>,
 }
 
@@ -97,14 +96,11 @@ impl OutlineRenderActor {
         document: watch::Receiver<Option<Arc<Document>>>,
         outline_sender: mpsc::UnboundedSender<Outline>,
     ) -> Self {
-        let mut res = Self {
+        Self {
             signal,
             document,
-            renderer: IncrSvgDocServer::default(),
             outline_sender,
-        };
-        res.renderer.set_should_attach_debug_info(true);
-        res
+        }
     }
 
     pub fn run(mut self) {
