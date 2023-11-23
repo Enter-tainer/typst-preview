@@ -638,7 +638,6 @@ class OutlineProvider implements vscode.TreeDataProvider<OutlineItem> {
 
 	getChildren(element?: OutlineItem): Thenable<OutlineItem[]> {
 		if (!this.outline) {
-			vscode.window.showInformationMessage('No dependency in empty workspace');
 			return Promise.resolve([]);
 		}
 
