@@ -1,7 +1,7 @@
-import { TypstPatchAttrs, patchSvgToContainer } from "./svg-patch";
-import { installEditorJumpToHandler, removeSourceMappingHandler } from "./svg-debug-info";
+import { TypstPatchAttrs, patchSvgToContainer } from "./typst-patch";
+import { installEditorJumpToHandler, removeSourceMappingHandler } from "./typst-debug-info";
 import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
-import { CanvasPage, patchOutlineEntry } from "./outline";
+import { CanvasPage, patchOutlineEntry } from "./typst-outline";
 
 export interface ContainerDOMState {
   /// cached `hookedElem.offsetWidth` or `hookedElem.innerWidth`

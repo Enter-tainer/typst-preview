@@ -1,4 +1,4 @@
-import { OriginViewInstruction, TypstPatchAttrs, changeViewPerspective, equalPatchElem, interpretTargetView, patchAttributes } from "./svg-patch";
+import { OriginViewInstruction, TypstPatchAttrs, changeViewPerspective, equalPatchElem, interpretTargetView, patchAttributes } from "./typst-patch";
 
 interface CursorPosition {
   // eslint-disable-next-line @typescript-eslint/naming-convention

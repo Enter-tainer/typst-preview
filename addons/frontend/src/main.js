@@ -7,7 +7,7 @@ import "./styles/layout.css";
 import "./styles/help-panel.css";
 
 import { wsMain } from './ws';
-import { PreviewMode } from './svg-doc';
+import { PreviewMode } from './typst-doc';
 
 /// Main entry point of the frontend program.
 main();

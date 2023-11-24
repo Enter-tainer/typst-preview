@@ -3,7 +3,7 @@ import {
   PatchPair,
   interpretTargetView,
   changeViewPerspective,
-} from "./svg-patch";
+} from "./typst-patch";
 
 interface Attributes {
   [key: string]: string | null | undefined;

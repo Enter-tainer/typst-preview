@@ -1,4 +1,4 @@
-import { PreviewMode, TypstDocument } from "./svg-doc";
+import { PreviewMode, TypstDocument } from "./typst-doc";
 import {
     rendererBuildInfo,
     createTypstRenderer,

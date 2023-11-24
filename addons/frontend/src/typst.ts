@@ -1,4 +1,4 @@
-import { triggerRipple } from "./svg-animation";
+import { triggerRipple } from "./typst-animation";
 
 // debounce https://stackoverflow.com/questions/23181243/throttling-a-mousemove-event-to-fire-no-more-than-5-times-a-second
 // ignore fast events, good for capturing double click
