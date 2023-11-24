@@ -228,17 +228,16 @@ impl TypstClient {
 
                                 // calculate reasonable delta bound
                                 let average_delta =
-                                    lines.windows(2).map(|w| w[1] - w[0]).sum::<usize>()
-                                        / lines.len();
+                                    lines.windows(2).map(|w| (w[1] - w[0]) as f32).sum::<f32>()
+                                        / lines.len() as f32;
                                 let average_sigma = (lines
                                     .windows(2)
-                                    .map(|w| (w[1] - w[0] - average_delta).pow(2) as f32)
+                                    .map(|w| ((w[1] - w[0]) as f32 - average_delta).powf(2.))
                                     .sum::<f32>()
                                     / lines.len() as f32)
-                                    .sqrt()
-                                    .ceil()
-                                    as usize;
-                                let reasonable_delta_bound = average_delta + average_sigma * 2;
+                                    .sqrt();
+                                let reasonable_delta_bound =
+                                    (average_delta + average_sigma * 2.).ceil() as usize;
 
                                 // pick the last contiguous lines
                                 let mut pick_line = lines.last().cloned().unwrap_or_default();
