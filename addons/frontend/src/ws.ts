@@ -269,12 +269,21 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
             ];
             // console.log(message[0], message[1].length);
             if (isContentPreview) {
-                if ((message[0] === "jump" || message[0] === "partial-rendering" || message[0] === "cursor")) {
+                // whether to scroll to the content preview when user updates document
+                const autoScrollContentPreview = false;
+                if (!autoScrollContentPreview && message[0] === "jump") {
+                    return;
+                }
+
+                // "viewport": viewport change to document doesn't affect content preview
+                // "partial-rendering": content previe always render partially
+                // "cursor": currently not supported
+                if ((message[0] === "viewport" || message[0] === "partial-rendering" || message[0] === "cursor")) {
                     return;
                 }
             }
 
-            if (message[0] === "jump") {
+            if (message[0] === "jump" || message[0] === "viewport") {
                 // todo: aware height padding
                 const [page, x, y] = dec
                     .decode((message[1] as any).buffer)

@@ -16,16 +16,16 @@ pub type SrcToDocJumpInfo = DocumentPosition;
 
 #[derive(Debug, Clone)]
 pub enum WebviewActorRequest {
+    ViewportPosition(DocumentPosition),
     SrcToDocJump(SrcToDocJumpInfo),
     CursorPosition(CursorPosition),
 }
 
-fn src_to_doc_jump_to_string(page_no: usize, x: f32, y: f32) -> String {
-    format!("jump,{page_no} {x} {y}")
-}
-
-fn cursor_position_to_string(page_no: usize, x: f32, y: f32) -> String {
-    format!("cursor,{page_no} {x} {y}")
+fn position_req(
+    event: &'static str,
+    DocumentPosition { page_no, x, y }: DocumentPosition,
+) -> String {
+    format!("{event},{page_no} {x} {y}")
 }
 
 pub struct WebviewActor {
@@ -88,13 +88,15 @@ impl WebviewActor {
                     debug!("WebviewActor: received message from mailbox: {:?}", msg);
                     match msg {
                         WebviewActorRequest::SrcToDocJump(jump_info) => {
-                            let SrcToDocJumpInfo { page_no, x, y } = jump_info;
-                            let msg = src_to_doc_jump_to_string(page_no, x, y);
+                            let msg = position_req("jump", jump_info);
+                            self.webview_websocket_conn.send(Message::Binary(msg.into_bytes())).await.unwrap();
+                        }
+                        WebviewActorRequest::ViewportPosition(jump_info) => {
+                            let msg = position_req("viewport", jump_info);
                             self.webview_websocket_conn.send(Message::Binary(msg.into_bytes())).await.unwrap();
                         }
                         WebviewActorRequest::CursorPosition(jump_info) => {
-                            let SrcToDocJumpInfo { page_no, x, y } = jump_info;
-                            let msg = cursor_position_to_string(page_no, x, y);
+                            let msg = position_req("cursor", jump_info);
                             self.webview_websocket_conn.send(Message::Binary(msg.into_bytes())).await.unwrap();
                         }
                     }
