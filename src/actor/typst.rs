@@ -200,6 +200,8 @@ impl TypstClient {
                         find_in_frame(frame, pos.point(), &filter_by_main)
                             .or_else(|| {
                                 // unfortunately, the heading element is not in the main file
+                                // See <https://github.com/Enter-tainer/typst-preview/pull/193> for
+                                // algorithmic description.
 
                                 // find all locations in the frame and in the main file
                                 let mut locations = vec![];
