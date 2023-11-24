@@ -199,9 +199,12 @@ impl TypstClient {
 
                         find_in_frame(frame, pos.point(), &filter_by_main)
                             .or_else(|| {
-                                let mut max_loc = 0u64;
-                                let mut span = Span::detached();
-                                let fuzzy_finder = &mut |_pos: &Point, s: &Span| {
+                                // unfortunately, the heading element is not in the main file
+
+                                // find all locations in the frame and in the main file
+                                let mut locations = vec![];
+                                let mut lines = vec![];
+                                let fuzzy_collector = &mut |_pos: &Point, s: &Span| {
                                     if s.id() != Some(main_id) {
                                         return false;
                                     }
@@ -209,16 +212,54 @@ impl TypstClient {
                                         return false;
                                     };
 
-                                    let loc = node.offset() as u64;
-                                    if loc < max_loc {
-                                        return false;
-                                    }
+                                    let loc = node.offset();
+                                    let line = main_src.byte_to_line(loc).unwrap_or_default();
+                                    lines.push(line);
 
-                                    max_loc = loc;
-                                    span = *s;
+                                    locations.push(((line, loc), *s));
                                     true
                                 };
-                                fuzzy_find_in_frame(frame, fuzzy_finder).then_some(span)
+                                fuzzy_find_in_frame(frame, fuzzy_collector);
+                                // locations.sort_by_key(|((_, loc), _)| *loc);
+                                // debug!("TypstActor: fuzzy locations: {:?}", locations);
+
+                                // sort line numbers to find the last contiguous lines
+                                lines.sort();
+
+                                // calculate reasonable delta bound
+                                let average_delta =
+                                    lines.windows(2).map(|w| w[1] - w[0]).sum::<usize>()
+                                        / lines.len();
+                                let average_sigma = (lines
+                                    .windows(2)
+                                    .map(|w| (w[1] - w[0] - average_delta).pow(2) as f32)
+                                    .sum::<f32>()
+                                    / lines.len() as f32)
+                                    .sqrt()
+                                    .ceil()
+                                    as usize;
+                                let reasonable_delta_bound = average_delta + average_sigma * 2;
+
+                                // pick the last contiguous lines
+                                let mut pick_line = lines.last().cloned().unwrap_or_default();
+                                for line in lines.iter().rev() {
+                                    if pick_line - *line > reasonable_delta_bound {
+                                        break;
+                                    }
+                                    pick_line = *line;
+                                }
+
+                                // min location in the last contiguous lines
+                                let picked = locations
+                                    .into_iter()
+                                    .filter(|((line, _), _)| *line == pick_line)
+                                    .min_by_key(|((_, loc), _)| *loc);
+
+                                debug!(
+                                    "TypstActor: picked location: {:?}(bar = {:?}) {:?}",
+                                    pick_line, reasonable_delta_bound, picked
+                                );
+                                picked.map(|(_, s)| s)
                             })
                             .map(|s| span_id_to_u64(&s))
                     })
@@ -376,11 +417,11 @@ fn fuzzy_find_in_frame(frame: &Frame, filter: &mut impl FnMut(&Point, &Span) -> 
 
 /// Find the position of a span in a frame.
 fn find_in_frame(frame: &Frame, click: Point, filter: &impl Fn(&Span) -> bool) -> Option<Span> {
-    for (mut pos, item) in frame.items().rev() {
+    for (mut pos, item) in frame.items() {
         match item {
             FrameItem::Group(group) => {
                 // TODO: Handle transformation.
-                if let Some(span) = find_in_frame(&group.frame, click, filter) {
+                if let Some(span) = find_in_frame(&group.frame, click - pos, filter) {
                     return Some(span);
                 }
             }
