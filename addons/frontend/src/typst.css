@@ -39,14 +39,14 @@ body {
 }
 
 .typst-outline-title, .typst-preview-canvas-page-number {
-  color: var(--typst-preview-toolbar-fg-color);
+  color: var(--typst-preview-foreground-color);
   font-family: sans-serif;
   text-align: center;
   width: 100%;
 }
 
 .typst-preview-svg-page-number {
-  fill: var(--typst-preview-toolbar-fg-color);
+  fill: var(--typst-preview-foreground-color);
   font-family: sans-serif;
   /* set to alignment center */
   text-anchor: middle;
