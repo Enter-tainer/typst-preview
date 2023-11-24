@@ -189,7 +189,7 @@ function layoutText(svg: SVGElement) {
 
 window.handleTypstLocation = function (
   elem: Element,
-  page: number,
+  pageNo: number,
   x: number,
   y: number
 ) {
@@ -198,17 +198,130 @@ window.handleTypstLocation = function (
     console.warn("no typst-doc found", elem);
     return;
   }
+
+  type ScrollRect = Pick<DOMRect, "left" | "top" | "width" | "height">;
+  const scrollTo = (pageRect: ScrollRect, innerLeft: number, innerTop: number) => {
+
+    const windowRoot = document.body || document.firstElementChild;
+    const basePos = windowRoot.getBoundingClientRect();
+
+    const left = innerLeft - basePos.left;
+    const top = innerTop - basePos.top;
+
+
+    // evaluate window viewport 1vw
+    const pw = window.innerWidth * 0.01;
+    const ph = window.innerHeight * 0.01;
+
+    const xOffsetInnerFix = 7 * pw;
+    const yOffsetInnerFix = 38.2 * ph;
+
+    const xOffset = left - xOffsetInnerFix;
+    const yOffset = top - yOffsetInnerFix;
+
+    const widthOccupied = 100 * 100 * pw / pageRect.width;
+
+    const pageAdjustLeft = pageRect.left - basePos.left - 5 * pw;
+    const pageAdjust = pageRect.left - basePos.left + pageRect.width - 95 * pw;
+
+    // default single-column or multi-column layout
+    if (widthOccupied >= 90 || widthOccupied < 50) {
+      window.scrollTo({ behavior: "smooth", left: xOffset, top: yOffset });
+    } else { // for double-column layout
+      // console.log('occupied adjustment', widthOccupied, page);
+
+      const xOffsetAdjsut = xOffset > pageAdjust ? pageAdjust : pageAdjustLeft;
+
+      window.scrollTo({ behavior: "smooth", left: xOffsetAdjsut, top: yOffset });
+    }
+
+    // grid ripple for debug vw
+    // triggerRipple(
+    //   windowRoot,
+    //   svgRect.left + 50 * vw,
+    //   svgRect.top + 1 * vh,
+    //   "typst-jump-ripple",
+    //   "typst-jump-ripple-effect .4s linear",
+    //   "green",
+    // );
+
+    // triggerRipple(
+    //   windowRoot,
+    //   pageRect.left - basePos.left + vw,
+    //   pageRect.top - basePos.top + vh,
+    //   "typst-jump-ripple",
+    //   "typst-jump-ripple-effect .4s linear",
+    //   "red",
+    // );
+
+    // triggerRipple(
+    //   windowRoot,
+    //   pageAdjust,
+    //   pageRect.top - basePos.top + vh,
+    //   "typst-jump-ripple",
+    //   "typst-jump-ripple-effect .4s linear",
+    //   "red",
+    // );
+
+    triggerRipple(
+      windowRoot,
+      left,
+      top,
+      "typst-jump-ripple",
+      "typst-jump-ripple-effect .4s linear"
+    );
+  }
+
+  const renderMode = docRoot.getAttribute("data-render-mode");
+  if (renderMode === 'canvas') {
+    const pages = docRoot.querySelectorAll<HTMLDivElement>('.typst-page');
+
+    const pageMapping = new Map<number, HTMLDivElement>();
+    for (const page of pages) {
+      const pageNumber = Number.parseInt(page.getAttribute('data-page-number')!);
+      if (pageMapping.has(pageNumber)) {
+        continue;
+      }
+      pageMapping.set(pageNumber, page);
+    }
+    pageNo -= 1;
+
+    if (!pageMapping.has(pageNo)) {
+      console.warn('page not found in canvas mode', pageNo, pageMapping);
+      return;
+    }
+
+    const canvasContainer = pageMapping.get(pageNo)!.firstElementChild!;
+    const canvasRectBase = canvasContainer.getBoundingClientRect();
+    const appliedScale = Number.parseFloat(canvasContainer.getAttribute("data-applied-scale") || "1") || 1;
+    const canvasRect = {
+      left: canvasRectBase.left,
+      top: canvasRectBase.top,
+      width: canvasRectBase.width / appliedScale,
+      height: canvasRectBase.height / appliedScale,
+    }
+
+    const dataWidth =
+      Number.parseFloat(canvasContainer.getAttribute("data-page-width") || "0") || 0;
+    const dataHeight =
+      Number.parseFloat(canvasContainer.getAttribute("data-page-height") || "0") || 0;
+
+    const left = canvasRect.left + (x / dataWidth) * canvasRect.width;
+    const top = canvasRect.top + (y / dataHeight) * canvasRect.height;
+
+    console.log('canvas mode jump', left, top, canvasRect, dataWidth, dataHeight, x, y);
+
+    scrollTo(canvasRect, left, top);
+    return;
+  }
+
   const children = docRoot.children;
   let nthPage = 0;
   for (let i = 0; i < children.length; i++) {
     if (children[i].tagName === "g") {
       nthPage++;
     }
-    if (nthPage == page) {
-      // evaluate window viewport 1vw
-      const pw = window.innerWidth * 0.01;
-      const ph = window.innerHeight * 0.01;
-
+    if (nthPage == pageNo) {
       const page = children[i] as SVGGElement;
       const dataWidth =
         Number.parseFloat(docRoot.getAttribute("data-width") || "0") || 0;
@@ -222,8 +335,6 @@ window.handleTypstLocation = function (
         width: svgRectBase.width,
         height: svgRectBase.height,
       }
-      const xOffsetInnerFix = 7 * pw;
-      const yOffsetInnerFix = 38.2 * ph;
 
       const transform = page.transform.baseVal.consolidate()?.matrix;
       if (transform) {
@@ -234,65 +345,10 @@ window.handleTypstLocation = function (
 
       const pageRect = page.getBoundingClientRect();
 
-      const windowRoot = document.body || document.firstElementChild;
-      const basePos = windowRoot.getBoundingClientRect();
+      const left = svgRect.left + (x / dataWidth) * svgRect.width;
+      const top = svgRect.top + (y / dataHeight) * svgRect.height;
 
-      const xOffset = svgRect.left - basePos.left + (x / dataWidth) * svgRect.width - xOffsetInnerFix;
-      const yOffset = svgRect.top - basePos.top + (y / dataHeight) * svgRect.height - yOffsetInnerFix;
-      const left = xOffset + xOffsetInnerFix;
-      const top = yOffset + yOffsetInnerFix;
-
-      const widthOccupied = 100 * 100 * pw / pageRect.width;
-
-      const pageAdjustLeft = pageRect.left - basePos.left - 5 * pw;
-      const pageAdjust = pageRect.left - basePos.left + pageRect.width - 95 * pw;
-
-      // default single-column or multi-column layout
-      if (widthOccupied >= 90 || widthOccupied < 50) {
-        window.scrollTo({ behavior: "smooth", left: xOffset, top: yOffset });
-      } else { // for double-column layout
-        // console.log('occupied adjustment', widthOccupied, page);
-
-        const xOffsetAdjsut = xOffset > pageAdjust ? pageAdjust : pageAdjustLeft;
-
-        window.scrollTo({ behavior: "smooth", left: xOffsetAdjsut, top: yOffset });
-      }
-
-      // grid ripple for debug vw
-      // triggerRipple(
-      //   windowRoot,
-      //   svgRect.left + 50 * vw,
-      //   svgRect.top + 1 * vh,
-      //   "typst-jump-ripple",
-      //   "typst-jump-ripple-effect .4s linear",
-      //   "green",
-      // );
-
-      // triggerRipple(
-      //   windowRoot,
-      //   pageRect.left - basePos.left + vw,
-      //   pageRect.top - basePos.top + vh,
-      //   "typst-jump-ripple",
-      //   "typst-jump-ripple-effect .4s linear",
-      //   "red",
-      // );
-
-      // triggerRipple(
-      //   windowRoot,
-      //   pageAdjust,
-      //   pageRect.top - basePos.top + vh,
-      //   "typst-jump-ripple",
-      //   "typst-jump-ripple-effect .4s linear",
-      //   "red",
-      // );
-
-      triggerRipple(
-        windowRoot,
-        left,
-        top,
-        "typst-jump-ripple",
-        "typst-jump-ripple-effect .4s linear"
-      );
+      scrollTo(pageRect, left, top);
       return;
     }
   }

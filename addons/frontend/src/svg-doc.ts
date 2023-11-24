@@ -299,6 +299,12 @@ class TypstDocumentImpl {
     // Note: one should retrieve dom state before rescale
     const container = this.cachedDOMState;
 
+    // get dom state from cache, so we are free from layout reflowing
+    const docDiv = this.hookedElem.firstElementChild! as HTMLDivElement;
+    if (!docDiv) {
+      return;
+    }
+
     let isFirst = true;
 
     const rescale = (canvasContainer: HTMLElement) => {
@@ -339,7 +345,7 @@ class TypstDocumentImpl {
 
           const widthAdjust = Math.max((container.width - scaledWidth) / 2, 0);
           const heightAdjust = Math.max((container.height - scaledHeight) / 2, 0);
-          this.hookedElem.style.transform = `translate(${widthAdjust}px, ${heightAdjust}px)`;
+          docDiv.style.transform = `translate(${widthAdjust}px, ${heightAdjust}px)`;
         }
       }
     }
@@ -358,9 +364,9 @@ class TypstDocumentImpl {
         }
       }
 
-      rescaleChildren(this.hookedElem);
+      rescaleChildren(docDiv);
     } else {
-      for (const ch of this.hookedElem.children) {
+      for (const ch of docDiv.children) {
         let canvasContainer = ch as HTMLDivElement;
         if (!canvasContainer.classList.contains('typst-page')) {
           continue;
@@ -648,31 +654,36 @@ class TypstDocumentImpl {
       }
     });
 
+    if (!this.hookedElem.firstElementChild) {
+      this.hookedElem.innerHTML = `<div class="typst-doc" data-render-mode="canvas"></div>`;
+    }
+    const docDiv = this.hookedElem.firstElementChild! as HTMLDivElement;
+
     if (this.isMixinOutline && this.outline) {
       console.log('render with outline', this.outline);
-      patchOutlineEntry(this.hookedElem as any, pagesInfo, this.outline.items);
-      for (const ch of this.hookedElem.children) {
+      patchOutlineEntry(docDiv as any, pagesInfo, this.outline.items);
+      for (const ch of docDiv.children) {
         if (!ch.classList.contains('typst-page')) {
           continue;
         }
         const pageNumber = Number.parseInt(ch.getAttribute('data-page-number')!);
         if (pageNumber >= pagesInfo.length) {
           // todo: cache key shifted
-          this.hookedElem.removeChild(ch);
+          docDiv.removeChild(ch);
           continue;
         }
         pagesInfo[pageNumber].container = ch as HTMLDivElement;
         pagesInfo[pageNumber].elem = ch.firstElementChild as HTMLDivElement;
       }
     } else {
-      for (const ch of this.hookedElem.children) {
+      for (const ch of docDiv.children) {
         if (!ch.classList.contains('typst-page')) {
           continue;
         }
         const pageNumber = Number.parseInt(ch.getAttribute('data-page-number')!);
         if (pageNumber >= pagesInfo.length) {
           // todo: cache key shifted
-          this.hookedElem.removeChild(ch);
+          docDiv.removeChild(ch);
           continue;
         }
         pagesInfo[pageNumber].container = ch as HTMLDivElement;
@@ -721,7 +732,7 @@ class TypstDocumentImpl {
           pageInfo.inserter(pageInfo);
         } else {
           if (pageInfo.index === 0) {
-            this.hookedElem.prepend(pageInfo.container);
+            docDiv.prepend(pageInfo.container);
           } else {
             pagesInfo[pageInfo.index - 1].container.after(pageInfo.container)
           }
@@ -735,10 +746,10 @@ class TypstDocumentImpl {
     // await Promise.all(pagesInfo.map(async (pageInfo) => {
     this.kModule.backgroundColor = '#ffffff';
     this.kModule.pixelPerPt = this.pixelPerPt;
-    if (this.hookedElem.getAttribute('data-rendering') === 'true') {
+    if (docDiv.getAttribute('data-rendering') === 'true') {
       throw new Error('rendering in progress, possibly a race condition');
     }
-    this.hookedElem.setAttribute('data-rendering', 'true');
+    docDiv.setAttribute('data-rendering', 'true');
     for (const pageInfo of pagesInfo) {
       const canvas = pageInfo.elem.firstElementChild as HTMLCanvasElement;
       // const tt1 = performance.now();
@@ -782,7 +793,7 @@ class TypstDocumentImpl {
         pageInfo.elem.setAttribute('data-cache-key', result.cacheKey);
       }
     }
-    this.hookedElem.removeAttribute('data-rendering');
+    docDiv.removeAttribute('data-rendering');
 
     // }));
 

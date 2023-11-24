@@ -282,7 +282,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
             // console.log(message[0], message[1].length);
             if (isContentPreview) {
                 // whether to scroll to the content preview when user updates document
-                const autoScrollContentPreview = false;
+                const autoScrollContentPreview = true;
                 if (!autoScrollContentPreview && message[0] === "jump") {
                     return;
                 }
