@@ -5,7 +5,8 @@ use tokio::sync::{mpsc, watch};
 use typst::doc::Document;
 use typst_ts_svg_exporter::IncrSvgDocServer;
 
-use super::outline::Outline;
+use crate::outline::Outline;
+
 #[derive(Debug, Clone, Copy)]
 pub enum RenderActorRequest {
     RenderFullLatest,
@@ -118,7 +119,7 @@ impl OutlineRenderActor {
                 info!("OutlineRenderActor: document is not ready");
                 continue;
             };
-            let data = crate::actor::outline::outline(&document);
+            let data = crate::outline::outline(&document);
             comemo::evict(30);
             debug!("OutlineRenderActor: sending outline");
             let Ok(_) = self.outline_sender.send(data) else {

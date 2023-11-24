@@ -1,5 +1,7 @@
 mod actor;
 mod args;
+pub mod debug_loc;
+mod outline;
 use clap::Parser;
 
 use futures::SinkExt;

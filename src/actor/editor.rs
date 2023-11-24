@@ -6,11 +6,12 @@ use tokio::{net::TcpStream, sync::broadcast};
 use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
 
 use crate::{
-    actor::outline::Outline, actor::typst::TypstActorRequest, ChangeCursorPositionRequest,
-    DocToSrcJumpInfo, MemoryFiles, MemoryFilesShort, SrcToDocJumpRequest,
+    actor::typst::TypstActorRequest, ChangeCursorPositionRequest, DocToSrcJumpInfo, MemoryFiles,
+    MemoryFilesShort, SrcToDocJumpRequest,
 };
+use crate::{debug_loc::DocumentPosition, outline::Outline};
 
-use super::{debug_loc::DocumentPosition, webview::WebviewActorRequest};
+use super::webview::WebviewActorRequest;
 #[derive(Debug, Deserialize)]
 pub struct DocToSrcJumpResolveRequest {
     /// Span id in hex-format.

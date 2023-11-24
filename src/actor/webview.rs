@@ -6,10 +6,8 @@ use tokio::{
 };
 use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
 
-use super::{
-    debug_loc::DocumentPosition, outline::Outline, render::RenderActorRequest,
-    typst::TypstActorRequest,
-};
+use super::{render::RenderActorRequest, typst::TypstActorRequest};
+use crate::{debug_loc::DocumentPosition, outline::Outline};
 
 pub type CursorPosition = DocumentPosition;
 pub type SrcToDocJumpInfo = DocumentPosition;
