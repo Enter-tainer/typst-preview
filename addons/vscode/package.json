@@ -77,6 +77,13 @@
         "description": "Show typst-preview log",
         "icon": "$(list-flat)",
         "when": "resourceLangId == typst"
+      },
+      {
+        "command": "typst-preview.revealDocument",
+        "title": "Typst Preview: Reveal document by span or physical document position",
+        "description": "Reveal document by span or physical document position, internally used by typst-preview",
+        "icon": "$(open-preview)",
+        "when": "resourceLangId == typst"
       }
     ],
     "menus": {

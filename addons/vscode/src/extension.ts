@@ -135,6 +135,25 @@ function getProjectRoot(currentPath: string): string {
 const serverProcesses: Array<any> = [];
 const activeTask = new Map<vscode.TextDocument, TaskControlBlock>();
 
+interface SourceScrollBySpanRequest {
+	event: 'sourceScrollBySpan';
+	span: string;
+}
+
+interface ScrollByPositionRequest {
+	event: 'panelScrollByPosition' | 'sourceScrollByPosition';
+	position: any;
+}
+
+interface ScrollRequest {
+	event: string;
+	filepath: string;
+	line: any;
+	character: any;
+}
+
+type DocRequests = SourceScrollBySpanRequest | ScrollByPositionRequest | ScrollRequest;
+
 // If there is only one preview task, we treat the workspace as a multi-file project,
 // so `Sync preview with cursor` command in any file goes to the unique preview server.
 //
@@ -144,8 +163,8 @@ const activeTask = new Map<vscode.TextDocument, TaskControlBlock>();
 // This is a compromise we made to support multi-file projects after evaluating performance,
 // effectiveness, and user needs.
 // See https://github.com/Enter-tainer/typst-preview/issues/164 for more detail.
-const reportPosition = async (bindDocument: vscode.TextDocument, activeEditor: vscode.TextEditor, event: string) => {
-	let tcb = activeTask.get(bindDocument);
+const sendDocRequest = async (bindDocument: vscode.TextDocument | undefined, scrollRequest: DocRequests) => {
+	let tcb = bindDocument && activeTask.get(bindDocument);
 	if (tcb === undefined) {
 		if (activeTask.size === 1) {
 			tcb = Array.from(activeTask.values())[0];
@@ -153,15 +172,18 @@ const reportPosition = async (bindDocument: vscode.TextDocument, activeEditor: v
 			return;
 		}
 	}
-	const { addonΠserver } = tcb;
-	const scrollRequest = {
+	tcb.addonΠserver.send(JSON.stringify(scrollRequest));
+};
+
+const reportPosition = async (bindDocument: vscode.TextDocument, activeEditor: vscode.TextEditor, event: string) => {
+	const scrollRequest: ScrollRequest = {
 		event,
 		'filepath': bindDocument.uri.fsPath,
 		'line': activeEditor.selection.active.line,
 		'character': activeEditor.selection.active.character,
 	};
-	console.log(scrollRequest);
-	addonΠserver.send(JSON.stringify(scrollRequest));
+	// console.log(scrollRequest);
+	sendDocRequest(bindDocument, scrollRequest);
 };
 
 interface TaskControlBlock {
@@ -655,7 +677,11 @@ export class OutlineItem extends vscode.TreeItem {
 	constructor(
 		public readonly data: OutlineItemData,
 		public readonly collapsibleState: vscode.TreeItemCollapsibleState,
-		public readonly command?: vscode.Command
+		public readonly command: vscode.Command = {
+			title: 'Reveal Outline Item',
+			command: 'typst-preview.revealDocument',
+			arguments: [{ span: data.span, position: data.position }],
+		}
 	) {
 		super(data.title, collapsibleState);
 		const span = this.data.span;
@@ -723,11 +749,31 @@ export function activate(context: vscode.ExtensionContext) {
 
 		reportPosition(activeEditor.document, activeEditor, 'panelScrollTo');
 	});
+	let revealDocumentDisposable = vscode.commands.registerCommand('typst-preview.revealDocument', async (args) => {
+		console.log(args);
+		// That's very unfortunate that sourceScrollBySpan doesn't work well.
+		// if (args.span) {
+		// 	sendDocRequest(undefined, {
+		// 		event: 'sourceScrollBySpan',
+		// 		span: args.span,
+		// 	});
+		// }
+		if (args.position) { // todo: tagging document
+			sendDocRequest(undefined, {
+				event: 'sourceScrollByPosition',
+				position: args.position,
+			});
+			sendDocRequest(undefined, {
+				event: 'panelScrollByPosition',
+				position: args.position,
+			});
+		}
+	});
 	let showLogDisposable = vscode.commands.registerCommand('typst-preview.showLog', async () => {
 		outputChannel.show();
 	});
 
-	context.subscriptions.push(webviewDisposable, browserDisposable, webviewSlideDisposable, browserSlideDisposable, syncDisposable, showLogDisposable, statusBarItem);
+	context.subscriptions.push(webviewDisposable, browserDisposable, webviewSlideDisposable, browserSlideDisposable, syncDisposable, showLogDisposable, statusBarItem, revealDocumentDisposable);
 	process.on('SIGINT', () => {
 		for (const serverProcess of serverProcesses) {
 			serverProcess.kill();
