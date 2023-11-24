@@ -84,6 +84,12 @@
         "description": "Reveal document by span or physical document position, internally used by typst-preview",
         "icon": "$(open-preview)",
         "when": "resourceLangId == typst"
+      },
+      {
+        "command": "typst-preview.noteOutline",
+        "title": "Note: Jumping to source location of the outline item doesn't work well if its body doesn't have source location, e.g.\n```\n#let my-heading(h) = heading(h) // will jump to here\n#my-heading(\"Title\") // will not jump to here\n```.\nHence, you may want to use `my-heading[Title]` instead to gain better experience of outline jumping.",
+        "description": "...",
+        "icon": "$(extensions-info-message)"
       }
     ],
     "menus": {
@@ -91,6 +97,13 @@
         {
           "command": "typst-preview.preview",
           "when": "resourceLangId == typst && editorTextFocus",
+          "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "typst-preview.noteOutline",
+          "when": "view == typst-preview.outline",
           "group": "navigation"
         }
       ]
