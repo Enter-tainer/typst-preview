@@ -4,23 +4,26 @@ use crate::{ChangeCursorPositionRequest, MemoryFiles, MemoryFilesShort, SrcToDoc
 use log::{debug, error, info};
 use tokio::sync::{broadcast, mpsc, watch};
 use typst::diag::SourceResult;
+use typst::doc::{Frame, FrameItem, Meta};
+use typst::geom::{Geometry, Point, Size};
+use typst::syntax::Span;
 use typst::{doc::Document, World};
 use typst_ts_compiler::service::{
     CompileActor, CompileClient as TsCompileClient, CompileExporter, Compiler, WorldExporter,
 };
 use typst_ts_compiler::service::{CompileDriver, WrappedCompiler};
 use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
+use typst_ts_core::vector::span_id_to_u64;
 
+use super::debug_loc::DocumentPosition;
 use super::editor::CompileStatus;
 use super::render::RenderActorRequest;
-use super::{
-    editor::EditorActorRequest,
-    webview::{SrcToDocJumpInfo, WebviewActorRequest},
-};
+use super::{editor::EditorActorRequest, webview::WebviewActorRequest};
 
 #[derive(Debug)]
 pub enum TypstActorRequest {
-    DocToSrcJumpResolve(u64),
+    JumpToSrcByPosition(DocumentPosition),
+    DocToSrcJumpResolve(/* span id */ u64),
     ChangeCursorPosition(ChangeCursorPositionRequest),
     SrcToDocJumpResolve(SrcToDocJumpRequest),
 
@@ -177,21 +180,57 @@ impl TypstClient {
         match mail {
             TypstActorRequest::DocToSrcJumpResolve(id) => {
                 debug!("TypstActor: processing doc2src: {:?}", id);
+                self.doc2src(id).await;
+            }
+            TypstActorRequest::JumpToSrcByPosition(pos) => {
+                debug!("TypstActor: processing jump to src by position: {pos:?}");
 
+                // todo: non-main file
                 let res = self
                     .inner()
-                    .resolve_doc_to_src_jump(id)
+                    .steal_async(move |this, _| {
+                        let doc = this.document()?;
+                        let frame = doc.pages.get(pos.page_no - 1)?;
+
+                        let main_id = this.compiler.main_id();
+                        let main_src = this.compiler.world().source(main_id).ok()?;
+                        let filter_by_main =
+                            |s: &Span| s.id() == Some(main_id) && main_src.find(*s).is_some();
+
+                        find_in_frame(frame, pos.point(), &filter_by_main)
+                            .or_else(|| {
+                                let mut max_loc = 0u64;
+                                let mut span = Span::detached();
+                                let fuzzy_finder = &mut |_pos: &Point, s: &Span| {
+                                    if s.id() != Some(main_id) {
+                                        return false;
+                                    }
+                                    let Some(node) = main_src.find(*s) else {
+                                        return false;
+                                    };
+
+                                    let loc = node.offset() as u64;
+                                    if loc < max_loc {
+                                        return false;
+                                    }
+
+                                    max_loc = loc;
+                                    span = *s;
+                                    true
+                                };
+                                fuzzy_find_in_frame(frame, fuzzy_finder).then_some(span)
+                            })
+                            .map(|s| span_id_to_u64(&s))
+                    })
                     .await
                     .map_err(|err| {
-                        error!("TypstActor: failed to resolve doc to src jump: {:#}", err);
+                        error!("TypstActor: failed to resolve page position: {:#}", err);
                     })
                     .ok()
                     .flatten();
 
-                if let Some(info) = res {
-                    let _ = self
-                        .editor_conn_sender
-                        .send(EditorActorRequest::DocToSrcJump(info));
+                if let Some(id) = res {
+                    self.doc2src(id).await;
                 }
             }
             TypstActorRequest::ChangeCursorPosition(req) => {
@@ -254,6 +293,24 @@ impl TypstClient {
         }
     }
 
+    async fn doc2src(&mut self, id: u64) {
+        let res = self
+            .inner()
+            .resolve_doc_to_src_jump(id)
+            .await
+            .map_err(|err| {
+                error!("TypstActor: failed to resolve doc to src jump: {:#}", err);
+            })
+            .ok()
+            .flatten();
+
+        if let Some(info) = res {
+            let _ = self
+                .editor_conn_sender
+                .send(EditorActorRequest::DocToSrcJump(info));
+        }
+    }
+
     fn update_memory_files(&mut self, files: MemoryFiles, reset_shadow: bool) {
         // todo: is it safe to believe that the path is normalized?
         let now = std::time::SystemTime::now();
@@ -280,4 +337,94 @@ impl TypstClient {
         let files = FileChangeSet::new_removes(files.files.into_iter().map(From::from).collect());
         self.inner().add_memory_changes(MemoryEvent::Update(files))
     }
+}
+
+/// Find the position of a span in a frame.
+fn fuzzy_find_in_frame(frame: &Frame, filter: &mut impl FnMut(&Point, &Span) -> bool) -> bool {
+    let mut res = false;
+    for (mut pos, item) in frame.items().rev() {
+        match item {
+            FrameItem::Group(group) => {
+                // TODO: Handle transformation.
+                res = fuzzy_find_in_frame(&group.frame, filter) || res;
+            }
+            FrameItem::Meta(Meta::Elem(elem), _) if filter(&pos, &elem.span()) => {
+                res = true;
+            }
+            FrameItem::Text(text) => {
+                for glyph in &text.glyphs {
+                    let width = glyph.x_advance.at(text.size);
+                    if filter(&pos, &glyph.span.0) {
+                        res = true;
+                    }
+
+                    pos.x += width;
+                }
+            }
+            FrameItem::Shape(_, span) | FrameItem::Image(_, _, span) => {
+                if filter(&pos, span) {
+                    res = true;
+                }
+            }
+
+            _ => {}
+        }
+    }
+
+    res
+}
+
+/// Find the position of a span in a frame.
+fn find_in_frame(frame: &Frame, click: Point, filter: &impl Fn(&Span) -> bool) -> Option<Span> {
+    for (mut pos, item) in frame.items().rev() {
+        match item {
+            FrameItem::Group(group) => {
+                // TODO: Handle transformation.
+                if let Some(span) = find_in_frame(&group.frame, click, filter) {
+                    return Some(span);
+                }
+            }
+            FrameItem::Meta(Meta::Elem(elem), _) if filter(&elem.span()) => {
+                return Some(elem.span());
+            }
+            FrameItem::Text(text) => {
+                for glyph in &text.glyphs {
+                    let width = glyph.x_advance.at(text.size);
+                    if is_in_rect(
+                        Point::new(pos.x, pos.y - text.size),
+                        Size::new(width, text.size),
+                        click,
+                    ) && filter(&glyph.span.0)
+                    {
+                        return Some(glyph.span.0);
+                    }
+
+                    pos.x += width;
+                }
+            }
+
+            FrameItem::Shape(shape, span) => {
+                let Geometry::Rect(size) = shape.geometry else {
+                    continue;
+                };
+                if is_in_rect(pos, size, click) && filter(span) {
+                    return Some(*span);
+                }
+            }
+
+            FrameItem::Image(_, size, span) if is_in_rect(pos, *size, click) && filter(span) => {
+                return Some(*span);
+            }
+
+            _ => {}
+        }
+    }
+
+    None
+}
+
+/// Whether a rectangle with the given size at the given position contains the
+/// click position.
+fn is_in_rect(pos: Point, size: Size, click: Point) -> bool {
+    pos.x <= click.x && pos.x + size.x >= click.x && pos.y <= click.y && pos.y + size.y >= click.y
 }
