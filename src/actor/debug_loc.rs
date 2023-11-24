@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use typst::{doc::Position as TypstPosition, geom::Point};
+use typst::doc::Position as TypstPosition;
 
 /// A serializable physical position in a document.
 ///
@@ -17,13 +17,6 @@ pub struct DocumentPosition {
     pub x: f32,
     /// The exact y-coordinate on the page (from the top, as usual).
     pub y: f32,
-}
-
-impl DocumentPosition {
-    pub fn point(&self) -> Point {
-        use typst::geom::Abs;
-        Point::new(Abs::raw(self.x as f64), Abs::raw(self.y as f64))
-    }
 }
 
 impl From<TypstPosition> for DocumentPosition {

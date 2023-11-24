@@ -143,19 +143,25 @@ pub fn outline(document: &TypstDocument) -> Outline {
 }
 
 fn outline_item(src: &HeadingNode, res: &mut Vec<OutlineItem>) {
-    let title = {
-        let body = src.element.expect_field::<Content>("body");
-        body.plain_text().trim().to_owned()
-    };
+    let body = src.element.expect_field::<Content>("body");
+    let title = body.plain_text().trim().to_owned();
 
     let mut children = Vec::with_capacity(src.children.len());
     for child in src.children.iter() {
         outline_item(child, &mut children);
     }
 
+    // use body's span first, otherwise use the element's span.
+    let span = body.span();
+    let span = if span.is_detached() {
+        src.element.span()
+    } else {
+        span
+    };
+
     res.push(OutlineItem {
         title,
-        span: Some(format!("{:x}", span_id_to_u64(&src.element.span()))),
+        span: Some(format!("{:x}", span_id_to_u64(&span))),
         position: Some(src.position),
         children,
     });

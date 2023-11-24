@@ -752,17 +752,13 @@ export function activate(context: vscode.ExtensionContext) {
 	let revealDocumentDisposable = vscode.commands.registerCommand('typst-preview.revealDocument', async (args) => {
 		console.log(args);
 		// That's very unfortunate that sourceScrollBySpan doesn't work well.
-		// if (args.span) {
-		// 	sendDocRequest(undefined, {
-		// 		event: 'sourceScrollBySpan',
-		// 		span: args.span,
-		// 	});
-		// }
-		if (args.position) { // todo: tagging document
+		if (args.span) {
 			sendDocRequest(undefined, {
-				event: 'sourceScrollByPosition',
-				position: args.position,
+				event: 'sourceScrollBySpan',
+				span: args.span,
 			});
+		}
+		if (args.position) { // todo: tagging document
 			sendDocRequest(undefined, {
 				event: 'panelScrollByPosition',
 				position: args.position,

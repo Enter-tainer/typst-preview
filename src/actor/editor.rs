@@ -18,11 +18,6 @@ pub struct DocToSrcJumpResolveRequest {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct SourceScrollByPositionRequest {
-    position: DocumentPosition,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct PanelScrollByPositionRequest {
     position: DocumentPosition,
 }
@@ -59,8 +54,6 @@ enum ControlPlaneMessage {
     SrcToDocJump(SrcToDocJumpRequest),
     #[serde(rename = "panelScrollByPosition")]
     PanelScrollByPosition(PanelScrollByPositionRequest),
-    #[serde(rename = "sourceScrollByPosition")]
-    SourceScrollByPosition(SourceScrollByPositionRequest),
     #[serde(rename = "sourceScrollBySpan")]
     DocToSrcJumpResolve(DocToSrcJumpResolveRequest),
     #[serde(rename = "syncMemoryFiles")]
@@ -150,10 +143,6 @@ impl EditorActor {
                         ControlPlaneMessage::SrcToDocJump(jump_info) => {
                             debug!("EditorActor: received message from editor: {:?}", jump_info);
                             self.world_sender.send(TypstActorRequest::SrcToDocJumpResolve(jump_info)).unwrap();
-                        }
-                        ControlPlaneMessage::SourceScrollByPosition(jump_info) => {
-                            debug!("EditorActor: received message from editor: {:?}", jump_info);
-                            self.world_sender.send(TypstActorRequest::JumpToSrcByPosition(jump_info.position)).unwrap();
                         }
                         ControlPlaneMessage::PanelScrollByPosition(jump_info) => {
                             debug!("EditorActor: received message from editor: {:?}", jump_info);
