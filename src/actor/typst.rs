@@ -174,7 +174,22 @@ impl TypstClient {
         match mail {
             TypstActorRequest::DocToSrcJumpResolve(id) => {
                 debug!("TypstActor: processing doc2src: {:?}", id);
-                self.doc2src(id).await;
+
+                let res = self
+                    .inner()
+                    .resolve_doc_to_src_jump(id)
+                    .await
+                    .map_err(|err| {
+                        error!("TypstActor: failed to resolve doc to src jump: {:#}", err);
+                    })
+                    .ok()
+                    .flatten();
+
+                if let Some(info) = res {
+                    let _ = self
+                        .editor_conn_sender
+                        .send(EditorActorRequest::DocToSrcJump(info));
+                }
             }
             TypstActorRequest::ChangeCursorPosition(req) => {
                 debug!("TypstActor: processing src2doc: {:?}", req);
@@ -233,24 +248,6 @@ impl TypstClient {
                 debug!("TypstActor: processing REMOVE memory files: {:?}", m.files);
                 self.remove_shadow_files(m);
             }
-        }
-    }
-
-    async fn doc2src(&mut self, id: u64) {
-        let res = self
-            .inner()
-            .resolve_doc_to_src_jump(id)
-            .await
-            .map_err(|err| {
-                error!("TypstActor: failed to resolve doc to src jump: {:#}", err);
-            })
-            .ok()
-            .flatten();
-
-        if let Some(info) = res {
-            let _ = self
-                .editor_conn_sender
-                .send(EditorActorRequest::DocToSrcJump(info));
         }
     }
 
