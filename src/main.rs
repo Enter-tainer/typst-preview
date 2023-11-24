@@ -172,7 +172,7 @@ async fn main() {
         doc_watch,
         renderer_mailbox,
         editor_conn,
-        webview_conn,
+        webview_conn: (webview_tx, _),
     } = TypstActor::set_up_channels();
     let typst_actor = TypstActor::new(
         compiler_driver,
@@ -180,7 +180,7 @@ async fn main() {
         doc_watch.0,
         renderer_mailbox.0.clone(),
         editor_conn.0.clone(),
-        webview_conn.0.clone(),
+        webview_tx.clone(),
     );
 
     tokio::spawn(typst_actor.run());
@@ -189,6 +189,7 @@ async fn main() {
     let data_plane_addr = arguments.data_plane_host;
     let data_plane_handle = {
         let typst_tx = typst_mailbox.0.clone();
+        let webview_tx = webview_tx.clone();
         let doc_watch_rx = doc_watch.1.clone();
         tokio::spawn(async move {
             // Create the event loop and TCP listener we'll accept connections on.
@@ -200,7 +201,7 @@ async fn main() {
             );
             let _ = data_plane_port_tx.send(listener.local_addr().unwrap().port());
             while let Ok((stream, _)) = listener.accept().await {
-                let src_to_doc_rx = webview_conn.0.subscribe();
+                let webview_rx = webview_tx.subscribe();
                 let typst_tx = typst_tx.clone();
                 let doc_watch_rx = doc_watch_rx.clone();
                 let mut conn = accept_connection(stream).await;
@@ -220,7 +221,7 @@ async fn main() {
                 let webview_actor = actor::webview::WebviewActor::new(
                     conn,
                     svg.1,
-                    src_to_doc_rx,
+                    webview_rx,
                     typst_tx,
                     render_full.0,
                     render_outline_tx,
@@ -279,7 +280,7 @@ async fn main() {
             );
             let (stream, _) = listener.accept().await.unwrap();
             let conn = accept_connection(stream).await;
-            let editor_actor = EditorActor::new(editor_rx, conn, typst_tx);
+            let editor_actor = EditorActor::new(editor_rx, conn, typst_tx, webview_tx);
             editor_actor.run().await;
         })
     };
