@@ -29,11 +29,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
     if (!url) {
         const hookedElem = document.getElementById("typst-app");
         if (hookedElem) {
-            if (isContentPreview) {
-                hookedElem.innerHTML = `<span style="margin: 0px 5px">No Content</span>`;
-            } else {
-                hookedElem.innerHTML = "";
-            }
+            hookedElem.innerHTML = "";
         }
         return () => { };
     }
