@@ -112,9 +112,17 @@ impl HeadingNode {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize)]
 pub struct Outline {
     items: Vec<OutlineItem>,
+}
+
+impl fmt::Debug for Outline {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Outline")
+            .field("items_len", &self.items.len())
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
