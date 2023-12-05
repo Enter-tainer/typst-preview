@@ -4,11 +4,11 @@ use crate::{ChangeCursorPositionRequest, MemoryFiles, MemoryFilesShort, SrcToDoc
 use log::{debug, error, info};
 use tokio::sync::{broadcast, mpsc, watch};
 use typst::diag::SourceResult;
-use typst::{doc::Document, World};
+use typst::{model::Document, World};
 use typst_ts_compiler::service::{
     CompileActor, CompileClient as TsCompileClient, CompileExporter, Compiler, WorldExporter,
 };
-use typst_ts_compiler::service::{CompileDriver, WrappedCompiler};
+use typst_ts_compiler::service::{CompileDriver, CompileMiddleware};
 use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
 
 use super::editor::CompileStatus;
@@ -54,7 +54,7 @@ struct Reporter<C> {
     sender: mpsc::UnboundedSender<EditorActorRequest>,
 }
 
-impl<C: Compiler> WrappedCompiler for Reporter<C> {
+impl<C: Compiler> CompileMiddleware for Reporter<C> {
     type Compiler = C;
 
     fn inner(&self) -> &Self::Compiler {
@@ -65,11 +65,14 @@ impl<C: Compiler> WrappedCompiler for Reporter<C> {
         &mut self.inner
     }
 
-    fn wrap_compile(&mut self) -> SourceResult<Arc<Document>> {
+    fn wrap_compile(
+        &mut self,
+        env: &mut typst_ts_compiler::service::CompileEnv,
+    ) -> SourceResult<Arc<Document>> {
         let _ = self
             .sender
             .send(EditorActorRequest::CompileStatus(CompileStatus::Compiling));
-        let doc = self.inner_mut().compile();
+        let doc = self.inner_mut().compile(env);
         if let Err(err) = &doc {
             let _ = self.sender.send(EditorActorRequest::CompileStatus(
                 CompileStatus::CompileError,
@@ -86,7 +89,7 @@ impl<C: Compiler> WrappedCompiler for Reporter<C> {
 }
 
 impl<C: Compiler + WorldExporter> WorldExporter for Reporter<C> {
-    fn export(&mut self, output: Arc<typst::doc::Document>) -> SourceResult<()> {
+    fn export(&mut self, output: Arc<typst::model::Document>) -> SourceResult<()> {
         self.inner.export(output)
     }
 }
