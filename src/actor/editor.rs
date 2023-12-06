@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tokio::{net::TcpStream, sync::broadcast};
 use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
+use typst_ts_core::vector::span_id_from_u64;
 
 use crate::{
     actor::typst::TypstActorRequest, ChangeCursorPositionRequest, DocToSrcJumpInfo, MemoryFiles,
@@ -152,7 +153,9 @@ impl EditorActor {
                         ControlPlaneMessage::DocToSrcJumpResolve(jump_info) => {
                             debug!("EditorActor: received message from editor: {:?}", jump_info);
                             let jump_info = u64::from_str_radix(&jump_info.span, 16).unwrap();
-                            self.world_sender.send(TypstActorRequest::DocToSrcJumpResolve(jump_info)).unwrap();
+                            if let Some(span) = span_id_from_u64(jump_info) {
+                                self.world_sender.send(TypstActorRequest::DocToSrcJumpResolve(span)).unwrap();
+                            };
                         }
                         ControlPlaneMessage::SyncMemoryFiles(memory_files) => {
                             debug!("EditorActor: received message from editor: SyncMemoryFiles {:?}", memory_files.files.keys().collect::<Vec<_>>());

@@ -4,12 +4,14 @@ use crate::{ChangeCursorPositionRequest, MemoryFiles, MemoryFilesShort, SrcToDoc
 use log::{debug, error, info};
 use tokio::sync::{broadcast, mpsc, watch};
 use typst::diag::SourceResult;
+use typst::syntax::Span;
 use typst::{model::Document, World};
 use typst_ts_compiler::service::{
     CompileActor, CompileClient as TsCompileClient, CompileExporter, Compiler, WorldExporter,
 };
 use typst_ts_compiler::service::{CompileDriver, CompileMiddleware};
 use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
+use typst_ts_core::vector::span_id_to_u64;
 
 use super::editor::CompileStatus;
 use super::render::RenderActorRequest;
@@ -17,7 +19,7 @@ use super::{editor::EditorActorRequest, webview::WebviewActorRequest};
 
 #[derive(Debug)]
 pub enum TypstActorRequest {
-    DocToSrcJumpResolve(/* span id */ u64),
+    DocToSrcJumpResolve(Span),
     ChangeCursorPosition(ChangeCursorPositionRequest),
     SrcToDocJumpResolve(SrcToDocJumpRequest),
 
@@ -178,9 +180,10 @@ impl TypstClient {
             TypstActorRequest::DocToSrcJumpResolve(id) => {
                 debug!("TypstActor: processing doc2src: {:?}", id);
 
+                // todo: let typst.ts accept `Span` instead of that u64
                 let res = self
                     .inner()
-                    .resolve_doc_to_src_jump(id)
+                    .resolve_doc_to_src_jump(span_id_to_u64(&id))
                     .await
                     .map_err(|err| {
                         error!("TypstActor: failed to resolve doc to src jump: {:#}", err);

@@ -5,6 +5,7 @@ use tokio::{
     sync::{broadcast, mpsc},
 };
 use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
+use typst_ts_core::vector::span_id_from_u64;
 
 use super::{render::RenderActorRequest, typst::TypstActorRequest};
 use crate::{debug_loc::DocumentPosition, outline::Outline};
@@ -120,9 +121,11 @@ impl WebviewActor {
                     } else if msg.starts_with("srclocation") {
                         let location = msg.split(' ').nth(1).unwrap();
                         let id = u64::from_str_radix(location, 16).unwrap();
-                        let Ok(_) = self.doc_to_src_sender.send(TypstActorRequest::DocToSrcJumpResolve(id)) else {
-                            info!("WebviewActor: failed to send DocToSrcJumpResolve message to TypstActor");
-                            break;
+                        if let Some(span) = span_id_from_u64(id) {
+                            let Ok(_) = self.doc_to_src_sender.send(TypstActorRequest::DocToSrcJumpResolve(span)) else {
+                                info!("WebviewActor: failed to send DocToSrcJumpResolve message to TypstActor");
+                                break;
+                            };
                         };
                     } else {
                         info!("WebviewActor: received unknown message from websocket: {}", msg);
