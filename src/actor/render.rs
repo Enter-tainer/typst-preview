@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use log::{debug, info};
 use tokio::sync::{mpsc, watch};
-use typst::doc::Document;
+use typst::model::Document;
 use typst_ts_svg_exporter::IncrSvgDocServer;
 
 use crate::outline::Outline;

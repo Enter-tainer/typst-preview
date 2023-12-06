@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use typst::doc::Position as TypstPosition;
+use typst::layout::Position as TypstPosition;
 
 /// A serializable physical position in a document.
 ///

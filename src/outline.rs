@@ -1,12 +1,12 @@
 use std::num::NonZeroUsize;
 
-use typst::{
-    geom::Smart,
-    model::{Content, Introspector},
-};
-use typst_ts_core::{vector::span_id_to_u64, TypstDocument};
+use crate::debug_loc::DocumentPosition;
 
-use super::debug_loc::DocumentPosition;
+use typst::foundations::{Content, NativeElement, Smart};
+use typst::introspection::Introspector;
+use typst::model::HeadingElem;
+use typst_ts_core::vector::span_id_to_u64;
+use typst_ts_core::TypstDocument;
 
 /// A heading in the outline panel.
 #[derive(Debug, Clone)]
@@ -19,7 +19,7 @@ pub(crate) struct HeadingNode {
 }
 
 /// Construct the outline for the document.
-pub(crate) fn get_outline(introspector: &mut Introspector) -> Option<Vec<HeadingNode>> {
+pub(crate) fn get_outline(introspector: &Introspector) -> Option<Vec<HeadingNode>> {
     let mut tree: Vec<HeadingNode> = vec![];
 
     // Stores the level of the topmost skipped ancestor of the next bookmarked
@@ -28,8 +28,7 @@ pub(crate) fn get_outline(introspector: &mut Introspector) -> Option<Vec<Heading
     // Therefore, its next descendant must be added at its level, which is
     // enforced in the manner shown below.
     let mut last_skipped_level = None;
-    let selector = typst::eval::LANG_ITEMS.get().unwrap().heading_elem.select();
-    for heading in introspector.query(&selector).iter() {
+    for heading in introspector.query(&HeadingElem::elem().select()).iter() {
         let leaf = HeadingNode::leaf(introspector, (**heading).clone());
 
         if leaf.bookmarked {
@@ -94,19 +93,19 @@ pub(crate) fn get_outline(introspector: &mut Introspector) -> Option<Vec<Heading
 }
 
 impl HeadingNode {
-    fn leaf(introspector: &mut Introspector, element: Content) -> Self {
+    fn leaf(introspector: &Introspector, element: Content) -> Self {
         let position = {
             let loc = element.location().unwrap();
             introspector.position(loc).into()
         };
 
         HeadingNode {
-            level: element.expect_field::<NonZeroUsize>("level"),
+            level: element.expect_field_by_name::<NonZeroUsize>("level"),
             position,
             // 'bookmarked' set to 'auto' falls back to the value of 'outlined'.
             bookmarked: element
-                .expect_field::<Smart<bool>>("bookmarked")
-                .unwrap_or_else(|| element.expect_field::<bool>("outlined")),
+                .expect_field_by_name::<Smart<bool>>("bookmarked")
+                .unwrap_or_else(|| element.expect_field_by_name::<bool>("outlined")),
             element,
             children: Vec::new(),
         }
@@ -131,8 +130,7 @@ struct OutlineItem {
 }
 
 pub fn outline(document: &TypstDocument) -> Outline {
-    let mut introspector = Introspector::new(&document.pages);
-    let outline = get_outline(&mut introspector);
+    let outline = get_outline(&document.introspector);
     let mut items = Vec::with_capacity(outline.as_ref().map_or(0, Vec::len));
 
     for heading in outline.iter().flatten() {
@@ -143,7 +141,7 @@ pub fn outline(document: &TypstDocument) -> Outline {
 }
 
 fn outline_item(src: &HeadingNode, res: &mut Vec<OutlineItem>) {
-    let body = src.element.expect_field::<Content>("body");
+    let body = src.element.expect_field_by_name::<Content>("body");
     let title = body.plain_text().trim().to_owned();
 
     let mut children = Vec::with_capacity(src.children.len());

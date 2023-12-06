@@ -240,3 +240,8 @@ Add preview button
 
 - Bug fix:
   - Scroll to cursor on 2-column documents is now improved.
+
+### v0.10.0
+
+- Features:
+  - Bump to typst v0.10.0
