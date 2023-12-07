@@ -233,17 +233,13 @@ async fn main() {
                 });
                 let render_actor =
                     actor::render::RenderActor::new(render_full.1, doc_watch_rx.clone(), svg.0);
-                std::thread::spawn(move || {
-                    render_actor.run();
-                });
+                render_actor.run();
                 let outline_render_actor = actor::render::OutlineRenderActor::new(
                     render_outline.1,
                     doc_watch_rx,
                     outline.0,
                 );
-                std::thread::spawn(move || {
-                    outline_render_actor.run();
-                });
+                outline_render_actor.run();
                 let mut renderer_rx = renderer_mailbox.0.subscribe();
                 let renderer_outline_rx = render_outline.0;
                 tokio::spawn(async move {

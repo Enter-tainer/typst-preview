@@ -45,11 +45,19 @@ impl RenderActor {
         res
     }
 
-    pub fn run(mut self) {
+    pub fn run(self) {
+        std::thread::Builder::new()
+            .name("RenderActor".to_owned())
+            .spawn(move || self.run_impl())
+            .unwrap();
+    }
+
+    #[tokio::main(flavor = "current_thread")]
+    pub async fn run_impl(mut self) {
         loop {
             let mut has_full_render = false;
             debug!("RenderActor: waiting for message");
-            let Some(msg) = self.mailbox.blocking_recv() else {
+            let Some(msg) = self.mailbox.recv().await else {
                 info!("RenderActor: no more messages");
                 break;
             };
@@ -104,10 +112,18 @@ impl OutlineRenderActor {
         }
     }
 
-    pub fn run(mut self) {
+    pub fn run(self) {
+        std::thread::Builder::new()
+            .name("OutlineRenderActor".to_owned())
+            .spawn(move || self.run_impl())
+            .unwrap();
+    }
+
+    #[tokio::main(flavor = "current_thread")]
+    pub async fn run_impl(mut self) {
         loop {
             debug!("OutlineRenderActor: waiting for message");
-            let Some(_) = self.signal.blocking_recv() else {
+            let Some(_) = self.signal.recv().await else {
                 info!("OutlineRenderActor: no more messages");
                 break;
             };
