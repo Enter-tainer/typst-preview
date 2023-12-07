@@ -5,30 +5,26 @@ use tokio::{
     sync::{broadcast, mpsc},
 };
 use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
+use typst_ts_core::vector::span_id_from_u64;
 
-use super::{outline::Outline, render::RenderActorRequest, typst::TypstActorRequest};
+use super::{render::RenderActorRequest, typst::TypstActorRequest};
+use crate::{debug_loc::DocumentPosition, outline::Outline};
 
-#[derive(Debug, Clone, Copy, serde::Serialize)]
-pub struct CursorPosition {
-    pub page_no: usize,
-    pub x: f64,
-    pub y: f64,
-}
-
-pub type SrcToDocJumpInfo = CursorPosition;
+pub type CursorPosition = DocumentPosition;
+pub type SrcToDocJumpInfo = DocumentPosition;
 
 #[derive(Debug, Clone)]
 pub enum WebviewActorRequest {
+    ViewportPosition(DocumentPosition),
     SrcToDocJump(SrcToDocJumpInfo),
     CursorPosition(CursorPosition),
 }
 
-fn src_to_doc_jump_to_string(page_no: usize, x: f64, y: f64) -> String {
-    format!("jump,{page_no} {x} {y}")
-}
-
-fn cursor_position_to_string(page_no: usize, x: f64, y: f64) -> String {
-    format!("cursor,{page_no} {x} {y}")
+fn position_req(
+    event: &'static str,
+    DocumentPosition { page_no, x, y }: DocumentPosition,
+) -> String {
+    format!("{event},{page_no} {x} {y}")
 }
 
 pub struct WebviewActor {
@@ -91,13 +87,15 @@ impl WebviewActor {
                     debug!("WebviewActor: received message from mailbox: {:?}", msg);
                     match msg {
                         WebviewActorRequest::SrcToDocJump(jump_info) => {
-                            let SrcToDocJumpInfo { page_no, x, y } = jump_info;
-                            let msg = src_to_doc_jump_to_string(page_no, x, y);
+                            let msg = position_req("jump", jump_info);
+                            self.webview_websocket_conn.send(Message::Binary(msg.into_bytes())).await.unwrap();
+                        }
+                        WebviewActorRequest::ViewportPosition(jump_info) => {
+                            let msg = position_req("viewport", jump_info);
                             self.webview_websocket_conn.send(Message::Binary(msg.into_bytes())).await.unwrap();
                         }
                         WebviewActorRequest::CursorPosition(jump_info) => {
-                            let SrcToDocJumpInfo { page_no, x, y } = jump_info;
-                            let msg = cursor_position_to_string(page_no, x, y);
+                            let msg = position_req("cursor", jump_info);
                             self.webview_websocket_conn.send(Message::Binary(msg.into_bytes())).await.unwrap();
                         }
                     }
@@ -123,9 +121,11 @@ impl WebviewActor {
                     } else if msg.starts_with("srclocation") {
                         let location = msg.split(' ').nth(1).unwrap();
                         let id = u64::from_str_radix(location, 16).unwrap();
-                        let Ok(_) = self.doc_to_src_sender.send(TypstActorRequest::DocToSrcJumpResolve(id)) else {
-                            info!("WebviewActor: failed to send DocToSrcJumpResolve message to TypstActor");
-                            break;
+                        if let Some(span) = span_id_from_u64(id) {
+                            let Ok(_) = self.doc_to_src_sender.send(TypstActorRequest::DocToSrcJumpResolve(span)) else {
+                                info!("WebviewActor: failed to send DocToSrcJumpResolve message to TypstActor");
+                                break;
+                            };
                         };
                     } else {
                         info!("WebviewActor: received unknown message from websocket: {}", msg);

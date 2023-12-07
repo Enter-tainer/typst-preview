@@ -4,23 +4,22 @@ use crate::{ChangeCursorPositionRequest, MemoryFiles, MemoryFilesShort, SrcToDoc
 use log::{debug, error, info};
 use tokio::sync::{broadcast, mpsc, watch};
 use typst::diag::SourceResult;
+use typst::syntax::Span;
 use typst::{model::Document, World};
 use typst_ts_compiler::service::{
     CompileActor, CompileClient as TsCompileClient, CompileExporter, Compiler, WorldExporter,
 };
 use typst_ts_compiler::service::{CompileDriver, CompileMiddleware};
 use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
+use typst_ts_core::vector::span_id_to_u64;
 
 use super::editor::CompileStatus;
 use super::render::RenderActorRequest;
-use super::{
-    editor::EditorActorRequest,
-    webview::{SrcToDocJumpInfo, WebviewActorRequest},
-};
+use super::{editor::EditorActorRequest, webview::WebviewActorRequest};
 
 #[derive(Debug)]
 pub enum TypstActorRequest {
-    DocToSrcJumpResolve(u64),
+    DocToSrcJumpResolve(Span),
     ChangeCursorPosition(ChangeCursorPositionRequest),
     SrcToDocJumpResolve(SrcToDocJumpRequest),
 
@@ -181,9 +180,10 @@ impl TypstClient {
             TypstActorRequest::DocToSrcJumpResolve(id) => {
                 debug!("TypstActor: processing doc2src: {:?}", id);
 
+                // todo: let typst.ts accept `Span` instead of that u64
                 let res = self
                     .inner()
-                    .resolve_doc_to_src_jump(id)
+                    .resolve_doc_to_src_jump(span_id_to_u64(&id))
                     .await
                     .map_err(|err| {
                         error!("TypstActor: failed to resolve doc to src jump: {:#}", err);
@@ -209,17 +209,12 @@ impl TypstClient {
                         error!("TypstActor: failed to resolve cursor position: {:#}", err);
                     })
                     .ok()
-                    .flatten()
-                    .map(|jump_pos| SrcToDocJumpInfo {
-                        page_no: jump_pos.page.into(),
-                        x: jump_pos.point.x.to_pt(),
-                        y: jump_pos.point.y.to_pt(),
-                    });
+                    .flatten();
 
                 if let Some(info) = res {
                     let _ = self
                         .webview_conn_sender
-                        .send(WebviewActorRequest::CursorPosition(info));
+                        .send(WebviewActorRequest::CursorPosition(info.into()));
                 }
             }
             TypstActorRequest::SrcToDocJumpResolve(req) => {
@@ -233,17 +228,12 @@ impl TypstClient {
                         error!("TypstActor: failed to resolve src to doc jump: {:#}", err);
                     })
                     .ok()
-                    .flatten()
-                    .map(|jump_pos| SrcToDocJumpInfo {
-                        page_no: jump_pos.page.into(),
-                        x: jump_pos.point.x.to_pt(),
-                        y: jump_pos.point.y.to_pt(),
-                    });
+                    .flatten();
 
                 if let Some(info) = res {
                     let _ = self
                         .webview_conn_sender
-                        .send(WebviewActorRequest::SrcToDocJump(info));
+                        .send(WebviewActorRequest::SrcToDocJump(info.into()));
                 }
             }
             TypstActorRequest::SyncMemoryFiles(m) => {

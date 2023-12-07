@@ -1,24 +1,25 @@
 use std::num::NonZeroUsize;
 
-use super::webview::CursorPosition;
+use crate::debug_loc::DocumentPosition;
+
 use typst::foundations::{Content, NativeElement, Smart};
 use typst::introspection::Introspector;
-use typst::layout::Position;
 use typst::model::HeadingElem;
+use typst_ts_core::vector::span_id_to_u64;
 use typst_ts_core::TypstDocument;
 
 /// A heading in the outline panel.
 #[derive(Debug, Clone)]
 pub(crate) struct HeadingNode {
     element: Content,
-    position: Position,
+    position: DocumentPosition,
     level: NonZeroUsize,
     bookmarked: bool,
     children: Vec<HeadingNode>,
 }
 
 /// Construct the outline for the document.
-pub(crate) fn get_outline(introspector: &mut Introspector) -> Option<Vec<HeadingNode>> {
+pub(crate) fn get_outline(introspector: &Introspector) -> Option<Vec<HeadingNode>> {
     let mut tree: Vec<HeadingNode> = vec![];
 
     // Stores the level of the topmost skipped ancestor of the next bookmarked
@@ -92,10 +93,10 @@ pub(crate) fn get_outline(introspector: &mut Introspector) -> Option<Vec<Heading
 }
 
 impl HeadingNode {
-    fn leaf(introspector: &mut Introspector, element: Content) -> Self {
+    fn leaf(introspector: &Introspector, element: Content) -> Self {
         let position = {
             let loc = element.location().unwrap();
-            introspector.position(loc)
+            introspector.position(loc).into()
         };
 
         HeadingNode {
@@ -118,15 +119,18 @@ pub struct Outline {
 
 #[derive(Debug, Clone, serde::Serialize)]
 struct OutlineItem {
+    /// Plain text title.
     title: String,
-    position: Option<CursorPosition>,
+    /// Span id in hex-format.
+    span: Option<String>,
+    /// The resolved position in the document.
+    position: Option<DocumentPosition>,
+    /// The children of the outline item.
     children: Vec<OutlineItem>,
 }
 
 pub fn outline(document: &TypstDocument) -> Outline {
-    let mut introspector = Introspector::default();
-    introspector.rebuild(&document.pages);
-    let outline = crate::actor::outline::get_outline(&mut introspector);
+    let outline = get_outline(&document.introspector);
     let mut items = Vec::with_capacity(outline.as_ref().map_or(0, Vec::len));
 
     for heading in outline.iter().flatten() {
@@ -140,20 +144,23 @@ fn outline_item(src: &HeadingNode, res: &mut Vec<OutlineItem>) {
     let body = src.element.expect_field_by_name::<Content>("body");
     let title = body.plain_text().trim().to_owned();
 
-    let position = Some(CursorPosition {
-        page_no: src.position.page.into(),
-        x: src.position.point.x.to_pt(),
-        y: src.position.point.y.to_pt(),
-    });
-
     let mut children = Vec::with_capacity(src.children.len());
     for child in src.children.iter() {
         outline_item(child, &mut children);
     }
 
+    // use body's span first, otherwise use the element's span.
+    let span = body.span();
+    let span = if span.is_detached() {
+        src.element.span()
+    } else {
+        span
+    };
+
     res.push(OutlineItem {
         title,
-        position,
+        span: Some(format!("{:x}", span_id_to_u64(&span))),
+        position: Some(src.position),
         children,
     });
 }
