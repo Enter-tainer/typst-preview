@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use log::{debug, info};
-use tokio::sync::{mpsc, watch};
+use log::{debug, info, trace};
+use tokio::sync::{broadcast, mpsc, watch};
 use typst::model::Document;
 use typst_ts_svg_exporter::IncrSvgDocServer;
 
-use crate::outline::Outline;
+use super::editor::EditorActorRequest;
 
 #[derive(Debug, Clone, Copy)]
 pub enum RenderActorRequest {
@@ -23,7 +23,7 @@ impl RenderActorRequest {
 }
 
 pub struct RenderActor {
-    mailbox: mpsc::UnboundedReceiver<RenderActorRequest>,
+    mailbox: broadcast::Receiver<RenderActorRequest>,
     document: watch::Receiver<Option<Arc<Document>>>,
     renderer: IncrSvgDocServer,
     svg_sender: mpsc::UnboundedSender<Vec<u8>>,
@@ -31,7 +31,7 @@ pub struct RenderActor {
 
 impl RenderActor {
     pub fn new(
-        mailbox: mpsc::UnboundedReceiver<RenderActorRequest>,
+        mailbox: broadcast::Receiver<RenderActorRequest>,
         document: watch::Receiver<Option<Arc<Document>>>,
         svg_sender: mpsc::UnboundedSender<Vec<u8>>,
     ) -> Self {
@@ -45,23 +45,31 @@ impl RenderActor {
         res
     }
 
-    pub fn run(self) {
+    pub fn spawn(self) {
         std::thread::Builder::new()
             .name("RenderActor".to_owned())
-            .spawn(move || self.run_impl())
+            .spawn(move || self.run())
             .unwrap();
     }
 
     #[tokio::main(flavor = "current_thread")]
-    pub async fn run_impl(mut self) {
+    async fn run(mut self) {
         loop {
             let mut has_full_render = false;
             debug!("RenderActor: waiting for message");
-            let Some(msg) = self.mailbox.recv().await else {
-                info!("RenderActor: no more messages");
-                break;
-            };
-            has_full_render |= msg.is_full_render();
+            match self.mailbox.recv().await {
+                Ok(msg) => {
+                    trace!("RenderActor: received message: {:?}", msg);
+                    has_full_render |= msg.is_full_render();
+                }
+                Err(broadcast::error::RecvError::Closed) => {
+                    info!("RenderActor: no more messages");
+                    break;
+                }
+                Err(broadcast::error::RecvError::Lagged(_)) => {
+                    info!("RenderActor: lagged message. Some events are dropped");
+                }
+            }
             // read the queue to empty
             while let Ok(msg) = self.mailbox.try_recv() {
                 has_full_render |= msg.is_full_render();
@@ -94,39 +102,47 @@ impl RenderActor {
 }
 
 pub struct OutlineRenderActor {
-    signal: mpsc::UnboundedReceiver<()>,
+    signal: broadcast::Receiver<RenderActorRequest>,
     document: watch::Receiver<Option<Arc<Document>>>,
-    outline_sender: mpsc::UnboundedSender<Outline>,
+    editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
 }
 
 impl OutlineRenderActor {
     pub fn new(
-        signal: mpsc::UnboundedReceiver<()>,
+        signal: broadcast::Receiver<RenderActorRequest>,
         document: watch::Receiver<Option<Arc<Document>>>,
-        outline_sender: mpsc::UnboundedSender<Outline>,
+        editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
     ) -> Self {
         Self {
             signal,
             document,
-            outline_sender,
+            editor_tx,
         }
     }
 
-    pub fn run(self) {
+    pub fn spawn(self) {
         std::thread::Builder::new()
             .name("OutlineRenderActor".to_owned())
-            .spawn(move || self.run_impl())
+            .spawn(move || self.run())
             .unwrap();
     }
 
     #[tokio::main(flavor = "current_thread")]
-    pub async fn run_impl(mut self) {
+    async fn run(mut self) {
         loop {
             debug!("OutlineRenderActor: waiting for message");
-            let Some(_) = self.signal.recv().await else {
-                info!("OutlineRenderActor: no more messages");
-                break;
-            };
+            match self.signal.recv().await {
+                Ok(msg) => {
+                    debug!("OutlineRenderActor: received message: {:?}", msg);
+                }
+                Err(broadcast::error::RecvError::Closed) => {
+                    info!("OutlineRenderActor: no more messages");
+                    break;
+                }
+                Err(broadcast::error::RecvError::Lagged(_)) => {
+                    info!("OutlineRenderActor: lagged message. Some events are dropped");
+                }
+            }
             // read the queue to empty
             while self.signal.try_recv().is_ok() {}
             // if a full render is requested, we render the latest document
@@ -138,7 +154,7 @@ impl OutlineRenderActor {
             let data = crate::outline::outline(&document);
             comemo::evict(30);
             debug!("OutlineRenderActor: sending outline");
-            let Ok(_) = self.outline_sender.send(data) else {
+            let Ok(_) = self.editor_tx.send(EditorActorRequest::Outline(data)) else {
                 info!("OutlineRenderActor: outline_sender is dropped");
                 break;
             };

@@ -1,72 +1,28 @@
 mod actor;
 mod args;
-pub mod debug_loc;
+mod debug_loc;
 mod outline;
-use clap::Parser;
 
+use std::collections::HashMap;
+use std::path::PathBuf;
+
+use clap::Parser;
 use futures::SinkExt;
 use hyper::http::Error;
 use hyper::service::{make_service_fn, service_fn};
 use log::{error, info};
-
 use serde::Deserialize;
-use std::collections::HashMap;
-use tokio_tungstenite::tungstenite::Message;
-
-use std::path::PathBuf;
-
 use tokio::net::{TcpListener, TcpStream};
-
-use crate::actor::editor::EditorActor;
-use crate::actor::typst::TypstActor;
-use crate::args::{CliArguments, PreviewMode};
-
+use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 
 use typst_ts_compiler::service::CompileDriver;
 use typst_ts_compiler::TypstSystemWorld;
 use typst_ts_core::config::CompileOpts;
 
-#[allow(dead_code)]
-/// A summary of the input arguments relevant to compilation.
-struct CompileSettings {
-    /// The path to the input file.
-    input: PathBuf,
-
-    /// Whether to watch the input files for changes.
-    watch: bool,
-
-    /// The root directory for absolute paths.
-    root: Option<PathBuf>,
-
-    /// The paths to search for fonts.
-    font_paths: Vec<PathBuf>,
-}
-
-impl CompileSettings {
-    /// Create a new compile settings from the field values.
-    pub fn new(
-        input: PathBuf,
-        watch: bool,
-        root: Option<PathBuf>,
-        font_paths: Vec<PathBuf>,
-    ) -> Self {
-        Self {
-            input,
-            watch,
-            root,
-            font_paths,
-        }
-    }
-
-    /// Create a new compile settings from the CLI arguments and a compile command.
-    ///
-    /// # Panics
-    /// Panics if the command is not a compile or watch command.
-    pub fn with_arguments(args: CliArguments) -> Self {
-        Self::new(args.input, true, args.root, args.font_paths)
-    }
-}
+use crate::actor::editor::EditorActor;
+use crate::actor::typst::TypstActor;
+use crate::args::{CliArguments, PreviewMode};
 
 pub use typst_ts_compiler::service::DocToSrcJumpInfo;
 
@@ -130,14 +86,13 @@ async fn main() {
         .try_init();
     let arguments = CliArguments::parse();
     info!("Arguments: {:#?}", arguments);
-    let command = CompileSettings::with_arguments(arguments.clone());
     let enable_partial_rendering = arguments.enable_partial_rendering;
-    let entry = if command.input.is_absolute() {
-        command.input.clone()
+    let entry = if arguments.input.is_absolute() {
+        arguments.input.clone()
     } else {
-        std::env::current_dir().unwrap().join(command.input)
+        std::env::current_dir().unwrap().join(arguments.input)
     };
-    let root = if let Some(root) = &command.root {
+    let root = if let Some(root) = &arguments.root {
         if root.is_absolute() {
             root.clone()
         } else {
@@ -212,55 +167,28 @@ async fn main() {
                         .await
                         .unwrap();
                 }
-                let actor::webview::Channels {
-                    svg,
-                    mut outline,
-                    render_full,
-                    render_outline,
-                } = actor::webview::WebviewActor::set_up_channels();
-                let render_tx = render_full.0.clone();
-                let render_outline_tx = render_outline.0.clone();
+                let actor::webview::Channels { svg } =
+                    actor::webview::WebviewActor::set_up_channels();
                 let webview_actor = actor::webview::WebviewActor::new(
                     conn,
                     svg.1,
                     webview_rx,
                     typst_tx,
-                    render_full.0,
-                    render_outline_tx,
+                    renderer_mailbox.0.clone(),
                 );
-                tokio::spawn(async move {
-                    webview_actor.run().await;
-                });
-                let render_actor =
-                    actor::render::RenderActor::new(render_full.1, doc_watch_rx.clone(), svg.0);
-                render_actor.run();
+                tokio::spawn(webview_actor.run());
+                let render_actor = actor::render::RenderActor::new(
+                    renderer_mailbox.0.subscribe(),
+                    doc_watch_rx.clone(),
+                    svg.0,
+                );
+                render_actor.spawn();
                 let outline_render_actor = actor::render::OutlineRenderActor::new(
-                    render_outline.1,
+                    renderer_mailbox.0.subscribe(),
                     doc_watch_rx,
-                    outline.0,
+                    editor_conn.0.clone(),
                 );
-                outline_render_actor.run();
-                let mut renderer_rx = renderer_mailbox.0.subscribe();
-                let renderer_outline_rx = render_outline.0;
-                tokio::spawn(async move {
-                    while let Ok(msg) = renderer_rx.recv().await {
-                        let Ok(_) = render_tx.send(msg) else {
-                            break;
-                        };
-                        let Ok(_) = renderer_outline_rx.send(()) else {
-                            break;
-                        };
-                    }
-                });
-
-                let editor_tx = editor_conn.0.clone();
-                tokio::spawn(async move {
-                    while let Some(msg) = outline.1.recv().await {
-                        editor_tx
-                            .send(actor::editor::EditorActorRequest::Outline(msg))
-                            .unwrap();
-                    }
-                });
+                outline_render_actor.spawn();
             }
         })
     };
