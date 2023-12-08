@@ -1,5 +1,5 @@
 use futures::{SinkExt, StreamExt};
-use log::{debug, info, warn};
+use log::{debug, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tokio::{net::TcpStream, sync::broadcast};
@@ -104,7 +104,7 @@ impl EditorActor {
         loop {
             tokio::select! {
                 Some(msg) = self.mailbox.recv() => {
-                    debug!("EditorActor: received message from mailbox: {:?}", msg);
+                    trace!("EditorActor: received message from mailbox: {:?}", msg);
                     match msg {
                         EditorActorRequest::DocToSrcJump(jump_info) => {
                             let Ok(_) = self.editor_websocket_conn.send(Message::Text(
