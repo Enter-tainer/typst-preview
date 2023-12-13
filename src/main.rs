@@ -5,7 +5,52 @@ use typst_ts_compiler::service::CompileDriver;
 use typst_ts_compiler::TypstSystemWorld;
 use typst_ts_core::config::CompileOpts;
 
-use typst_preview::{preview, CliArguments};
+use hyper::{
+    service::{make_service_fn, service_fn},
+    Error,
+};
+
+use typst_preview::{preview, CliArguments, PreviewMode, Previewer};
+
+pub async fn make_static_host(
+    previewer: &Previewer,
+    static_file_addr: String,
+    mode: PreviewMode,
+) -> SocketAddr {
+    let frontend_html = previewer.frontend_html(mode);
+    let make_service = make_service_fn(|_| {
+        let html = frontend_html.clone();
+        async move {
+            Ok::<_, hyper::http::Error>(service_fn(move |req| {
+                // todo: clone may not be necessary
+                let html = html.as_ref().to_owned();
+                async move {
+                    if req.uri().path() == "/" {
+                        log::info!("Serve frontend: {:?}", mode);
+                        Ok::<_, Error>(hyper::Response::new(hyper::Body::from(html)))
+                    } else {
+                        // jump to /
+                        let mut res = hyper::Response::new(hyper::Body::empty());
+                        *res.status_mut() = hyper::StatusCode::FOUND;
+                        res.headers_mut().insert(
+                            hyper::header::LOCATION,
+                            hyper::header::HeaderValue::from_static("/"),
+                        );
+                        Ok(res)
+                    }
+                }
+            }))
+        }
+    });
+    let server = hyper::Server::bind(&static_file_addr.parse().unwrap()).serve(make_service);
+
+    let addr = server.local_addr();
+    if let Err(e) = server.await {
+        error!("Static file server error: {}", e);
+    }
+
+    addr
+}
 
 /// Entry point.
 #[tokio::main]
@@ -62,10 +107,22 @@ async fn main() {
 
     let previewer = preview(arguments.preview, compiler_driver).await;
 
+    let static_file_addr = arguments.static_file_host;
+    let mode = arguments.preview_mode;
+    if !static_file_addr.is_empty() {
+        let addr = make_static_host(&previewer, static_file_addr, mode).await;
+        info!("Static file server listening on: {}", addr);
+        if !arguments.dont_open_in_browser {
+            if let Err(e) = open::that_detached(format!("http://{}", addr)) {
+                error!("failed to open browser: {}", e);
+            };
+        }
+    }
+
     previewer.join().await;
 }
 
-use std::borrow::Cow;
+use std::{borrow::Cow, net::SocketAddr};
 
 pub static EMBEDDED_FONT: &[Cow<'_, [u8]>] = &[
     // Embed default fonts.
