@@ -1,3 +1,4 @@
+use core::fmt;
 use std::num::NonZeroUsize;
 
 use crate::debug_loc::DocumentPosition;
