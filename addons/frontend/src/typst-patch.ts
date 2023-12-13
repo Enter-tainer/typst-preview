@@ -87,7 +87,7 @@ export function interpretTargetView<T extends ElementChildren, U extends T = T>(
   targetChildren: T[],
   // todo: remove this tag
   isPatchingSvg: boolean = true, // patch svg or outline
-  tIsU = (_x: T): _x is U => true,
+  tIsU = (x: T): x is U => !!x.getAttribute(TypstPatchAttrs.Tid),
 ): ViewTransform<U> {
   const availableOwnedResource = new Map<string, [T, number[]]>();
   const targetView: TargetViewInstruction<U>[] = [];
