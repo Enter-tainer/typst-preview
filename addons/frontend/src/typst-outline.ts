@@ -8,6 +8,7 @@ interface CursorPosition {
 }
 
 export interface OutlineItemData {
+  span?: string,
   title: string,
   position?: CursorPosition,
   children: OutlineItemData[],
@@ -104,8 +105,12 @@ class GenContext {
     // create title at the beginning of this node
     const titleSpan = document.createElement('span');
     titleSpan.classList.add('typst-outline-title', 'level-' + level);
-    titleSpan.textContent = item.title;
-    tagPatchId(titleSpan, 'title:' + item.title);
+    const destSpan = document.createElement('span');
+    destSpan.textContent = '↬';
+    const titleContentSpan = document.createElement('span');
+    titleContentSpan.textContent = item.title;
+    titleSpan.append(destSpan, ' ', titleContentSpan);
+    tagPatchId(titleSpan, `span:${item.span},title:${item.title}`);
     outlineNode.push(new GenElem(titleSpan));
 
     // pre-order traversal last visit
@@ -125,12 +130,23 @@ class GenContext {
     this.insertionPoint = insertionPoint;
     this.parent = parent;
 
+    if (item.span) {
+      destSpan.style.textDecoration = 'underline';
+      destSpan.style.cursor = 'pointer';
+
+      destSpan.addEventListener('click', () => {
+        window.typstWebsocket.send(`srclocation ${item.span}`);
+      });
+    } else {
+      destSpan.remove();
+    }
+
     // apply clickable behavior to node containing children
     if (hasChildren) {
-      titleSpan.style.textDecoration = 'underline';
-      titleSpan.style.cursor = 'pointer';
+      titleContentSpan.style.textDecoration = 'underline';
+      titleContentSpan.style.cursor = 'pointer';
 
-      titleSpan.addEventListener('click', () => {
+      titleContentSpan.addEventListener('click', () => {
         titleSpan.parentElement!.classList.toggle('collapsed');
       });
     }
