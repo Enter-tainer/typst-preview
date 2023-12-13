@@ -646,6 +646,7 @@ class TypstDocumentImpl {
     // console.log('toggleCanvasViewportChange!!!!!!', this.id, this.isRendering);
     const pagesInfo: CanvasPage[] = this.kModule.retrievePagesInfo().map((x, index) => {
       return {
+        tag: 'canvas',
         index,
         width: x.width,
         height: x.height,

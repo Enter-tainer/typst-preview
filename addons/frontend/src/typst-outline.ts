@@ -17,6 +17,7 @@ export interface OutlineItemData {
 type GenNode = CanvasPage | GenElem;
 
 export interface CanvasPage {
+  tag: 'canvas',
   index: number;
   width: number;
   height: number;
@@ -30,7 +31,7 @@ export interface CanvasPage {
 
 class GenElem {
   children: GenNode[] = [];
-  constructor(public container: HTMLElement) { }
+  constructor(public tag: string, public container: HTMLElement, public additions?: Record<string, any>) { }
 
   push(child: GenNode) {
     this.children.push(child);
@@ -71,9 +72,10 @@ class GenContext {
   insertionPoint: GenElem;
   parent: GenElem;
   lastVisit?: GenElem;
+  allElemList: GenElem[] = [];
 
   constructor(public pages: CanvasPage[]) {
-    this.insertionPoint = new GenElem(document.createElement('div'));
+    this.insertionPoint = new GenElem('outline', document.createElement('div'));
     this.parent = this.insertionPoint;
   }
 
@@ -90,14 +92,15 @@ class GenContext {
   generate(item: OutlineItemData, level: number): GenElem {
     // console.log(`g page_no: ${item.position?.page_no}`, ctx.populateCnt, item);
 
+    const id = `span:${item.span},title:${item.title}`;
+
     const outlineDiv = document.createElement('div');
     outlineDiv.classList.add('typst-outline');
     outlineDiv.setAttribute('data-title', item.title);
-    tagPatchId(outlineDiv, 'outline:' + item.title);
-    const outlineNode = new GenElem(outlineDiv);
+    tagPatchId(outlineDiv, 'outline:' + id);
+    const outlineNode = new GenElem('outline', outlineDiv, {});
 
     let pos = item.position?.page_no || 0;
-    let hasChildren = Math.max(0, pos - this.populateCnt) + item.children.length > 0;
 
     // populate canvas stubs before this node
     this.spliceCanvas(this.insertionPoint, pos);
@@ -110,8 +113,13 @@ class GenContext {
     const titleContentSpan = document.createElement('span');
     titleContentSpan.textContent = item.title;
     titleSpan.append(destSpan, ' ', titleContentSpan);
-    tagPatchId(titleSpan, `span:${item.span},title:${item.title}`);
-    outlineNode.push(new GenElem(titleSpan));
+    tagPatchId(titleSpan, id);
+    const title = new GenElem('outline-title', titleSpan, {
+      content: titleContentSpan,
+    });
+    outlineNode.push(title);
+    outlineNode.additions!.title = title;
+    this.allElemList.push(outlineNode);
 
     // pre-order traversal last visit
     this.lastVisit = outlineNode;
@@ -141,16 +149,6 @@ class GenContext {
       destSpan.remove();
     }
 
-    // apply clickable behavior to node containing children
-    if (hasChildren) {
-      titleContentSpan.style.textDecoration = 'underline';
-      titleContentSpan.style.cursor = 'pointer';
-
-      titleContentSpan.addEventListener('click', () => {
-        titleSpan.parentElement!.classList.toggle('collapsed');
-      });
-    }
-
     return outlineNode;
   }
 }
@@ -168,6 +166,25 @@ export function patchOutlineEntry(prev: HTMLDivElement, pages: CanvasPage[], ite
   }
   // populate canvas stubs after the last node
   ctx.spliceCanvas(ctx.lastVisit || next, pages.length + 1);
+
+
+  // post process outline
+  const dataTags = ['outline', 'canvas'];
+  const isDataNode = (x: GenNode) => dataTags.includes(x.tag);
+  for (const elem of ctx.allElemList) {
+    // apply clickable behavior to node containing children
+    if (elem.children.some(isDataNode)) {
+      const titleContentSpan = elem.additions!.title!.additions!.content as HTMLSpanElement;
+
+      titleContentSpan.style.textDecoration = 'underline';
+      titleContentSpan.style.cursor = 'pointer';
+
+      const c = elem.container;
+      titleContentSpan.addEventListener('click', () => {
+        c.classList.toggle('collapsed');
+      });
+    }
+  }
 
   // patch outline to container
   if (prev.children.length === 0) {
