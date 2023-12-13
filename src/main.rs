@@ -158,6 +158,7 @@ async fn main() {
             );
             let _ = data_plane_port_tx.send(listener.local_addr().unwrap().port());
             while let Ok((stream, _)) = listener.accept().await {
+                let webview_tx = webview_tx.clone();
                 let webview_rx = webview_tx.subscribe();
                 let typst_tx = typst_tx.clone();
                 let doc_watch_rx = doc_watch_rx.clone();
@@ -172,6 +173,7 @@ async fn main() {
                 let webview_actor = actor::webview::WebviewActor::new(
                     conn,
                     svg.1,
+                    webview_tx,
                     webview_rx,
                     typst_tx,
                     renderer_mailbox.0.clone(),

@@ -32,7 +32,8 @@ pub struct WebviewActor {
     svg_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
     mailbox: broadcast::Receiver<WebviewActorRequest>,
 
-    doc_to_src_sender: mpsc::UnboundedSender<TypstActorRequest>,
+    broadcast_sender: broadcast::Sender<WebviewActorRequest>,
+    doc_action_sender: mpsc::UnboundedSender<TypstActorRequest>,
     render_sender: broadcast::Sender<RenderActorRequest>,
 }
 
@@ -52,15 +53,17 @@ impl WebviewActor {
     pub fn new(
         websocket_conn: WebSocketStream<TcpStream>,
         svg_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
+        broadcast_sender: broadcast::Sender<WebviewActorRequest>,
         mailbox: broadcast::Receiver<WebviewActorRequest>,
-        doc_to_src_sender: mpsc::UnboundedSender<TypstActorRequest>,
+        doc_action_sender: mpsc::UnboundedSender<TypstActorRequest>,
         render_sender: broadcast::Sender<RenderActorRequest>,
     ) -> Self {
         Self {
             webview_websocket_conn: websocket_conn,
             svg_receiver,
             mailbox,
-            doc_to_src_sender,
+            broadcast_sender,
+            doc_action_sender,
             render_sender,
         }
     }
@@ -106,11 +109,20 @@ impl WebviewActor {
                         let location = msg.split(' ').nth(1).unwrap();
                         let id = u64::from_str_radix(location, 16).unwrap();
                         if let Some(span) = span_id_from_u64(id) {
-                            let Ok(_) = self.doc_to_src_sender.send(TypstActorRequest::DocToSrcJumpResolve(span)) else {
+                            let Ok(_) = self.doc_action_sender.send(TypstActorRequest::DocToSrcJumpResolve(span)) else {
                                 info!("WebviewActor: failed to send DocToSrcJumpResolve message to TypstActor");
                                 break;
                             };
                         };
+                    } else if msg.starts_with("outline-sync") {
+                        let location = msg.split(',').nth(1).unwrap();
+                        let location = location.split(' ').collect::<Vec::<&str>>();
+                        let page_no = location[0].parse().unwrap();
+                        let x = location.get(1).map(|s| s.parse().unwrap()).unwrap_or(0.);
+                        let y = location.get(2).map(|s| s.parse().unwrap()).unwrap_or(0.);
+                        let pos = DocumentPosition { page_no, x, y };
+
+                        self.broadcast_sender.send(WebviewActorRequest::ViewportPosition(pos)).unwrap();
                     } else {
                         info!("WebviewActor: received unknown message from websocket: {}", msg);
                         self.webview_websocket_conn.send(Message::Text(format!("error, received unknown message: {}", msg))).await.unwrap();
