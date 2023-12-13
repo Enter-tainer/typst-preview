@@ -6,11 +6,7 @@ mod outline;
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use futures::SinkExt;
-use hyper::{
-    service::{make_service_fn, service_fn},
-    Error,
-};
-use log::{error, info};
+use log::info;
 use serde::Deserialize;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::tungstenite::Message;
@@ -71,20 +67,14 @@ pub struct MemoryFilesShort {
 const HTML: &str = include_str!("../addons/vscode/out/frontend/index.html");
 
 pub struct Previewer {
-    frontend_html: ImmutStr,
     frontend_html_factory: Box<dyn Fn(PreviewMode) -> ImmutStr>,
     data_plane_handle: tokio::task::JoinHandle<()>,
     control_plane_handle: tokio::task::JoinHandle<()>,
 }
 
 impl Previewer {
-    /// Get the HTML for the frontend (with set preview mode)
-    pub fn frontend_html(&self) -> ImmutStr {
-        self.frontend_html.clone()
-    }
-
     /// Get the HTML for the frontend by a given preview mode
-    pub fn frontend_html_in_mode(&self, mode: PreviewMode) -> ImmutStr {
+    pub fn frontend_html(&self, mode: PreviewMode) -> ImmutStr {
         (self.frontend_html_factory)(mode)
     }
 
@@ -230,48 +220,8 @@ pub async fn preview(arguments: PreviewArgs, compiler_driver: CompileDriver) -> 
         )
         .into()
     });
-    let mode = arguments.preview_mode;
-    let frontend_html = frontend_html_factory(mode);
-    let make_service = make_service_fn(|_| {
-        let html = frontend_html.clone();
-        async move {
-            Ok::<_, hyper::http::Error>(service_fn(move |req| {
-                // todo: clone may not be necessary
-                let html = html.as_ref().to_owned();
-                async move {
-                    if req.uri().path() == "/" {
-                        log::info!("Serve frontend: {:?}", mode);
-                        Ok::<_, Error>(hyper::Response::new(hyper::Body::from(html)))
-                    } else {
-                        // jump to /
-                        let mut res = hyper::Response::new(hyper::Body::empty());
-                        *res.status_mut() = hyper::StatusCode::FOUND;
-                        res.headers_mut().insert(
-                            hyper::header::LOCATION,
-                            hyper::header::HeaderValue::from_static("/"),
-                        );
-                        Ok(res)
-                    }
-                }
-            }))
-        }
-    });
-    let static_file_addr = arguments.static_file_host;
-    if !static_file_addr.is_empty() {
-        let server = hyper::Server::bind(&static_file_addr.parse().unwrap()).serve(make_service);
-        if !arguments.dont_open_in_browser {
-            if let Err(e) = open::that_detached(format!("http://{}", server.local_addr())) {
-                error!("failed to open browser: {}", e);
-            };
-        }
-        info!("Static file server listening on: {}", server.local_addr());
-        if let Err(e) = server.await {
-            error!("Static file server error: {}", e);
-        }
-    }
 
     Previewer {
-        frontend_html,
         frontend_html_factory,
         data_plane_handle,
         control_plane_handle,
