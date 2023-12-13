@@ -124,7 +124,7 @@ class TypstDocumentImpl {
 
     if (this.isContentPreview) {
       this.renderMode = RenderMode.Canvas;
-      this.pixelPerPt = 0.5;
+      this.pixelPerPt = 1;
       this.isMixinOutline = true;
     }
 
