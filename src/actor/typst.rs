@@ -28,8 +28,8 @@ pub enum TypstActorRequest {
     RemoveMemoryFiles(MemoryFilesShort),
 }
 
-type CompileService = CompileActor<Reporter<CompileExporter<CompileDriver>>>;
-type CompileClient = TsCompileClient<CompileService>;
+pub type CompileService = CompileActor<Reporter<CompileExporter<CompileDriver>>>;
+pub type CompileClient = TsCompileClient<CompileService>;
 
 pub struct TypstActor {
     inner: CompileService,
@@ -48,7 +48,7 @@ pub struct Channels {
     pub webview_conn: BroadcastChannel<WebviewActorRequest>,
 }
 
-struct Reporter<C> {
+pub struct Reporter<C> {
     inner: C,
     sender: mpsc::UnboundedSender<EditorActorRequest>,
 }

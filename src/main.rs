@@ -5,7 +5,10 @@ mod outline;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 
+use actor::editor::CompileStatus;
+use args::PreviewArgs;
 use clap::Parser;
 use futures::SinkExt;
 use hyper::http::Error;
@@ -19,8 +22,10 @@ use tokio_tungstenite::WebSocketStream;
 use typst_ts_compiler::service::CompileDriver;
 use typst_ts_compiler::TypstSystemWorld;
 use typst_ts_core::config::CompileOpts;
+use typst_ts_core::{ImmutStr, TypstDocument as Document};
 
 use crate::actor::editor::EditorActor;
+use crate::actor::typst::CompileClient;
 use crate::actor::typst::TypstActor;
 use crate::args::{CliArguments, PreviewMode};
 
@@ -86,11 +91,10 @@ async fn main() {
         .try_init();
     let arguments = CliArguments::parse();
     info!("Arguments: {:#?}", arguments);
-    let enable_partial_rendering = arguments.enable_partial_rendering;
     let entry = if arguments.input.is_absolute() {
         arguments.input.clone()
     } else {
-        std::env::current_dir().unwrap().join(arguments.input)
+        std::env::current_dir().unwrap().join(&arguments.input)
     };
     let root = if let Some(root) = &arguments.root {
         if root.is_absolute() {
@@ -105,6 +109,7 @@ async fn main() {
         error!("entry file must be in the root directory");
         std::process::exit(1);
     }
+
     let compiler_driver = {
         let world = TypstSystemWorld::new(CompileOpts {
             root_dir: root.clone(),
@@ -122,6 +127,53 @@ async fn main() {
         info!("Ctrl-C received, exiting");
         std::process::exit(0);
     });
+
+    let previewer = preview(arguments.preview, compiler_driver).await;
+
+    previewer.join().await;
+}
+
+pub struct Previewer {
+    frontend_html: ImmutStr,
+    frontend_html_factory: Box<dyn Fn(PreviewMode) -> ImmutStr>,
+    data_plane_handle: tokio::task::JoinHandle<()>,
+    control_plane_handle: tokio::task::JoinHandle<()>,
+}
+
+impl Previewer {
+    /// Get the HTML for the frontend (with set preview mode)
+    pub fn frontend_html(&self) -> ImmutStr {
+        self.frontend_html.clone()
+    }
+
+    /// Get the HTML for the frontend by a given preview mode
+    pub fn frontend_html_in_mode(&self, mode: PreviewMode) -> ImmutStr {
+        (self.frontend_html_factory)(mode)
+    }
+
+    /// Join the previewer actors.
+    // todo: close the actors
+    pub async fn join(self) {
+        let _ = tokio::join!(self.data_plane_handle, self.control_plane_handle);
+    }
+}
+
+pub trait CompileHost {
+    fn subscribe_doc(&self) -> Option<tokio::sync::watch::Receiver<Option<Arc<Document>>>> {
+        None
+    }
+
+    fn subscribe_status(&self) -> Option<tokio::sync::watch::Receiver<CompileStatus>> {
+        None
+    }
+
+    // todo: design this compile host based on CompileClient
+    fn make(self) -> CompileClient;
+}
+
+// todo: replace compile driver with compile host
+pub async fn preview(arguments: PreviewArgs, compiler_driver: CompileDriver) -> Previewer {
+    let enable_partial_rendering = arguments.enable_partial_rendering;
 
     // Create the world that serves sources, fonts and files.
     let actor::typst::Channels {
@@ -212,27 +264,34 @@ async fn main() {
             editor_actor.run().await;
         })
     };
-    let static_file_addr = arguments.static_file_host;
     let data_plane_port = data_plane_port_rx.await.unwrap();
+    let html = HTML.replace(
+        "ws://127.0.0.1:23625",
+        format!("ws://127.0.0.1:{data_plane_port}").as_str(),
+    );
+    // previewMode
+    let frontend_html_factory = Box::new(move |mode| -> ImmutStr {
+        let mode = match mode {
+            PreviewMode::Document => "Doc",
+            PreviewMode::Slide => "Slide",
+        };
+        html.replace(
+            "preview-arg:previewMode:Doc",
+            format!("preview-arg:previewMode:{}", mode).as_str(),
+        )
+        .into()
+    });
+    let mode = arguments.preview_mode;
+    let frontend_html = frontend_html_factory(mode);
     let make_service = make_service_fn(|_| {
+        let html = frontend_html.clone();
         async move {
             Ok::<_, hyper::http::Error>(service_fn(move |req| {
+                // todo: clone may not be necessary
+                let html = html.as_ref().to_owned();
                 async move {
                     if req.uri().path() == "/" {
-                        let html = HTML.replace(
-                            "ws://127.0.0.1:23625",
-                            format!("ws://127.0.0.1:{data_plane_port}").as_str(),
-                        );
-                        // previewMode
-                        let mode = match arguments.preview_mode {
-                            PreviewMode::Document => "Doc",
-                            PreviewMode::Slide => "Slide",
-                        };
-                        let html = html.replace(
-                            "preview-arg:previewMode:Doc",
-                            format!("preview-arg:previewMode:{}", mode).as_str(),
-                        );
-                        log::info!("Preview mode: {}", mode);
+                        log::info!("Serve frontend: {:?}", mode);
                         Ok::<_, Error>(hyper::Response::new(hyper::Body::from(html)))
                     } else {
                         // jump to /
@@ -248,17 +307,26 @@ async fn main() {
             }))
         }
     });
-    let server = hyper::Server::bind(&static_file_addr.parse().unwrap()).serve(make_service);
-    if !arguments.dont_open_in_browser {
-        if let Err(e) = open::that_detached(format!("http://{}", server.local_addr())) {
-            error!("failed to open browser: {}", e);
-        };
+    let static_file_addr = arguments.static_file_host;
+    if !static_file_addr.is_empty() {
+        let server = hyper::Server::bind(&static_file_addr.parse().unwrap()).serve(make_service);
+        if !arguments.dont_open_in_browser {
+            if let Err(e) = open::that_detached(format!("http://{}", server.local_addr())) {
+                error!("failed to open browser: {}", e);
+            };
+        }
+        info!("Static file server listening on: {}", server.local_addr());
+        if let Err(e) = server.await {
+            error!("Static file server error: {}", e);
+        }
     }
-    info!("Static file server listening on: {}", server.local_addr());
-    if let Err(e) = server.await {
-        error!("Static file server error: {}", e);
+
+    Previewer {
+        frontend_html,
+        frontend_html_factory,
+        data_plane_handle,
+        control_plane_handle,
     }
-    let _ = tokio::join!(data_plane_handle, control_plane_handle);
 }
 
 async fn accept_connection(stream: TcpStream) -> WebSocketStream<TcpStream> {
