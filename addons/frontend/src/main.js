@@ -5,6 +5,7 @@ import "./typst.css";
 import "./styles/toolbar.css";
 import "./styles/layout.css";
 import "./styles/help-panel.css";
+import "./styles/outline.css";
 
 import { wsMain } from './ws';
 import { PreviewMode } from './typst-doc';

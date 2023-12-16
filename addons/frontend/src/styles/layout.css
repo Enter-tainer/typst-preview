@@ -27,8 +27,15 @@
 }
 
 #typst-container.content-preview {
-  --main-margin: 20px;
-  margin-top: calc(var(--main-margin) / 2);
+  /* --main-margin: 20px;
+  margin-top: calc(var(--main-margin) / 2); */
+  margin-top: 5px;
+}
+
+#typst-container.content-preview .typst-outline-title,
+#typst-container.content-preview .typst-page.canvas-mode {
+  width: calc(100% - (2 * 5px));
+  margin: 0 5px;
 }
 
 #typst-container.content-preview svg {

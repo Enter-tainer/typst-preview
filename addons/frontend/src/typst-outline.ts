@@ -106,15 +106,15 @@ class GenContext {
     this.spliceCanvas(this.insertionPoint, pos);
 
     // create title at the beginning of this node
-    const titleSpan = document.createElement('span');
-    titleSpan.classList.add('typst-outline-title', 'level-' + level);
+    const titleDiv = document.createElement('div');
+    titleDiv.classList.add('typst-outline-title', 'level-' + level);
     const destSpan = document.createElement('span');
     destSpan.textContent = '↬';
     const titleContentSpan = document.createElement('span');
     titleContentSpan.textContent = item.title;
-    titleSpan.append(destSpan, ' ', titleContentSpan);
-    tagPatchId(titleSpan, id);
-    const title = new GenElem('outline-title', titleSpan, {
+    titleDiv.append(destSpan, ' ', titleContentSpan);
+    tagPatchId(titleDiv, id);
+    const title = new GenElem('outline-title', titleDiv, {
       content: titleContentSpan,
     });
     outlineNode.push(title);

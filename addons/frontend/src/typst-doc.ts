@@ -297,7 +297,8 @@ class TypstDocumentImpl {
   private rescaleCanvas() {
     // get dom state from cache, so we are free from layout reflowing
     // Note: one should retrieve dom state before rescale
-    const container = this.cachedDOMState;
+    const { width: cwRaw, height: ch } = this.cachedDOMState;
+    const cw = (this.isContentPreview ? (cwRaw - 10) : cwRaw);
 
     // get dom state from cache, so we are free from layout reflowing
     const docDiv = this.hookedElem.firstElementChild! as HTMLDivElement;
@@ -322,8 +323,8 @@ class TypstDocumentImpl {
 
       this.currentRealScale =
         this.previewMode === PreviewMode.Slide ?
-          Math.min(container.width / canvasWidth, container.height / canvasHeight) :
-          container.width / canvasWidth;
+          Math.min(cw / canvasWidth, ch / canvasHeight) :
+          cw / canvasWidth;
       const scale = this.currentRealScale * this.currentScaleRatio;
 
       // apply scale
@@ -343,8 +344,8 @@ class TypstDocumentImpl {
 
         if (this.previewMode === PreviewMode.Slide) {
 
-          const widthAdjust = Math.max((container.width - scaledWidth) / 2, 0);
-          const heightAdjust = Math.max((container.height - scaledHeight) / 2, 0);
+          const widthAdjust = Math.max((cw - scaledWidth) / 2, 0);
+          const heightAdjust = Math.max((ch - scaledHeight) / 2, 0);
           docDiv.style.transform = `translate(${widthAdjust}px, ${heightAdjust}px)`;
         }
       }
