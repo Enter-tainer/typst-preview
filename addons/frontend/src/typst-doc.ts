@@ -1023,7 +1023,10 @@ class TypstDocumentImpl {
         }
         break;
       }
-      case RenderMode.Canvas: { break; }
+      case RenderMode.Canvas: {
+        this.rescale();
+        break;
+      }
       default: {
         throw new Error(`unknown render mode ${this.renderMode}`);
       }
