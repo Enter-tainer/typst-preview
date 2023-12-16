@@ -38,15 +38,6 @@ body {
   background-color: #fff;
 }
 
-.typst-preview-page-number {
-  fill: var(--typst-preview-toolbar-fg-color);
-  font-family: sans-serif;
-  /* set to alignment center */
-  text-anchor: middle;
-  /* set to alignment center */
-  dominant-baseline: central;
-}
-
 .hide-scrollbar-x {
   overflow-x: hidden;
 }

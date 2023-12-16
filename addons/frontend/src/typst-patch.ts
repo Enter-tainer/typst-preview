@@ -6,7 +6,7 @@ export interface ElementChildren {
 }
 
 /// Semantic attributes attached to SVG elements.
-const enum TypstSvgAttrs {
+export const enum TypstPatchAttrs {
   /// The data-tid attribute is used to identify the element.
   /// It is used to compare two elements.
   ///
@@ -29,9 +29,9 @@ function isGElem(node: Element): node is SVGGElement {
 }
 
 /// Compare two elements by their data-tid attribute.
-function equalElem(prev: SVGGElement, next: SVGGElement) {
-  const prevDataTid = prev.getAttribute(TypstSvgAttrs.Tid);
-  const nextDataTid = next.getAttribute(TypstSvgAttrs.Tid);
+export function equalPatchElem(prev: Element, next: Element) {
+  const prevDataTid = prev.getAttribute(TypstPatchAttrs.Tid);
+  const nextDataTid = next.getAttribute(TypstPatchAttrs.Tid);
   /// Whenever we see a bad equality, we don't reuse it.
   /// Note: there are three cases:
   /// + prevBad && nextBad: we don't reuse it.
@@ -39,7 +39,7 @@ function equalElem(prev: SVGGElement, next: SVGGElement) {
   /// + prevBad && !nextBad:
   ///  Note: inferred that prevDataTid !== nextDataTid
   ///  hence we still don't reuse it.
-  const nextBadEquality = next.getAttribute(TypstSvgAttrs.BadEquality);
+  const nextBadEquality = next.getAttribute(TypstPatchAttrs.BadEquality);
   return !nextBadEquality && prevDataTid && prevDataTid === nextDataTid;
 }
 
@@ -85,7 +85,9 @@ export type ViewTransform<U> = [TargetViewInstruction<U>[], PatchPair<U>[]];
 export function interpretTargetView<T extends ElementChildren, U extends T = T>(
   originChildren: T[],
   targetChildren: T[],
-  tIsU = (_x: T): _x is U => true
+  // todo: remove this tag
+  isPatchingSvg: boolean = true, // patch svg or outline
+  tIsU = (x: T): x is U => !!x.getAttribute(TypstPatchAttrs.Tid),
 ): ViewTransform<U> {
   const availableOwnedResource = new Map<string, [T, number[]]>();
   const targetView: TargetViewInstruction<U>[] = [];
@@ -96,7 +98,7 @@ export function interpretTargetView<T extends ElementChildren, U extends T = T>(
       continue;
     }
 
-    const data_tid = prevChild.getAttribute(TypstSvgAttrs.Tid);
+    const data_tid = prevChild.getAttribute(TypstPatchAttrs.Tid);
     if (!data_tid) {
       targetView.push(["remove", i]);
       continue;
@@ -116,18 +118,23 @@ export function interpretTargetView<T extends ElementChildren, U extends T = T>(
       continue;
     }
 
-    const nextDataTid = nextChild.getAttribute(TypstSvgAttrs.Tid);
+    const nextDataTid = nextChild.getAttribute(TypstPatchAttrs.Tid);
     if (!nextDataTid) {
       throw new Error("not data tid for reusing g element for " + nextDataTid);
     }
 
-    const reuseTargetTid = nextChild.getAttribute(TypstSvgAttrs.ReuseFrom);
+    const reuseTargetTid = nextChild.getAttribute(TypstPatchAttrs.ReuseFrom);
     if (!reuseTargetTid) {
       targetView.push(["append", nextChild]);
       continue;
     }
     if (!availableOwnedResource.has(reuseTargetTid)) {
-      throw new Error("no available resource for reuse " + reuseTargetTid);
+      if (isPatchingSvg) {
+        throw new Error("no available resource for reuse " + reuseTargetTid);
+      } else {
+        targetView.push(["append", nextChild]);
+        continue;
+      }
     }
 
     const rsrc = availableOwnedResource.get(reuseTargetTid)!;
@@ -136,7 +143,7 @@ export function interpretTargetView<T extends ElementChildren, U extends T = T>(
     /// no available resource
     if (prevIdx === undefined) {
       /// clean one is reused directly
-      if (nextDataTid === reuseTargetTid) {
+      if (nextDataTid === reuseTargetTid && isPatchingSvg) {
         const clonedNode = rsrc[0].cloneNode(true) as U;
         toPatch.push([clonedNode, nextChild]);
         targetView.push(["append", clonedNode]);
@@ -352,7 +359,7 @@ function patchRoot(prev: SVGElement, next: SVGElement) {
 }
 
 /// apply attribute patches to the `prev <svg or g>` element
-function patchAttributes(prev: Element, next: Element) {
+export function patchAttributes(prev: Element, next: Element) {
   const prevAttrs = prev.attributes;
   const nextAttrs = next.attributes;
   if (prevAttrs.length === nextAttrs.length) {
@@ -393,6 +400,7 @@ function patchChildren(prev: Element, next: Element) {
   const [targetView, toPatch] = interpretTargetView<SVGGElement>(
     prev.children as unknown as SVGGElement[],
     next.children as unknown as SVGGElement[],
+    true,
     isGElem
   );
 
@@ -415,10 +423,10 @@ function patchChildren(prev: Element, next: Element) {
 /// Return true if the `prev` element is reused.
 /// Return false if the `prev` element is replaced.
 function reuseOrPatchElem(prev: SVGGElement, next: SVGGElement) {
-  const canReuse = equalElem(prev, next);
+  const canReuse = equalPatchElem(prev, next);
 
   /// Even if the element is reused, we still need to replace its attributes.
-  next.removeAttribute(TypstSvgAttrs.ReuseFrom);
+  next.removeAttribute(TypstPatchAttrs.ReuseFrom);
   patchAttributes(prev, next);
 
   if (canReuse) {

@@ -1,4 +1,4 @@
-import { PreviewMode, SvgDocument } from "./svg-doc";
+import { PreviewMode, TypstDocument } from "./typst-doc";
 import {
     rendererBuildInfo,
     createTypstRenderer,
@@ -29,11 +29,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
     if (!url) {
         const hookedElem = document.getElementById("typst-app");
         if (hookedElem) {
-            if (isContentPreview) {
-                hookedElem.innerHTML = `<span style="margin: 0px 5px">No Content</span>`;
-            } else {
-                hookedElem.innerHTML = "";
-            }
+            hookedElem.innerHTML = "";
         }
         return () => { };
     }
@@ -48,7 +44,6 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         listeners.push([window, event, listener]);
     }
 
-
     function createSvgDocument(wasmDocRef: RenderSession) {
         const hookedElem = document.getElementById("typst-app")!;
         if (hookedElem.firstElementChild?.tagName !== "svg") {
@@ -56,7 +51,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         }
         const resizeTarget = document.getElementById('typst-container-main')!;
 
-        const svgDoc = new SvgDocument(hookedElem!, wasmDocRef, {
+        const svgDoc = new TypstDocument(hookedElem!, wasmDocRef, {
             previewMode,
             isContentPreview,
             // set rescale target to `body`
@@ -74,7 +69,20 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         // drag (panal resizing) -> rescaling
         // window.onresize = () => svgDoc.rescale();
         addWindowEventListener("resize", () => svgDoc.addViewportChange());
-        addWindowEventListener("scroll", () => svgDoc.addViewportChange());
+        if (!isContentPreview) {
+            addWindowEventListener("scroll", () => svgDoc.addViewportChange());
+        }
+
+        // Handle messages sent from the extension to the webview
+        addWindowEventListener('message', event => {
+            const message = event.data; // The json data that the extension sent
+            switch (message.type) {
+                case 'outline': {
+                    svgDoc.setOutineData(message.outline);
+                    break;
+                }
+            }
+        });
 
         if (previewMode === PreviewMode.Slide) {
             {
@@ -196,7 +204,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         return svgDoc;
     }
 
-    function setupSocket(svgDoc: SvgDocument): () => void {
+    function setupSocket(svgDoc: TypstDocument): () => void {
         // todo: reconnect setTimeout(() => setupSocket(svgDoc), 1000);
         subject = webSocket<ArrayBuffer>({
             url,
@@ -270,7 +278,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
             // console.log(message[0], message[1].length);
             if (isContentPreview) {
                 // whether to scroll to the content preview when user updates document
-                const autoScrollContentPreview = false;
+                const autoScrollContentPreview = true;
                 if (!autoScrollContentPreview && message[0] === "jump") {
                     return;
                 }

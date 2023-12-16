@@ -5,9 +5,10 @@ import "./typst.css";
 import "./styles/toolbar.css";
 import "./styles/layout.css";
 import "./styles/help-panel.css";
+import "./styles/outline.css";
 
 import { wsMain } from './ws';
-import { PreviewMode } from './svg-doc';
+import { PreviewMode } from './typst-doc';
 
 /// Main entry point of the frontend program.
 main();
