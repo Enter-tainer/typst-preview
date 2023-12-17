@@ -245,3 +245,11 @@ Add preview button
 
 - Features:
   - Bump to typst v0.10.0
+
+### v0.10.1
+
+- Features:
+  - Improve thumbnail side panel and outline. Now it is clickable and you can jump to the corresponding page.
+
+- Bug fixes:
+  - Improve performance for outline generation.
