@@ -253,3 +253,8 @@ Add preview button
 
 - Bug fixes:
   - Improve performance for outline generation.
+
+### v0.10.2
+
+- Bug fixes:
+  - fix scrollbar hiding
