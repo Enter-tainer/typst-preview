@@ -135,7 +135,7 @@ class TypstDocumentImpl {
     this.hookedElem.parentElement?.classList.add("hide-scrollbar-x");
     if (this.previewMode === PreviewMode.Slide) {
       this.hookedElem.classList.add("hide-scrollbar-y");
-      document.body.classList.add("hide-scrollbar-y");
+      this.hookedElem.parentElement?.classList.add("hide-scrollbar-y");
     }
 
     if (this.renderMode === RenderMode.Svg) {
@@ -200,17 +200,17 @@ class TypstDocumentImpl {
         // hide scrollbar if scale == 1
         if (Math.abs(this.currentScaleRatio - 1) < 1e-5) {
           this.hookedElem.classList.add("hide-scrollbar-x");
-          document.body.classList.add("hide-scrollbar-x");
+          this.hookedElem.parentElement?.classList.add("hide-scrollbar-x");
           if (this.previewMode === PreviewMode.Slide) {
             this.hookedElem.classList.add("hide-scrollbar-y");
-            document.body.classList.add("hide-scrollbar-y");
+            this.hookedElem.parentElement?.classList.add("hide-scrollbar-y");
           }
         } else {
           this.hookedElem.classList.remove("hide-scrollbar-x");
-          document.body.classList.remove("hide-scrollbar-x");
+          this.hookedElem.parentElement?.classList.remove("hide-scrollbar-x");
           if (this.previewMode === PreviewMode.Slide) {
             this.hookedElem.classList.remove("hide-scrollbar-y");
-            document.body.classList.remove("hide-scrollbar-y");
+            this.hookedElem.parentElement?.classList.remove("hide-scrollbar-y");
           }
         }
 
