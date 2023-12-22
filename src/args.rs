@@ -18,20 +18,7 @@ pub enum PreviewMode {
 const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
 
 #[derive(Debug, Clone, Parser)]
-#[clap(name = "typst-preview", author, version, about, long_version(LONG_VERSION.as_str()))]
-pub struct CliArguments {
-    /// Add additional directories to search for fonts
-    #[clap(long = "font-path", value_name = "DIR", action = ArgAction::Append, env = "TYPST_FONT_PATHS", value_delimiter = ENV_PATH_SEP)]
-    pub font_paths: Vec<PathBuf>,
-
-    /// Root directory for your project
-    #[clap(long = "root", value_name = "DIR")]
-    pub root: Option<PathBuf>,
-
-    /// Preview mode
-    #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
-    pub preview_mode: PreviewMode,
-
+pub struct PreviewArgs {
     /// Data plane server will bind to this address
     #[clap(
         long = "data-plane-host",
@@ -50,6 +37,21 @@ pub struct CliArguments {
     )]
     pub control_plane_host: String,
 
+    /// Only render visible part of the document. This can improve performance but still being experimental.
+    #[clap(long = "partial-rendering")]
+    pub enable_partial_rendering: bool,
+}
+
+#[derive(Debug, Clone, Parser)]
+#[clap(name = "typst-preview", author, version, about, long_version(LONG_VERSION.as_str()))]
+pub struct CliArguments {
+    #[clap(flatten)]
+    pub preview: PreviewArgs,
+
+    /// Preview mode
+    #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
+    pub preview_mode: PreviewMode,
+
     /// Host for the preview server
     #[clap(
         long = "host",
@@ -63,9 +65,13 @@ pub struct CliArguments {
     #[clap(long = "no-open")]
     pub dont_open_in_browser: bool,
 
-    /// Only render visible part of the document. This can improve performance but still being experimental.
-    #[clap(long = "partial-rendering")]
-    pub enable_partial_rendering: bool,
+    /// Add additional directories to search for fonts
+    #[clap(long = "font-path", value_name = "DIR", action = ArgAction::Append, env = "TYPST_FONT_PATHS", value_delimiter = ENV_PATH_SEP)]
+    pub font_paths: Vec<PathBuf>,
+
+    /// Root directory for your project
+    #[clap(long = "root", value_name = "DIR")]
+    pub root: Option<PathBuf>,
 
     pub input: PathBuf,
 }
