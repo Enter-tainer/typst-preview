@@ -353,3 +353,56 @@ window.handleTypstLocation = function (
     }
   }
 };
+
+window.rasterizeTasks = [];
+const rTextCbs: [string, string][] = [];
+function setShapeStyle(elem: HTMLDivElement, dataUrl: string) {
+  elem.style.setProperty("mask-image", `url(${dataUrl})`);
+  elem.style.setProperty("-webkit-mask-image", `url(${dataUrl})`);
+  elem.style.setProperty("mask-size", "100% 100%");
+  elem.style.setProperty("-webkit-mask-size", "100% 100%");
+  elem.style.setProperty("background", "var(--glyph_fill)");
+}
+
+window.handleTextRasterized = function (canvas: HTMLCanvasElement, elem: Element, randomToken: string) {
+  window.rasterizeTasks.push(new Promise((resolve) => {
+    console.log("handleTextRasterized", elem, randomToken);
+    const t = (blob: Blob | null) => {
+      console.log("handleTextRasterized blob for", blob, randomToken);
+      if (!blob) {
+        return;
+      }
+      const dataUrl = URL.createObjectURL(blob);
+      setShapeStyle(elem as HTMLDivElement, dataUrl);
+      let isSet = false;
+      for (const elem of document.getElementsByClassName(randomToken)) {
+        setShapeStyle(elem as HTMLDivElement, dataUrl);
+        isSet = true;
+      }
+      if (!isSet) {
+        rTextCbs.push([randomToken, dataUrl]);
+        // console.log("rTextCbs", rTextCbs.length);
+        return;
+      }
+    };
+    canvas.toBlob((b) => {
+      t(b);
+      resolve(b);
+    });
+  }));
+}
+
+window.postTextRasterization = async function (root: Element) {
+  const tasks = window.rasterizeTasks;
+  window.rasterizeTasks = [];
+  await Promise.all(tasks);
+
+  for (let i = 0; i < rTextCbs.length; i++) {
+    // console.log("rTextCbs", rTextCbs[i]);
+    const [randomToken, src] = rTextCbs[i];
+    for (const elem of root.getElementsByClassName(randomToken)) {
+      setShapeStyle(elem as HTMLDivElement, src);
+    }
+  }
+  rTextCbs.splice(0, rTextCbs.length);
+}

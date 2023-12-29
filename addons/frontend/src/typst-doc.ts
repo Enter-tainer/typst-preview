@@ -803,7 +803,7 @@ class TypstDocumentImpl {
     return [t2, t3];
   }
 
-  private toggleSvgViewportChange() {
+  private async toggleSvgViewportChange() {
     let patchStr: string;
     const mode = this.previewMode;
     if (mode === PreviewMode.Doc) {
@@ -815,7 +815,7 @@ class TypstDocumentImpl {
     }
 
     const t2 = performance.now();
-    patchSvgToContainer(this.hookedElem, patchStr, elem => this.decorateSvgElement(elem, mode));
+    await patchSvgToContainer(this.hookedElem, patchStr, elem => this.decorateSvgElement(elem, mode));
     const t3 = performance.now();
 
     return [t2, t3];

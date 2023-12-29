@@ -322,23 +322,80 @@ export function changeViewPerspective<
 
 function runOriginViewInstructions(
   prev: Element,
-  originView: OriginViewInstruction<Node>[]
+  originView: OriginViewInstruction<Element>[]
 ) {
+  if (originView.length === 2) {
+    if (originView[0][0] === "remove" && originView[1][0] === "insert") {
+      if (originView[0][1] === originView[1][1]) {
+        // same text
+        const prevText = prev.children[originView[0][1]] as Element;
+        const nextText = originView[1][2];
+        if (prevText.classList.contains("typst-text") &&
+          nextText.classList.contains("typst-text")
+        ) {
+          console.log("patch text", prevText, nextText);
+          patchSameShapeElem(prevText, nextText);
+          return;
+        }
+      }
+    }
+  }
+
   // console.log("interpreted origin view", originView);
   for (const [op, off, fr] of originView) {
     switch (op) {
       case "insert":
         prev.insertBefore(fr, prev.children[off]);
+        // a text insert
+        if ((fr as Element).classList.contains("typst-text")) {
+          console.log("insert text", fr);
+        }
         break;
       case "swap_in":
         prev.insertBefore(prev.children[fr], prev.children[off]);
+        // a text insert
+        if ((prev.children[fr] as Element).classList.contains("typst-text")) {
+          console.log("swap_in text", fr);
+        }
         break;
       case "remove":
+        // a text insert
+        if ((prev.children[off] as Element).classList.contains("typst-text")) {
+          console.log("remove text", prev.children[off]);
+        }
         prev.children[off].remove();
         break;
       default:
         throw new Error("unknown op " + op);
     }
+  }
+}
+
+function patchSameShapeElem(prev: Element, next: Element) {
+  if (prev.classList.contains("typst-ptext")) {
+    const p = (prev as HTMLDivElement);
+    const n = (next as HTMLDivElement);
+    p.style.setProperty("mask-image", n.style.getPropertyValue("mask-image"));
+    // p.style.setProperty("-webkit-mask-image", n.style.getPropertyValue("-webkit-mask-image"));
+    return;
+  }
+  if (prev.classList.contains("tsel")) {
+    prev.replaceWith(next);
+    return;
+  }
+  patchAttributes(prev, next);
+  const prevChildren = prev.children;
+  const nextChildren = next.children;
+  if (prevChildren.length !== nextChildren.length) {
+    throw new Error("different children length");
+  }
+  for (let i = 0; i < prevChildren.length; i++) {
+    const prevChild = prevChildren[i];
+    const nextChild = nextChildren[i];
+    if (prevChild.tagName !== nextChild.tagName) {
+      throw new Error("different children tag name");
+    }
+    patchSameShapeElem(prevChild, nextChild);
   }
 }
 
@@ -593,17 +650,19 @@ function patchSvgHeader(prev: SVGElement, next: SVGElement) {
 /// End of Update to Global Svg Resources
 /// Main
 
-export function patchSvgToContainer(
+export async function patchSvgToContainer(
   hookedElem: Element, patchStr: string, decorateSvgElement: (elem: SVGElement) => void = () => void (0)) {
   if (hookedElem.firstElementChild) {
     const elem = document.createElement("div");
     elem.innerHTML = patchStr;
+    await window.postTextRasterization(elem);
     const next = elem.firstElementChild! as SVGElement;
     initOrPatchSvgHeader(next);
     decorateSvgElement(next);
     patchRoot(/* prev */ hookedElem.firstElementChild as SVGElement, next);
   } else {
     hookedElem.innerHTML = patchStr;
+    await window.postTextRasterization(hookedElem);
     const next = hookedElem.firstElementChild! as SVGElement;
     initOrPatchSvgHeader(next);
     decorateSvgElement(next);
