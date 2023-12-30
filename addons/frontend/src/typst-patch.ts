@@ -129,12 +129,8 @@ export function interpretTargetView<T extends ElementChildren, U extends T = T>(
       continue;
     }
     if (!availableOwnedResource.has(reuseTargetTid)) {
-      if (isPatchingSvg) {
-        throw new Error("no available resource for reuse " + reuseTargetTid);
-      } else {
-        targetView.push(["append", nextChild]);
-        continue;
-      }
+      targetView.push(["append", nextChild]);
+      continue;
     }
 
     const rsrc = availableOwnedResource.get(reuseTargetTid)!;
