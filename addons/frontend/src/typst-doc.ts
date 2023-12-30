@@ -440,6 +440,7 @@ class TypstDocumentImpl {
 
   private decorateSvgElement(svg: SVGElement, mode: PreviewMode) {
     const container = this.cachedDOMState;
+    const kShouldMixinCanvas = this.previewMode === PreviewMode.Doc;
 
     // the <rect> could only have integer width and height
     // so we scale it by 100 to make it more accurate
@@ -533,26 +534,25 @@ class TypstDocumentImpl {
     for (let i = 0; i < nextPages.length; i++) {
       /// Retrieve page width, height
       const nextPage = nextPages[i];
-      const { width: pageWidth, height: pageHeight } = nextPage;
+      const { width: pageWidth, height: pageHeight, elem: pageElem } = nextPage;
 
       /// Switch a dummy svg page to canvas mode
-      const nextElem = nextPage.elem;
-      if (isEmptyPage(nextElem)) {
+      if (kShouldMixinCanvas && isEmptyPage(pageElem)) {
         /// Render this page as canvas
         createCanvasPageOn(nextPage);
-        nextElem.setAttribute('data-mixin-canvas', '1');
+        pageElem.setAttribute('data-mixin-canvas', '1');
 
         /// override reuse info for virtual DOM patching
         ///
         /// we cannot have much work to do, but we optimistically think of the canvas
         /// on the same page offset are the same canvas element.
         const offsetTag = `canvas:${nextPage.index}`;
-        nextElem.setAttribute(TypstPatchAttrs.Tid, offsetTag);
-        nextElem.setAttribute(TypstPatchAttrs.ReuseFrom, offsetTag);
+        pageElem.setAttribute(TypstPatchAttrs.Tid, offsetTag);
+        pageElem.setAttribute(TypstPatchAttrs.ReuseFrom, offsetTag);
       }
-      if (isReusingEmptyPage(nextElem)) {
+      if (kShouldMixinCanvas && isReusingEmptyPage(pageElem)) {
         /// delete reuse from empty page
-        nextElem.removeAttribute(TypstPatchAttrs.ReuseFrom);
+        pageElem.removeAttribute(TypstPatchAttrs.ReuseFrom);
       }
 
       /// center the page and add margin
@@ -578,7 +578,7 @@ class TypstDocumentImpl {
       // innerRect.setAttribute("stroke-opacity", "0.4");
 
       /// Move page to the correct position
-      nextPage.elem.setAttribute("transform", translateAttr);
+      pageElem.setAttribute("transform", translateAttr);
 
       /// Insert rectangles
       // todo: this is buggy not preserving order?
@@ -622,35 +622,37 @@ class TypstDocumentImpl {
       accumulatedHeight = calculatedPaddedY + pageHeightEnd;
     }
 
-    /// Retrieve original pages
-    for (const prev of this.hookedElem.firstElementChild?.children || []) {
-      if (!prev.classList.contains("typst-page")) {
-        continue;
-      }
-      // nextPage.elem.setAttribute('data-mixin-canvas', 'true');
-      if (prev.getAttribute('data-mixin-canvas') !== '1') {
-        continue;
-      }
+    if (kShouldMixinCanvas) {
+      /// Retrieve original pages
+      for (const prev of this.hookedElem.firstElementChild?.children || []) {
+        if (!prev.classList.contains("typst-page")) {
+          continue;
+        }
+        // nextPage.elem.setAttribute('data-mixin-canvas', 'true');
+        if (prev.getAttribute('data-mixin-canvas') !== '1') {
+          continue;
+        }
 
-      const ch = prev.querySelector('.typst-svg-mixin-canvas');
-      if (ch?.tagName === 'foreignObject') {
-        const canvasDiv = ch.firstElementChild as HTMLDivElement;
+        const ch = prev.querySelector('.typst-svg-mixin-canvas');
+        if (ch?.tagName === 'foreignObject') {
+          const canvasDiv = ch.firstElementChild as HTMLDivElement;
 
-        const pageNumber = Number.parseInt(canvasDiv.getAttribute('data-page-number')!);
-        const pageInfo = n2CMapping.get(pageNumber);
-        if (pageInfo) {
-          pageInfo.container = canvasDiv as HTMLDivElement;
-          pageInfo.elem = canvasDiv.firstElementChild as HTMLDivElement;
+          const pageNumber = Number.parseInt(canvasDiv.getAttribute('data-page-number')!);
+          const pageInfo = n2CMapping.get(pageNumber);
+          if (pageInfo) {
+            pageInfo.container = canvasDiv as HTMLDivElement;
+            pageInfo.elem = canvasDiv.firstElementChild as HTMLDivElement;
+          }
         }
       }
-    }
 
-    this.ensureCreatedCanvas(pagesInCanvasMode);
-    this.canvasRenderCToken = new TypstCancellationToken();
-    this.updateCanvas(pagesInCanvasMode, this.canvasRenderCToken)
-      .then(() => {
-        this.canvasRenderCToken = undefined;
-      });
+      this.ensureCreatedCanvas(pagesInCanvasMode);
+      this.canvasRenderCToken = new TypstCancellationToken();
+      this.updateCanvas(pagesInCanvasMode, this.canvasRenderCToken)
+        .then(() => {
+          this.canvasRenderCToken = undefined;
+        });
+    }
 
     if (this.isContentPreview) {
       accumulatedHeight += fontSize; // always add a bottom margin for last page number
