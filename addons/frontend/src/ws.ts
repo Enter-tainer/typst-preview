@@ -8,7 +8,7 @@ import renderModule from "@myriaddreamin/typst-ts-renderer/pkg/typst_ts_renderer
 // import { RenderSession as RenderSession2 } from "@myriaddreamin/typst-ts-renderer/pkg/wasm-pack-shim.mjs";
 import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 import { WebSocketSubject, webSocket } from 'rxjs/webSocket';
-import { Subject, buffer, debounceTime, tap } from "rxjs";
+import { Subject, Subscription, buffer, debounceTime, fromEvent, tap } from "rxjs";
 
 // for debug propose
 // queryObjects((window as any).TypstRenderSession);
@@ -35,14 +35,8 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
     }
 
     let disposed = false;
-    let subject: WebSocketSubject<ArrayBuffer> | undefined = undefined;
-    const listeners: [any, string, any][] = [];
-    function addWindowEventListener<K extends keyof WindowEventMap>(
-        type: K, listener: (this: Window, ev: WindowEventMap[K]) => any): void;
-    function addWindowEventListener(event: string, listener: any) {
-        window.addEventListener(event, listener);
-        listeners.push([window, event, listener]);
-    }
+    let $ws: WebSocketSubject<ArrayBuffer> | undefined = undefined;
+    const subsribes: Subscription[] = [];
 
     function createSvgDocument(wasmDocRef: RenderSession) {
         const hookedElem = document.getElementById("typst-app")!;
@@ -68,21 +62,32 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
 
         // drag (panal resizing) -> rescaling
         // window.onresize = () => svgDoc.rescale();
-        addWindowEventListener("resize", () => svgDoc.addViewportChange());
+        subsribes.push(
+            fromEvent(window, "resize").
+                subscribe(() => svgDoc.addViewportChange())
+        );
+
         if (!isContentPreview) {
-            addWindowEventListener("scroll", () => svgDoc.addViewportChange());
+            subsribes.push(
+                fromEvent(window, "scroll").
+                    pipe(debounceTime(1500)).
+                    subscribe(() => svgDoc.addViewportChange())
+            );
         }
 
         // Handle messages sent from the extension to the webview
-        addWindowEventListener('message', event => {
-            const message = event.data; // The json data that the extension sent
-            switch (message.type) {
-                case 'outline': {
-                    svgDoc.setOutineData(message.outline);
-                    break;
-                }
-            }
-        });
+        subsribes.push(
+            fromEvent<MessageEvent>(window, "message").
+                subscribe(event => {
+                    const message = event.data; // The json data that the extension sent
+                    switch (message.type) {
+                        case 'outline': {
+                            svgDoc.setOutineData(message.outline);
+                            break;
+                        }
+                    }
+                })
+        );
 
         if (previewMode === PreviewMode.Slide) {
             {
@@ -206,7 +211,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
 
     function setupSocket(svgDoc: TypstDocument): () => void {
         // todo: reconnect setTimeout(() => setupSocket(svgDoc), 1000);
-        subject = webSocket<ArrayBuffer>({
+        $ws = webSocket<ArrayBuffer>({
             url,
             binaryType: "arraybuffer",
             serializer: t => t,
@@ -223,7 +228,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
             closeObserver: {
                 next: (e) => {
                     console.log('WebSocket connection closed', e);
-                    subject?.unsubscribe();
+                    $ws?.unsubscribe();
                     if (!disposed) {
                         setTimeout(() => setupSocket(svgDoc), 1000);
                     }
@@ -236,28 +241,29 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         const dispose = () => {
             disposed = true;
             svgDoc.dispose();
-            for (const [target, evt, listener] of listeners.splice(0, listeners.length)) {
-                target.removeEventListener(evt, listener);
+            for (const sub of subsribes.splice(0, subsribes.length)) {
+                sub.unsubscribe();
             }
-            subject?.complete();
-            batchMessageChannel.unsubscribe();
+            $ws?.complete();
         };
 
         // window.typstWebsocket = new WebSocket("ws://127.0.0.1:23625");
 
 
-        subject.subscribe({
+        $ws.subscribe({
             next: (data) => batchMessageChannel.next(data), // Called whenever there is a message from the server.
             error: err => console.log("WebSocket Error: ", err), // Called if at any point WebSocket API signals some kind of error.
             complete: () => console.log('complete') // Called when connection is closed (for whatever reason).
         });
 
-        batchMessageChannel
-            .pipe(buffer(batchMessageChannel.pipe(debounceTime(0))))
-            .pipe(tap(dataList => { console.log(`batch ${dataList.length} messages`) }))
-            .subscribe((dataList) => {
-                dataList.map(processMessage)
-            });
+        subsribes.push(
+            batchMessageChannel
+                .pipe(buffer(batchMessageChannel.pipe(debounceTime(0))))
+                .pipe(tap(dataList => { console.log(`batch ${dataList.length} messages`) }))
+                .subscribe((dataList) => {
+                    dataList.map(processMessage)
+                })
+        );
 
         function processMessage(data: ArrayBuffer) {
             if (!(data instanceof ArrayBuffer)) {
@@ -346,29 +352,6 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
 
             svgDoc.addChangement(message as any);
         };
-
-        // 当WebSocket连接关闭时
-        // window.typstWebsocket.addEventListener("close", () => {
-        //     console.log("WebSocket connection closed");
-        // });
-
-        // 当发生错误时
-        // window.typstWebsocket.addEventListener("error", (error) => {
-        //     console.error("WebSocket Error: ", error);
-        // }
-
-        // window.typstWebsocket.addEventListener("open", () => {
-        //     console.log("WebSocket connection opened");
-        //     svgDoc.reset();
-        //     window.typstWebsocket.send("current");
-        // });
-
-        // window.typstWebsocket.addEventListener("close", () => {
-        //     setTimeout(() => setupSocket(svgDoc), 1000);
-        // });
-
-        // 当收到WebSocket数据时
-        // window.typstWebsocket.addEventListener("message", event => processMessage(event.data));
 
         return dispose;
     }
