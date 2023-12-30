@@ -230,6 +230,9 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
                 }
             }
         });
+
+        const batchMessageChannel = new Subject<ArrayBuffer>();
+
         const dispose = () => {
             disposed = true;
             svgDoc.dispose();
@@ -237,11 +240,11 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
                 target.removeEventListener(evt, listener);
             }
             subject?.complete();
+            batchMessageChannel.unsubscribe();
         };
 
         // window.typstWebsocket = new WebSocket("ws://127.0.0.1:23625");
 
-        const batchMessageChannel = new Subject<ArrayBuffer>();
 
         subject.subscribe({
             next: (data) => batchMessageChannel.next(data), // Called whenever there is a message from the server.
