@@ -647,10 +647,13 @@ class TypstDocumentImpl {
       }
 
       this.ensureCreatedCanvas(pagesInCanvasMode);
-      this.canvasRenderCToken = new TypstCancellationToken();
-      this.updateCanvas(pagesInCanvasMode, this.canvasRenderCToken)
-        .then(() => {
-          this.canvasRenderCToken = undefined;
+      console.assert(this.canvasRenderCToken === undefined, 'Noo!!: canvasRenderCToken should be undefined');
+      const tok = this.canvasRenderCToken = new TypstCancellationToken();
+      this.updateCanvas(pagesInCanvasMode, tok)
+        .finally(() => {
+          if (tok === this.canvasRenderCToken) {
+            this.canvasRenderCToken = undefined;
+          }
         });
     }
 
