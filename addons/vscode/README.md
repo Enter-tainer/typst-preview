@@ -258,3 +258,11 @@ Add preview button
 
 - Bug fixes:
   - fix scrollbar hiding
+
+### v0.10.3
+
+- Bug fixes:
+  - Thanks to new rendering technique, scrolling in no longer laggy on long document.
+
+- Features:
+  - We now automatically declare the previewing file as entrypoint when `typst-preview.pinPreviewFile` is set to `true`. This is like the eye icon in webapp. This should improve diagnostic messages for typst lsp. You can enable this by setting `typst-preview.pinPreviewFile` to `true`.
