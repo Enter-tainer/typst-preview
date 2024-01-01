@@ -355,6 +355,12 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		}
 	});
 
+	// interact with typst-lsp
+	if (vscode.workspace.getConfiguration().get<boolean>('typst-preview.pinPreviewFile')) {
+		console.log('pinPreviewFile');
+		await vscode.commands.executeCommand('typst-lsp.pinMainToCurrent');
+	}
+
 	if (enableCursor) {
 		addonΠserver.addEventListener("open", () => {
 			reportPosition(bindDocument, activeEditor, 'changeCursorPosition');
@@ -392,6 +398,11 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		src2docHandlerDispose?.dispose();
 		shadowDispose?.dispose();
 		shadowDisposeClose?.dispose();
+
+		// interact with typst-lsp
+		if (vscode.workspace.getConfiguration().get<boolean>('typst-preview.pinPreviewFile')) {
+			vscode.commands.executeCommand('typst-lsp.unpinMain');
+		}
 	});
 
 	let connectUrl = `ws://127.0.0.1:${dataPlanePort}`;

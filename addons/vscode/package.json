@@ -197,6 +197,11 @@
             "Show full status bar indicator (ICON Compile Success)",
             "Show compact status bar indicator (ICON)"
           ]
+        },
+        "typst-preview.pinPreviewFile": {
+          "description": "Declare current previewing file as entrypoint for typst-lsp. This will make typst-lsp to use this file as entrypoint instead of the file opened in vscode. This can improve diagnostics messages and auto completion but still being experimental.",
+          "type": "boolean",
+          "default": false
         }
       }
     },
