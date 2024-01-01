@@ -1,4 +1,4 @@
-import { TypstPatchAttrs, patchSvgToContainer } from "./typst-patch";
+import { TypstPatchAttrs, isDummyPatchElem, patchSvgToContainer } from "./typst-patch";
 import { installEditorJumpToHandler, removeSourceMappingHandler } from "./typst-debug-info";
 import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 import { CanvasPage, patchOutlineEntry } from "./typst-outline";
@@ -25,8 +25,6 @@ export enum PreviewMode {
   Doc,
   Slide,
 }
-
-// let rnd = 0;
 
 class TypstDocumentImpl {
   /// Configuration fields
@@ -58,6 +56,8 @@ class TypstDocumentImpl {
   patchQueue: [string, string][] = [];
   /// resources to dispose
   private disposeList: (() => void)[] = [];
+  /// canvas render ctoken
+  canvasRenderCToken?: TypstCancellationToken;
 
   /// There are two scales in this class: The real scale is to adjust the size
   /// of `hookedElem` to fit the svg. The virtual scale (scale ratio) is to let
@@ -430,6 +430,7 @@ class TypstDocumentImpl {
 
   private decorateSvgElement(svg: SVGElement, mode: PreviewMode) {
     const container = this.cachedDOMState;
+    const kShouldMixinCanvas = this.previewMode === PreviewMode.Doc;
 
     // the <rect> could only have integer width and height
     // so we scale it by 100 to make it more accurate
@@ -439,7 +440,14 @@ class TypstDocumentImpl {
     /// Caclulate width
     let maxWidth = 0;
 
-    const nextPages = (() => {
+    interface SvgPage {
+      elem: Element;
+      width: number;
+      height: number;
+      index: number;
+    }
+
+    const nextPages: SvgPage[] = (() => {
       /// Retrieve original pages
       const filteredNextPages = Array.from(svg.children).filter(
         (x) => x.classList.contains("typst-page")
@@ -454,11 +462,12 @@ class TypstDocumentImpl {
       } else {
         throw new Error(`unknown preview mode ${mode}`);
       }
-    })().map((elem) => {
+    })().map((elem, index) => {
       const width = Number.parseFloat(elem.getAttribute("data-page-width")!);
       const height = Number.parseFloat(elem.getAttribute("data-page-height")!);
       maxWidth = Math.max(maxWidth, width);
       return {
+        index,
         elem,
         width,
         height,
@@ -492,10 +501,45 @@ class TypstDocumentImpl {
     const firstPage = (nextPages.length ? nextPages[0] : undefined)!;
     let firstRect: SVGRectElement = undefined!;
 
+    const pagesInCanvasMode: CanvasPage[] = [];
+    /// Number to canvas page mapping
+    const n2CMapping = new Map<number, CanvasPage>();
+    const createCanvasPageOn = (nextPage: SvgPage) => {
+      const { elem, width, height, index } = nextPage;
+      const pg: CanvasPage = {
+        tag: 'canvas', index, width, height, container: undefined!, elem: undefined!,
+        inserter: (pageInfo) => {
+          const foreignObject = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
+          elem.appendChild(foreignObject);
+          foreignObject.setAttribute('width', `${width}`);
+          foreignObject.setAttribute('height', `${height}`);
+          foreignObject.classList.add('typst-svg-mixin-canvas');
+          foreignObject.prepend(pageInfo.container);
+        }
+      };
+      n2CMapping.set(index, pg);
+      pagesInCanvasMode.push(pg);
+    }
+
     for (let i = 0; i < nextPages.length; i++) {
       /// Retrieve page width, height
       const nextPage = nextPages[i];
-      const { width: pageWidth, height: pageHeight } = nextPage;
+      const { width: pageWidth, height: pageHeight, elem: pageElem } = nextPage;
+
+      /// Switch a dummy svg page to canvas mode
+      if (kShouldMixinCanvas && isDummyPatchElem(pageElem)) {
+        /// Render this page as canvas
+        createCanvasPageOn(nextPage);
+        pageElem.setAttribute('data-mixin-canvas', '1');
+
+        /// override reuse info for virtual DOM patching
+        ///
+        /// we cannot have much work to do, but we optimistically think of the canvas
+        /// on the same page offset are the same canvas element.
+        const offsetTag = `canvas:${nextPage.index}`;
+        pageElem.setAttribute(TypstPatchAttrs.Tid, offsetTag);
+        pageElem.setAttribute(TypstPatchAttrs.ReuseFrom, offsetTag);
+      }
 
       /// center the page and add margin
       const calculatedPaddedX = (newWidth - pageWidth) / 2;
@@ -520,7 +564,7 @@ class TypstDocumentImpl {
       // innerRect.setAttribute("stroke-opacity", "0.4");
 
       /// Move page to the correct position
-      nextPage.elem.setAttribute("transform", translateAttr);
+      pageElem.setAttribute("transform", translateAttr);
 
       /// Insert rectangles
       // todo: this is buggy not preserving order?
@@ -562,6 +606,42 @@ class TypstDocumentImpl {
       }
 
       accumulatedHeight = calculatedPaddedY + pageHeightEnd;
+    }
+
+    /// Starts to stole and update canvas elements
+    if (kShouldMixinCanvas) {
+      /// Retrieves original pages
+      for (const prev of this.hookedElem.firstElementChild?.children || []) {
+        if (!prev.classList.contains("typst-page")) {
+          continue;
+        }
+        // nextPage.elem.setAttribute('data-mixin-canvas', 'true');
+        if (prev.getAttribute('data-mixin-canvas') !== '1') {
+          continue;
+        }
+
+        const ch = prev.querySelector('.typst-svg-mixin-canvas');
+        if (ch?.tagName === 'foreignObject') {
+          const canvasDiv = ch.firstElementChild as HTMLDivElement;
+
+          const pageNumber = Number.parseInt(canvasDiv.getAttribute('data-page-number')!);
+          const pageInfo = n2CMapping.get(pageNumber);
+          if (pageInfo) {
+            pageInfo.container = canvasDiv as HTMLDivElement;
+            pageInfo.elem = canvasDiv.firstElementChild as HTMLDivElement;
+          }
+        }
+      }
+
+      this.ensureCreatedCanvas(pagesInCanvasMode);
+      console.assert(this.canvasRenderCToken === undefined, 'Noo!!: canvasRenderCToken should be undefined');
+      const tok = this.canvasRenderCToken = new TypstCancellationToken();
+      this.updateCanvas(pagesInCanvasMode, tok)
+        .finally(() => {
+          if (tok === this.canvasRenderCToken) {
+            this.canvasRenderCToken = undefined;
+          }
+        });
     }
 
     if (this.isContentPreview) {
@@ -693,7 +773,31 @@ class TypstDocumentImpl {
       }
     }
 
-    for (const pageInfo of pagesInfo) {
+    this.ensureCreatedCanvas(pagesInfo, (page) => {
+      if (page.index === 0) {
+        docDiv.prepend(page.container);
+      } else {
+        pagesInfo[page.index - 1].container.after(page.container)
+      }
+    });
+
+    const t2 = performance.now();
+
+    if (docDiv.getAttribute('data-rendering') === 'true') {
+      throw new Error('rendering in progress, possibly a race condition');
+    }
+    docDiv.setAttribute('data-rendering', 'true');
+    await this.updateCanvas(pagesInfo);
+    docDiv.removeAttribute('data-rendering');
+    // }));
+
+    const t3 = performance.now();
+
+    return [t2, t3];
+  }
+
+  ensureCreatedCanvas(pages: CanvasPage[], defaultInserter?: (page: CanvasPage) => void) {
+    for (const pageInfo of pages) {
       if (!pageInfo.elem) {
         pageInfo.elem = document.createElement('div');
         pageInfo.elem.setAttribute('class', 'typst-page-canvas');
@@ -732,27 +836,36 @@ class TypstDocumentImpl {
       if (!pageInfo.container.parentElement) {
         if (pageInfo.inserter) {
           pageInfo.inserter(pageInfo);
+        } else if (defaultInserter) {
+          defaultInserter(pageInfo);
         } else {
-          if (pageInfo.index === 0) {
-            docDiv.prepend(pageInfo.container);
-          } else {
-            pagesInfo[pageInfo.index - 1].container.after(pageInfo.container)
-          }
+          throw new Error('pageInfo.inserter is not defined');
         }
       }
     }
+  }
 
-    const t2 = performance.now();
-
+  private async updateCanvas(pagesInfo: CanvasPage[], tok?: TypstCancellationToken) {
+    const perf = performance.now();
+    console.log('updateCanvas start');
     // todo: priority in window
     // await Promise.all(pagesInfo.map(async (pageInfo) => {
     this.kModule.backgroundColor = '#ffffff';
     this.kModule.pixelPerPt = this.pixelPerPt;
-    if (docDiv.getAttribute('data-rendering') === 'true') {
-      throw new Error('rendering in progress, possibly a race condition');
+    const timeout = async (ms: number) => {
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve(undefined);
+        }, ms);
+      });
     }
-    docDiv.setAttribute('data-rendering', 'true');
     for (const pageInfo of pagesInfo) {
+      if (tok?.isCancelRequested()) {
+        await tok.consume();
+        console.log('updateCanvas cancelled', performance.now() - perf);
+        return;
+      }
+
       const canvas = pageInfo.elem.firstElementChild as HTMLCanvasElement;
       // const tt1 = performance.now();
 
@@ -785,6 +898,7 @@ class TypstDocumentImpl {
         }
       });
       if (cacheKey !== result.cacheKey) {
+        console.log('updateCanvas one miss', cacheKey, result.cacheKey);
         // console.log('renderCanvas', pageInfo.index, performance.now() - tt1, result);
         // todo: cache key changed
         // canvas.width = pageInfo.width * this.pixelPerPt;
@@ -794,14 +908,12 @@ class TypstDocumentImpl {
         canvas.setAttribute('data-cache-key', result.cacheKey);
         pageInfo.elem.setAttribute('data-cache-key', result.cacheKey);
       }
+
+      await timeout(0);
     }
-    docDiv.removeAttribute('data-rendering');
 
-    // }));
-
-    const t3 = performance.now();
-
-    return [t2, t3];
+    console.log('updateCanvas done', performance.now() - perf);
+    await tok?.consume();
   }
 
   private toggleSvgViewportChange() {
@@ -880,8 +992,8 @@ class TypstDocumentImpl {
 
       /// Adjust top and bottom
       const ch = this.hookedElem.firstElementChild?.children;
-      let topEstimate = top - height - 1,
-        bottomEstimate = top + height * 2 + 1;
+      let topEstimate = top - 1,
+        bottomEstimate = top + height + 1;
       if (ch) {
         const pages = Array.from(ch).filter(x => x.classList.contains('typst-page'));
         let minTop = 1e33,
@@ -928,6 +1040,13 @@ class TypstDocumentImpl {
   }
 
   private async processQueue(svgUpdateEvent: [string, string]) {
+    const ctoken = this.canvasRenderCToken;
+    if (ctoken) {
+      await ctoken.cancel();
+      await ctoken.wait();
+      this.canvasRenderCToken = undefined;
+      console.log('cancel canvas rendering');
+    }
     let t0 = performance.now();
     let t1 = undefined;
     let t2 = undefined;
@@ -1129,5 +1248,45 @@ export class TypstDocument {
   setOutineData(outline: any) {
     this.impl.outline = outline;
     this.addViewportChange();
+  }
+}
+
+class TypstCancellationToken {
+  isCancellationRequested: boolean = false;
+  private _onCancelled: Promise<void>;
+  private _onCancelledResolveResolved: Promise<() => void>;
+
+  constructor() {
+    let resolveT: () => void = undefined!;
+    let resolveX: (_: () => void) => void = undefined!;
+    this._onCancelled = new Promise((resolve) => {
+      resolveT = resolve;
+      if (resolveX) {
+        resolveX(resolve);
+      }
+    });
+    this._onCancelledResolveResolved = new Promise((resolve) => {
+      resolveX = resolve;
+      if (resolveT) {
+        resolve(resolveT);
+      }
+    });
+  }
+
+  async cancel(): Promise<void> {
+    await this._onCancelledResolveResolved;
+    this.isCancellationRequested = true;
+  }
+
+  isCancelRequested(): boolean {
+    return this.isCancellationRequested;
+  }
+
+  async consume(): Promise<void> {
+    (await this._onCancelledResolveResolved)();
+  }
+
+  wait(): Promise<void> {
+    return this._onCancelled;
   }
 }
