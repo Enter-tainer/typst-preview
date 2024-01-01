@@ -21,11 +21,18 @@ export const enum TypstPatchAttrs {
   /// The data-bad-equality attribute is used to indicate that the element
   /// doesn't have a good equality on hash.
   BadEquality = "data-bad-equality",
+
+  /// The data-dummy hints that this page is a dummy page (placeholder for a real page).
+  Dummy = "data-dummy",
 }
 
 /// Predicate that a xml element is a `<g>` element.
 function isGElem(node: Element): node is SVGGElement {
   return node.tagName === "g";
+}
+
+export function isDummyPatchElem(elem: Element) {
+  return elem.getAttribute(TypstPatchAttrs.Dummy) === "1";
 }
 
 /// Compare two elements by their data-tid attribute.

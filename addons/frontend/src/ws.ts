@@ -70,7 +70,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         if (!isContentPreview) {
             subsribes.push(
                 fromEvent(window, "scroll").
-                    pipe(debounceTime(1500)).
+                    pipe(debounceTime(500)).
                     subscribe(() => svgDoc.addViewportChange())
             );
         }

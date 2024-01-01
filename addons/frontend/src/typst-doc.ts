@@ -1,4 +1,4 @@
-import { TypstPatchAttrs, patchSvgToContainer } from "./typst-patch";
+import { TypstPatchAttrs, isDummyPatchElem, patchSvgToContainer } from "./typst-patch";
 import { installEditorJumpToHandler, removeSourceMappingHandler } from "./typst-debug-info";
 import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 import { CanvasPage, patchOutlineEntry } from "./typst-outline";
@@ -24,16 +24,6 @@ export enum RenderMode {
 export enum PreviewMode {
   Doc,
   Slide,
-}
-
-// let rnd = 0;
-
-function isEmptyPage(elem: Element): boolean {
-  return elem.getAttribute(TypstPatchAttrs.Tid) == 'pqKorb/btZUQlH2NwQkOiBc'
-}
-
-function isReusingEmptyPage(elem: Element): boolean {
-  return elem.getAttribute(TypstPatchAttrs.ReuseFrom) == 'pqKorb/btZUQlH2NwQkOiBc'
 }
 
 class TypstDocumentImpl {
@@ -537,7 +527,7 @@ class TypstDocumentImpl {
       const { width: pageWidth, height: pageHeight, elem: pageElem } = nextPage;
 
       /// Switch a dummy svg page to canvas mode
-      if (kShouldMixinCanvas && isEmptyPage(pageElem)) {
+      if (kShouldMixinCanvas && isDummyPatchElem(pageElem)) {
         /// Render this page as canvas
         createCanvasPageOn(nextPage);
         pageElem.setAttribute('data-mixin-canvas', '1');
@@ -549,10 +539,6 @@ class TypstDocumentImpl {
         const offsetTag = `canvas:${nextPage.index}`;
         pageElem.setAttribute(TypstPatchAttrs.Tid, offsetTag);
         pageElem.setAttribute(TypstPatchAttrs.ReuseFrom, offsetTag);
-      }
-      if (kShouldMixinCanvas && isReusingEmptyPage(pageElem)) {
-        /// delete reuse from empty page
-        pageElem.removeAttribute(TypstPatchAttrs.ReuseFrom);
       }
 
       /// center the page and add margin
@@ -622,8 +608,9 @@ class TypstDocumentImpl {
       accumulatedHeight = calculatedPaddedY + pageHeightEnd;
     }
 
+    /// Starts to stole and update canvas elements
     if (kShouldMixinCanvas) {
-      /// Retrieve original pages
+      /// Retrieves original pages
       for (const prev of this.hookedElem.firstElementChild?.children || []) {
         if (!prev.classList.contains("typst-page")) {
           continue;
@@ -875,6 +862,7 @@ class TypstDocumentImpl {
     for (const pageInfo of pagesInfo) {
       if (tok?.isCancelRequested()) {
         await tok.consume();
+        console.log('updateCanvas cancelled', performance.now() - perf);
         return;
       }
 
