@@ -277,13 +277,13 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
 
             const buffer = data;
             const messageData = new Uint8Array(buffer);
-            console.log('recv', messageData);
 
             const message_idx = messageData.indexOf(COMMA[0]);
             const message = [
                 dec.decode(messageData.slice(0, message_idx).buffer),
                 messageData.slice(message_idx + 1),
             ];
+            console.log('recv', message[0], messageData.length);
             // console.log(message[0], message[1].length);
             if (isContentPreview) {
                 // whether to scroll to the content preview when user updates document
