@@ -582,10 +582,20 @@ function patchSvgHeader(prev: SVGElement, next: SVGElement) {
         doc.body.appendChild(styleElement);
 
         const currentSvgSheet = (prevChild as HTMLStyleElement).sheet!;
+
+        let rules = new Set<string>();
+        for (const rule of currentSvgSheet.cssRules) {
+          rules.add(rule.cssText);
+        }
+
         const rulesToInsert = styleElement.sheet?.cssRules || [];
 
         // console.log("rules to insert", currentSvgSheet, rulesToInsert);
         for (const rule of rulesToInsert) {
+          if (rules.has(rule.cssText)) {
+            continue;
+          }
+          rules.add(rule.cssText);
           currentSvgSheet.insertRule(rule.cssText);
         }
       }
