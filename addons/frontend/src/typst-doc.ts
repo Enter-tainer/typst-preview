@@ -377,20 +377,12 @@ class TypstDocumentImpl {
     }
   }
 
-
-  // Note: one should retrieve dom state before rescale
-  private rescaleSvg() {
-    // get dom state from cache, so we are free from layout reflowing
-    const svg = this.hookedElem.firstElementChild! as SVGElement;
-
+  private rescaleSvgOn(svg: SVGElement) {
     const scale = this.getSvgScaleRatio();
     if (scale === 0) {
       console.warn("determine scale as 0, skip rescale");
       return;
     }
-
-    // get dom state from cache, so we are free from layout reflowing
-    const container = this.cachedDOMState;
 
     // apply scale
     const dataWidth = Number.parseFloat(svg.getAttribute("data-width")!);
@@ -409,6 +401,29 @@ class TypstDocumentImpl {
       svg.setAttribute("data-applied-height", appliedHeight);
       svg.setAttribute("height", `${scaledHeight}`);
     }
+  }
+
+  // Note: one should retrieve dom state before rescale
+  private rescaleSvg() {
+    // get dom state from cache, so we are free from layout reflowing
+    const svg = this.hookedElem.firstElementChild! as SVGElement;
+
+    const scale = this.getSvgScaleRatio();
+    if (scale === 0) {
+      console.warn("determine scale as 0, skip rescale");
+      return;
+    }
+
+    // get dom state from cache, so we are free from layout reflowing
+    const container = this.cachedDOMState;
+
+    // apply scale
+    const dataWidth = Number.parseFloat(svg.getAttribute("data-width")!);
+    const dataHeight = Number.parseFloat(svg.getAttribute("data-height")!);
+    const scaledWidth = Math.ceil(dataWidth * scale);
+    const scaledHeight = Math.ceil(dataHeight * scale);
+
+    this.rescaleSvgOn(svg);
 
     const widthAdjust = Math.max((container.width - scaledWidth) / 2, 0);
     let transformAttr = '';
@@ -674,6 +689,9 @@ class TypstDocumentImpl {
     svg.setAttribute("height", `${Math.ceil(newHeight)}`);
     svg.setAttribute("data-width", `${newWidth}`);
     svg.setAttribute("data-height", `${newHeight}`);
+
+    /// Early rescale
+    this.rescaleSvgOn(svg);
   }
 
   private get docWidth() {
@@ -981,14 +999,6 @@ class TypstDocumentImpl {
     let patchStr: string;
     // with 1px padding to avoid edge error
     if (this.partialRendering) {
-      console.log(
-        'render_in_window with partial rendering enabled',
-        revScale,
-        left,
-        top,
-        width,
-        height,
-      );
 
       /// Adjust top and bottom
       const ch = this.hookedElem.firstElementChild?.children;
@@ -1030,6 +1040,15 @@ class TypstDocumentImpl {
         // hi.x, hi.y
         left + width + 1,
         bottomEstimate,
+      );
+      console.log(
+        'render_in_window with partial rendering enabled window',
+        revScale,
+        left,
+        top,
+        width,
+        height,
+        ', patch scale', patchStr.length,
       );
     } else {
       console.log('render_in_window with partial rendering disabled', 0, 0, 1e33, 1e33);
