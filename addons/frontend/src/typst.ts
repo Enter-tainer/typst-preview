@@ -1,4 +1,4 @@
-import { triggerRipple } from "./typst-animation";
+import { triggerRipple } from "typst-dom/typst-animation.mjs";
 
 // debounce https://stackoverflow.com/questions/23181243/throttling-a-mousemove-event-to-fire-no-more-than-5-times-a-second
 // ignore fast events, good for capturing double click
@@ -12,7 +12,7 @@ let ignoredEvent = (function () {
     diff: number,
     time: number;
 
-  return function (callback: () => undefined, delay: number, id: string) {
+  return function (callback: () => void, delay: number, id: string) {
     time = new Date().getTime();
     id = id || "ignored event";
     diff = last[id] ? time - last[id] : time;

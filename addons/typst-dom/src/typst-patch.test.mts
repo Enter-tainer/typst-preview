@@ -3,7 +3,7 @@ import {
   PatchPair,
   interpretTargetView,
   changeViewPerspective,
-} from "./typst-patch";
+} from "./typst-patch.mjs";
 
 interface Attributes {
   [key: string]: string | null | undefined;
@@ -15,7 +15,7 @@ interface Attributes {
 class MockElement {
   tagName = "g";
 
-  constructor(public attrs: Attributes) { }
+  constructor(public attrs: Attributes) {}
 
   getAttribute(s: string): string | null {
     return this.attrs[s] ?? null;
@@ -41,9 +41,12 @@ const injectOffsets = (kind: string, elems: MockElement[]): MockElement[] => {
 
 const repeatOrJust = (n: number | (number | null)[]): MockElement[] => {
   if (Array.isArray(n)) {
-    return n.map((i) => new MockElement({
-      "data-tid": (i !== null) ? i.toString() : null,
-    }));
+    return n.map(
+      (i) =>
+        new MockElement({
+          "data-tid": i !== null ? i.toString() : null,
+        })
+    );
   }
 
   const res: MockElement[] = [];
@@ -56,7 +59,7 @@ const repeatOrJust = (n: number | (number | null)[]): MockElement[] => {
 
 const reuseStub = (n: number | null) =>
   new MockElement({
-    "data-reuse-from": (n !== null) ? n.toString() : null,
+    "data-reuse-from": n !== null ? n.toString() : null,
   });
 
 function toSnapshot([targetView, patchPair]: [
@@ -79,20 +82,27 @@ function toSnapshot([targetView, patchPair]: [
   return [...instructions, ...patches];
 }
 
-const hasTid = (elem: MockElement): elem is MockElement => elem.getAttribute("data-tid") !== null;
+const hasTid = (elem: MockElement): elem is MockElement =>
+  elem.getAttribute("data-tid") !== null;
 
-const indexTargetView = (init: number | (number | null)[], rearrange: (number | null)[]) =>
+const indexTargetView = (
+  init: number | (number | null)[],
+  rearrange: (number | null)[]
+) =>
   interpretTargetView<MockElement>(
     injectOffsets("o", repeatOrJust(init)),
     injectOffsets("t", rearrange.map(reuseStub)),
     true,
-    hasTid,
+    hasTid
   );
-const indexOriginView = (init: number | (number | null)[], rearrange: (number | null)[]) =>
+const indexOriginView = (
+  init: number | (number | null)[],
+  rearrange: (number | null)[]
+) =>
   changeViewPerspective<MockElement>(
     injectOffsets("o", repeatOrJust(init)),
     indexTargetView(init, rearrange)[0],
-    hasTid,
+    hasTid
   );
 
 describe("interpretView", () => {
@@ -252,7 +262,10 @@ describe("interpretView", () => {
     `);
   });
   it("handleReusePreseveOrder2", () => {
-    const result = indexTargetView([0, 1, 2, 1, 2, 3, 4, 3, 4], [1, 2, 3, 4, 3, 4, 1, 2]);
+    const result = indexTargetView(
+      [0, 1, 2, 1, 2, 3, 4, 3, 4],
+      [1, 2, 3, 4, 3, 4, 1, 2]
+    );
     expect(toSnapshot(result)).toMatchInlineSnapshot(`
       [
         "reuse,1",
@@ -269,7 +282,10 @@ describe("interpretView", () => {
     `);
   });
   it("handleReusePreseveOrder2_origin", () => {
-    const result = indexOriginView([0, 1, 2, 1, 2, 3, 4, 3, 4], [1, 2, 3, 4, 3, 4, 1, 2]);
+    const result = indexOriginView(
+      [0, 1, 2, 1, 2, 3, 4, 3, 4],
+      [1, 2, 3, 4, 3, 4, 1, 2]
+    );
     expect(toSnapshot([result, []])).toMatchInlineSnapshot(`
       [
         "remove,0",
@@ -286,13 +302,15 @@ describe("interpretView", () => {
     target[0].attrs["data-tid"] = "1";
     target[1].attrs["data-tid"] = "0";
     const result = interpretTargetView<MockElement>(
-      origin, target,
+      origin,
+      target,
       true,
-      hasTid,
+      hasTid
     );
-    const result2 = changeViewPerspective<MockElement>(origin,
+    const result2 = changeViewPerspective<MockElement>(
+      origin,
       result[0],
-      hasTid,
+      hasTid
     );
     expect(toSnapshot(result)).toMatchInlineSnapshot(`
       [
@@ -311,13 +329,15 @@ describe("interpretView", () => {
     const origin = injectOffsets("o", repeatOrJust([null, null, null, 0, 1]));
     const target = injectOffsets("t", [0, 1].map(reuseStub));
     const result = interpretTargetView<MockElement>(
-      origin, target,
+      origin,
+      target,
       true,
-      hasTid,
+      hasTid
     );
     const result2 = changeViewPerspective<MockElement>(
-      origin, result[0],
-      hasTid,
+      origin,
+      result[0],
+      hasTid
     );
     expect(toSnapshot(result)).toMatchInlineSnapshot(`
       [
@@ -335,13 +355,15 @@ describe("interpretView", () => {
     const origin = injectOffsets("o", repeatOrJust([null, null, null, 0, 1]));
     const target = injectOffsets("t", [1, null, 0, null, 1].map(reuseStub));
     const result = interpretTargetView<MockElement>(
-      origin, target,
+      origin,
+      target,
       true,
-      hasTid,
+      hasTid
     );
-    const result2 = changeViewPerspective<MockElement>(origin,
+    const result2 = changeViewPerspective<MockElement>(
+      origin,
       result[0],
-      hasTid,
+      hasTid
     );
     expect(toSnapshot(result)).toMatchInlineSnapshot(`
       [

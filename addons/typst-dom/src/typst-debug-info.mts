@@ -1,4 +1,4 @@
-import { triggerRipple } from "./typst-animation";
+import { triggerRipple } from "./typst-animation.mjs";
 
 const enum SourceMappingType {
   Text = 0,

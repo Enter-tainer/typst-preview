@@ -8,7 +8,7 @@ import "./styles/help-panel.css";
 import "./styles/outline.css";
 
 import { wsMain } from './ws';
-import { PreviewMode } from './typst-doc';
+import { PreviewMode } from 'typst-dom/typst-doc.mjs';
 
 /// Main entry point of the frontend program.
 main();

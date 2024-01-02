@@ -94,7 +94,7 @@ export function interpretTargetView<T extends ElementChildren, U extends T = T>(
   targetChildren: T[],
   // todo: remove this tag
   isPatchingSvg: boolean = true, // patch svg or outline
-  tIsU = (x: T): x is U => !!x.getAttribute(TypstPatchAttrs.Tid),
+  tIsU = (x: T): x is U => !!x.getAttribute(TypstPatchAttrs.Tid)
 ): ViewTransform<U> {
   const availableOwnedResource = new Map<string, [T, number[]]>();
   const targetView: TargetViewInstruction<U>[] = [];
@@ -449,7 +449,10 @@ interface FrozenReplacement {
   debug?: string;
 }
 
-function preReplaceNonSVGElements(prev: Element, next: Element): FrozenReplacement {
+function preReplaceNonSVGElements(
+  prev: Element,
+  next: Element
+): FrozenReplacement {
   const removedIndecies = [];
   const frozenReplacement: FrozenReplacement = {
     inserts: [],
@@ -485,11 +488,14 @@ function preReplaceNonSVGElements(prev: Element, next: Element): FrozenReplaceme
 }
 
 function postReplaceNonSVGElements(prev: Element, frozen: FrozenReplacement) {
-
   /// Retrive the `<g>` elements from the `prev` element.
   const gElements = Array.from(prev.children).filter(isGElem);
   if (gElements.length + 1 !== frozen.inserts.length) {
-    throw new Error(`invalid frozen replacement: gElements.length (${gElements.length}) + 1 !=== frozen.inserts.length (${frozen.inserts.length}) ${frozen.debug || ''}
+    throw new Error(`invalid frozen replacement: gElements.length (${
+      gElements.length
+    }) + 1 !=== frozen.inserts.length (${frozen.inserts.length}) ${
+      frozen.debug || ""
+    }
 current: ${prev.outerHTML}`);
   }
 
@@ -515,10 +521,10 @@ const SVG_HEADER_LENGTH = 3;
 
 function initOrPatchSvgHeader(svg: SVGElement) {
   if (!svg) {
-    throw new Error('no initial svg found');
+    throw new Error("no initial svg found");
   }
 
-  const prevResourceHeader = document.getElementById('typst-svg-resources');
+  const prevResourceHeader = document.getElementById("typst-svg-resources");
   if (prevResourceHeader) {
     patchSvgHeader(prevResourceHeader as unknown as SVGElement, svg);
     return;
@@ -529,11 +535,11 @@ function initOrPatchSvgHeader(svg: SVGElement) {
     "http://www.w3.org/2000/svg",
     "svg"
   );
-  resourceHeader.id = 'typst-svg-resources';
+  resourceHeader.id = "typst-svg-resources";
   // set viewbox, width, and height
   resourceHeader.setAttribute("viewBox", "0 0 0 0");
   resourceHeader.setAttribute("width", "0");
-  resourceHeader.setAttribute("height", "0")
+  resourceHeader.setAttribute("height", "0");
   resourceHeader.style.opacity = "0";
   resourceHeader.style.position = "absolute";
 
@@ -607,7 +613,10 @@ function patchSvgHeader(prev: SVGElement, next: SVGElement) {
 /// Main
 
 export function patchSvgToContainer(
-  hookedElem: Element, patchStr: string, decorateSvgElement: (elem: SVGElement) => void = () => void (0)) {
+  hookedElem: Element,
+  patchStr: string,
+  decorateSvgElement: (elem: SVGElement) => void = () => void 0
+) {
   if (hookedElem.firstElementChild) {
     const elem = document.createElement("div");
     elem.innerHTML = patchStr;

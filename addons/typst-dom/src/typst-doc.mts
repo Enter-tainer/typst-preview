@@ -1,7 +1,14 @@
-import { TypstPatchAttrs, isDummyPatchElem, patchSvgToContainer } from "./typst-patch";
-import { installEditorJumpToHandler, removeSourceMappingHandler } from "./typst-debug-info";
+import {
+  installEditorJumpToHandler,
+  removeSourceMappingHandler,
+} from "./typst-debug-info.mjs";
+import { patchOutlineEntry } from "./typst-outline.mjs";
+import {
+  TypstPatchAttrs,
+  isDummyPatchElem,
+  patchSvgToContainer,
+} from "./typst-patch.mjs";
 import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
-import { CanvasPage, patchOutlineEntry } from "./typst-outline";
 
 export interface ContainerDOMState {
   /// cached `hookedElem.offsetWidth` or `hookedElem.innerWidth`
@@ -24,6 +31,19 @@ export enum RenderMode {
 export enum PreviewMode {
   Doc,
   Slide,
+}
+
+export interface CanvasPage {
+  tag: "canvas";
+  index: number;
+  width: number;
+  height: number;
+  container: HTMLElement;
+  elem: HTMLElement;
+
+  // extra properties for patching
+  inserter?: (t: CanvasPage) => void;
+  stub?: HTMLElement;
 }
 
 class TypstDocumentImpl {
@@ -81,7 +101,6 @@ class TypstDocumentImpl {
   cursorPosition?: [number, number, number] = undefined;
   // id: number = rnd++;
 
-
   /// Cache fields
 
   /// cached state of container, default to retrieve state from `this.hookedElem`
@@ -94,11 +113,15 @@ class TypstDocumentImpl {
     },
   };
 
-  constructor(private hookedElem: HTMLElement, public kModule: RenderSession, options?: Options) {
-
+  constructor(
+    private hookedElem: HTMLElement,
+    public kModule: RenderSession,
+    options?: Options
+  ) {
     /// Apply configuration
     {
-      const { renderMode, previewMode, isContentPreview, retrieveDOMState } = options || {};
+      const { renderMode, previewMode, isContentPreview, retrieveDOMState } =
+        options || {};
       this.partialRendering = false;
       if (renderMode !== undefined) {
         this.renderMode = renderMode;
@@ -107,15 +130,18 @@ class TypstDocumentImpl {
         this.previewMode = previewMode;
       }
       this.isContentPreview = isContentPreview || false;
-      this.retrieveDOMState = retrieveDOMState || (() => {
-        return {
-          width: this.hookedElem.offsetWidth,
-          height: this.hookedElem.offsetHeight,
-          boundingRect: this.hookedElem.getBoundingClientRect(),
-        }
-      });
-      this.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue(
-        '--typst-preview-background-color');
+      this.retrieveDOMState =
+        retrieveDOMState ||
+        (() => {
+          return {
+            width: this.hookedElem.offsetWidth,
+            height: this.hookedElem.offsetHeight,
+            boundingRect: this.hookedElem.getBoundingClientRect(),
+          };
+        });
+      this.backgroundColor = getComputedStyle(
+        document.documentElement
+      ).getPropertyValue("--typst-preview-background-color");
     }
     if (this.isContentPreview) {
       // content preview has very bad performance without partial rendering
@@ -140,6 +166,11 @@ class TypstDocumentImpl {
 
     if (this.renderMode === RenderMode.Svg) {
       installEditorJumpToHandler(this.kModule, this.hookedElem);
+      this.disposeList.push(() => {
+        if (this.hookedElem) {
+          removeSourceMappingHandler(this.hookedElem);
+        }
+      });
     }
     this.installCtrlWheelHandler();
   }
@@ -219,7 +250,9 @@ class TypstDocumentImpl {
         if (svg) {
           const scaleRatio = this.getSvgScaleRatio();
 
-          const dataHeight = Number.parseFloat(svg.getAttribute("data-height")!);
+          const dataHeight = Number.parseFloat(
+            svg.getAttribute("data-height")!
+          );
           const scaledHeight = Math.ceil(dataHeight * scaleRatio);
 
           // we increase the height by 2 times.
@@ -271,9 +304,9 @@ class TypstDocumentImpl {
       svg.getAttribute("data-height") || svg.getAttribute("height") || "1"
     );
     this.currentRealScale =
-      this.previewMode === PreviewMode.Slide ?
-        Math.min(container.width / svgWidth, container.height / svgHeight) :
-        container.width / svgWidth;
+      this.previewMode === PreviewMode.Slide
+        ? Math.min(container.width / svgWidth, container.height / svgHeight)
+        : container.width / svgWidth;
 
     return this.currentRealScale * this.currentScaleRatio;
   }
@@ -298,7 +331,7 @@ class TypstDocumentImpl {
     // get dom state from cache, so we are free from layout reflowing
     // Note: one should retrieve dom state before rescale
     const { width: cwRaw, height: ch } = this.cachedDOMState;
-    const cw = (this.isContentPreview ? (cwRaw - 10) : cwRaw);
+    const cw = this.isContentPreview ? cwRaw - 10 : cwRaw;
 
     // get dom state from cache, so we are free from layout reflowing
     const docDiv = this.hookedElem.firstElementChild! as HTMLDivElement;
@@ -318,18 +351,21 @@ class TypstDocumentImpl {
       }
       let elem = canvasContainer.firstElementChild as HTMLDivElement;
 
-      const canvasWidth = Number.parseFloat(elem.getAttribute("data-page-width")!);
-      const canvasHeight = Number.parseFloat(elem.getAttribute("data-page-height")!);
+      const canvasWidth = Number.parseFloat(
+        elem.getAttribute("data-page-width")!
+      );
+      const canvasHeight = Number.parseFloat(
+        elem.getAttribute("data-page-height")!
+      );
 
       this.currentRealScale =
-        this.previewMode === PreviewMode.Slide ?
-          Math.min(cw / canvasWidth, ch / canvasHeight) :
-          cw / canvasWidth;
+        this.previewMode === PreviewMode.Slide
+          ? Math.min(cw / canvasWidth, ch / canvasHeight)
+          : cw / canvasWidth;
       const scale = this.currentRealScale * this.currentScaleRatio;
 
       // apply scale
       const appliedScale = (scale / this.pixelPerPt).toString();
-
 
       // set data applied width and height to memoize change
       if (elem.getAttribute("data-applied-scale") !== appliedScale) {
@@ -343,33 +379,32 @@ class TypstDocumentImpl {
         elem.style.transform = `scale(${appliedScale})`;
 
         if (this.previewMode === PreviewMode.Slide) {
-
           const widthAdjust = Math.max((cw - scaledWidth) / 2, 0);
           const heightAdjust = Math.max((ch - scaledHeight) / 2, 0);
           docDiv.style.transform = `translate(${widthAdjust}px, ${heightAdjust}px)`;
         }
       }
-    }
+    };
 
     if (this.isContentPreview) {
       isFirst = false;
       const rescaleChildren = (elem: HTMLElement) => {
         for (const ch of elem.children) {
           let canvasContainer = ch as HTMLElement;
-          if (canvasContainer.classList.contains('typst-page')) {
+          if (canvasContainer.classList.contains("typst-page")) {
             rescale(canvasContainer);
           }
-          if (canvasContainer.classList.contains('typst-outline')) {
+          if (canvasContainer.classList.contains("typst-outline")) {
             rescaleChildren(canvasContainer);
           }
         }
-      }
+      };
 
       rescaleChildren(docDiv);
     } else {
       for (const ch of docDiv.children) {
         let canvasContainer = ch as HTMLDivElement;
-        if (!canvasContainer.classList.contains('typst-page')) {
+        if (!canvasContainer.classList.contains("typst-page")) {
           continue;
         }
         rescale(canvasContainer);
@@ -426,7 +461,7 @@ class TypstDocumentImpl {
     this.rescaleSvgOn(svg);
 
     const widthAdjust = Math.max((container.width - scaledWidth) / 2, 0);
-    let transformAttr = '';
+    let transformAttr = "";
     if (this.previewMode === PreviewMode.Slide) {
       const heightAdjust = Math.max((container.height - scaledHeight) / 2, 0);
       transformAttr = `translate(${widthAdjust}px, ${heightAdjust}px)`;
@@ -450,7 +485,7 @@ class TypstDocumentImpl {
     // the <rect> could only have integer width and height
     // so we scale it by 100 to make it more accurate
     const INNER_RECT_UNIT = 100;
-    const INNER_RECT_SCALE = 'scale(0.01)';
+    const INNER_RECT_SCALE = "scale(0.01)";
 
     /// Caclulate width
     let maxWidth = 0;
@@ -464,8 +499,8 @@ class TypstDocumentImpl {
 
     const nextPages: SvgPage[] = (() => {
       /// Retrieve original pages
-      const filteredNextPages = Array.from(svg.children).filter(
-        (x) => x.classList.contains("typst-page")
+      const filteredNextPages = Array.from(svg.children).filter((x) =>
+        x.classList.contains("typst-page")
       );
 
       if (mode === PreviewMode.Doc) {
@@ -486,7 +521,7 @@ class TypstDocumentImpl {
         elem,
         width,
         height,
-      }
+      };
     });
 
     /// Adjust width
@@ -498,16 +533,14 @@ class TypstDocumentImpl {
 
     /// Prepare scale
     // scale derived from svg width and container with.
-    const computedScale = container.width
-      ? container.width / maxWidth
-      : 1;
+    const computedScale = container.width ? container.width / maxWidth : 1;
     // respect current scale ratio
     const scale = 1 / (this.currentScaleRatio * computedScale);
     const fontSize = 12 * scale;
 
     /// Calculate new width, height
     // 5pt height margin, 0pt width margin (it is buggy to add width margin)
-    const heightMargin = this.isContentPreview ? (6 * scale) : (5 * scale);
+    const heightMargin = this.isContentPreview ? 6 * scale : 5 * scale;
     const widthMargin = 0;
     const newWidth = maxWidth + 2 * widthMargin;
 
@@ -522,19 +555,27 @@ class TypstDocumentImpl {
     const createCanvasPageOn = (nextPage: SvgPage) => {
       const { elem, width, height, index } = nextPage;
       const pg: CanvasPage = {
-        tag: 'canvas', index, width, height, container: undefined!, elem: undefined!,
+        tag: "canvas",
+        index,
+        width,
+        height,
+        container: undefined!,
+        elem: undefined!,
         inserter: (pageInfo) => {
-          const foreignObject = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
+          const foreignObject = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "foreignObject"
+          );
           elem.appendChild(foreignObject);
-          foreignObject.setAttribute('width', `${width}`);
-          foreignObject.setAttribute('height', `${height}`);
-          foreignObject.classList.add('typst-svg-mixin-canvas');
+          foreignObject.setAttribute("width", `${width}`);
+          foreignObject.setAttribute("height", `${height}`);
+          foreignObject.classList.add("typst-svg-mixin-canvas");
           foreignObject.prepend(pageInfo.container);
-        }
+        },
       };
       n2CMapping.set(index, pg);
       pagesInCanvasMode.push(pg);
-    }
+    };
 
     for (let i = 0; i < nextPages.length; i++) {
       /// Retrieve page width, height
@@ -545,7 +586,7 @@ class TypstDocumentImpl {
       if (kShouldMixinCanvas && isDummyPatchElem(pageElem)) {
         /// Render this page as canvas
         createCanvasPageOn(nextPage);
-        pageElem.setAttribute('data-mixin-canvas', '1');
+        pageElem.setAttribute("data-mixin-canvas", "1");
 
         /// override reuse info for virtual DOM patching
         ///
@@ -562,15 +603,27 @@ class TypstDocumentImpl {
       const translateAttr = `translate(${calculatedPaddedX}, ${calculatedPaddedY})`;
 
       /// Create inner rectangle
-      const innerRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      const innerRect = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "rect"
+      );
       innerRect.setAttribute("class", "typst-page-inner");
       innerRect.setAttribute("data-page-width", pageWidth.toString());
       innerRect.setAttribute("data-page-height", pageHeight.toString());
-      innerRect.setAttribute("width", Math.floor((pageWidth * INNER_RECT_UNIT)).toString());
-      innerRect.setAttribute("height", Math.floor((pageHeight * INNER_RECT_UNIT)).toString());
+      innerRect.setAttribute(
+        "width",
+        Math.floor(pageWidth * INNER_RECT_UNIT).toString()
+      );
+      innerRect.setAttribute(
+        "height",
+        Math.floor(pageHeight * INNER_RECT_UNIT).toString()
+      );
       innerRect.setAttribute("x", "0");
       innerRect.setAttribute("y", "0");
-      innerRect.setAttribute("transform", `${translateAttr} ${INNER_RECT_SCALE}`);
+      innerRect.setAttribute(
+        "transform",
+        `${translateAttr} ${INNER_RECT_SCALE}`
+      );
       // white background
       innerRect.setAttribute("fill", "white");
       // It is quite ugly
@@ -588,34 +641,50 @@ class TypstDocumentImpl {
         firstRect = innerRect;
       }
 
-      let pageHeightEnd = pageHeight + (i + 1 === nextPages.length ? 0 : heightMargin);
+      let pageHeightEnd =
+        pageHeight + (i + 1 === nextPages.length ? 0 : heightMargin);
 
       if (this.isContentPreview) {
         // --typst-preview-toolbar-fg-color
         // create page number indicator
         // console.log('create page number indicator', scale);
-        const pageNumberIndicator = document.createElementNS("http://www.w3.org/2000/svg", "text");
-        pageNumberIndicator.setAttribute("class", "typst-preview-svg-page-number");
+        const pageNumberIndicator = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "text"
+        );
+        pageNumberIndicator.setAttribute(
+          "class",
+          "typst-preview-svg-page-number"
+        );
         pageNumberIndicator.setAttribute("x", "0");
         pageNumberIndicator.setAttribute("y", "0");
         const pnPaddedX = calculatedPaddedX + pageWidth / 2;
-        const pnPaddedY = calculatedPaddedY + pageHeight + heightMargin + fontSize / 2;
-        pageNumberIndicator.setAttribute("transform", `translate(${pnPaddedX}, ${pnPaddedY})`);
+        const pnPaddedY =
+          calculatedPaddedY + pageHeight + heightMargin + fontSize / 2;
+        pageNumberIndicator.setAttribute(
+          "transform",
+          `translate(${pnPaddedX}, ${pnPaddedY})`
+        );
         pageNumberIndicator.setAttribute("font-size", fontSize.toString());
         pageNumberIndicator.textContent = `${i + 1}`;
         svg.append(pageNumberIndicator);
 
         pageHeightEnd += fontSize;
-
       } else {
         if (this.cursorPosition && this.cursorPosition[0] === i + 1) {
           const [_, x, y] = this.cursorPosition;
-          const cursor = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+          const cursor = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "circle"
+          );
           cursor.setAttribute("cx", (x * INNER_RECT_UNIT).toString());
           cursor.setAttribute("cy", (y * INNER_RECT_UNIT).toString());
           cursor.setAttribute("r", (5 * scale * INNER_RECT_UNIT).toString());
           cursor.setAttribute("fill", "#86C166CC");
-          cursor.setAttribute("transform", `${translateAttr} ${INNER_RECT_SCALE}`);
+          cursor.setAttribute(
+            "transform",
+            `${translateAttr} ${INNER_RECT_SCALE}`
+          );
           svg.appendChild(cursor);
         }
       }
@@ -631,15 +700,17 @@ class TypstDocumentImpl {
           continue;
         }
         // nextPage.elem.setAttribute('data-mixin-canvas', 'true');
-        if (prev.getAttribute('data-mixin-canvas') !== '1') {
+        if (prev.getAttribute("data-mixin-canvas") !== "1") {
           continue;
         }
 
-        const ch = prev.querySelector('.typst-svg-mixin-canvas');
-        if (ch?.tagName === 'foreignObject') {
+        const ch = prev.querySelector(".typst-svg-mixin-canvas");
+        if (ch?.tagName === "foreignObject") {
           const canvasDiv = ch.firstElementChild as HTMLDivElement;
 
-          const pageNumber = Number.parseInt(canvasDiv.getAttribute('data-page-number')!);
+          const pageNumber = Number.parseInt(
+            canvasDiv.getAttribute("data-page-number")!
+          );
           const pageInfo = n2CMapping.get(pageNumber);
           if (pageInfo) {
             pageInfo.container = canvasDiv as HTMLDivElement;
@@ -649,14 +720,16 @@ class TypstDocumentImpl {
       }
 
       this.ensureCreatedCanvas(pagesInCanvasMode);
-      console.assert(this.canvasRenderCToken === undefined, 'Noo!!: canvasRenderCToken should be undefined');
-      const tok = this.canvasRenderCToken = new TypstCancellationToken();
-      this.updateCanvas(pagesInCanvasMode, tok)
-        .finally(() => {
-          if (tok === this.canvasRenderCToken) {
-            this.canvasRenderCToken = undefined;
-          }
-        });
+      console.assert(
+        this.canvasRenderCToken === undefined,
+        "Noo!!: canvasRenderCToken should be undefined"
+      );
+      const tok = (this.canvasRenderCToken = new TypstCancellationToken());
+      this.updateCanvas(pagesInCanvasMode, tok).finally(() => {
+        if (tok === this.canvasRenderCToken) {
+          this.canvasRenderCToken = undefined;
+        }
+      });
     }
 
     if (this.isContentPreview) {
@@ -670,7 +743,10 @@ class TypstDocumentImpl {
     if (firstPage) {
       const rectHeight = Math.ceil(newHeight).toString();
 
-      const outerRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      const outerRect = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "rect"
+      );
       outerRect.setAttribute("class", "typst-page-outer");
       outerRect.setAttribute("data-page-width", newWidth.toString());
       outerRect.setAttribute("data-page-height", rectHeight);
@@ -702,7 +778,7 @@ class TypstDocumentImpl {
         svg.getAttribute("data-width")! || svg.getAttribute("width")! || "1"
       );
       if (svgWidth < 1e-5) {
-        svgWidth = 1
+        svgWidth = 1;
       }
       return svgWidth;
     }
@@ -710,13 +786,15 @@ class TypstDocumentImpl {
     return this.kModule.docWidth;
   }
 
-
   private statSvgFromDom() {
-    const { width: containerWidth, boundingRect: containerBRect } = this.cachedDOMState;
+    const { width: containerWidth, boundingRect: containerBRect } =
+      this.cachedDOMState;
     // scale derived from svg width and container with.
     // svg.setAttribute("data-width", `${newWidth}`);
 
-    const computedRevScale = containerWidth ? this.docWidth / containerWidth : 1;
+    const computedRevScale = containerWidth
+      ? this.docWidth / containerWidth
+      : 1;
     // respect current scale ratio
     const revScale = computedRevScale / this.currentScaleRatio;
     const left = (window.screenLeft - containerBRect.left) * revScale;
@@ -743,16 +821,18 @@ class TypstDocumentImpl {
 
   private async toggleCanvasViewportChange() {
     // console.log('toggleCanvasViewportChange!!!!!!', this.id, this.isRendering);
-    const pagesInfo: CanvasPage[] = this.kModule.retrievePagesInfo().map((x, index) => {
-      return {
-        tag: 'canvas',
-        index,
-        width: x.width,
-        height: x.height,
-        container: undefined as any as HTMLDivElement,
-        elem: undefined as any as HTMLDivElement,
-      }
-    });
+    const pagesInfo: CanvasPage[] = this.kModule
+      .retrievePagesInfo()
+      .map((x, index) => {
+        return {
+          tag: "canvas",
+          index,
+          width: x.width,
+          height: x.height,
+          container: undefined as any as HTMLDivElement,
+          elem: undefined as any as HTMLDivElement,
+        };
+      });
 
     if (!this.hookedElem.firstElementChild) {
       this.hookedElem.innerHTML = `<div class="typst-doc" data-render-mode="canvas"></div>`;
@@ -760,13 +840,15 @@ class TypstDocumentImpl {
     const docDiv = this.hookedElem.firstElementChild! as HTMLDivElement;
 
     if (this.isMixinOutline && this.outline) {
-      console.log('render with outline', this.outline);
+      console.log("render with outline", this.outline);
       patchOutlineEntry(docDiv as any, pagesInfo, this.outline.items);
       for (const ch of docDiv.children) {
-        if (!ch.classList.contains('typst-page')) {
+        if (!ch.classList.contains("typst-page")) {
           continue;
         }
-        const pageNumber = Number.parseInt(ch.getAttribute('data-page-number')!);
+        const pageNumber = Number.parseInt(
+          ch.getAttribute("data-page-number")!
+        );
         if (pageNumber >= pagesInfo.length) {
           // todo: cache key shifted
           docDiv.removeChild(ch);
@@ -777,10 +859,12 @@ class TypstDocumentImpl {
       }
     } else {
       for (const ch of docDiv.children) {
-        if (!ch.classList.contains('typst-page')) {
+        if (!ch.classList.contains("typst-page")) {
           continue;
         }
-        const pageNumber = Number.parseInt(ch.getAttribute('data-page-number')!);
+        const pageNumber = Number.parseInt(
+          ch.getAttribute("data-page-number")!
+        );
         if (pageNumber >= pagesInfo.length) {
           // todo: cache key shifted
           docDiv.removeChild(ch);
@@ -795,18 +879,18 @@ class TypstDocumentImpl {
       if (page.index === 0) {
         docDiv.prepend(page.container);
       } else {
-        pagesInfo[page.index - 1].container.after(page.container)
+        pagesInfo[page.index - 1].container.after(page.container);
       }
     });
 
     const t2 = performance.now();
 
-    if (docDiv.getAttribute('data-rendering') === 'true') {
-      throw new Error('rendering in progress, possibly a race condition');
+    if (docDiv.getAttribute("data-rendering") === "true") {
+      throw new Error("rendering in progress, possibly a race condition");
     }
-    docDiv.setAttribute('data-rendering', 'true');
+    docDiv.setAttribute("data-rendering", "true");
     await this.updateCanvas(pagesInfo);
-    docDiv.removeAttribute('data-rendering');
+    docDiv.removeAttribute("data-rendering");
     // }));
 
     const t3 = performance.now();
@@ -814,37 +898,52 @@ class TypstDocumentImpl {
     return [t2, t3];
   }
 
-  ensureCreatedCanvas(pages: CanvasPage[], defaultInserter?: (page: CanvasPage) => void) {
+  ensureCreatedCanvas(
+    pages: CanvasPage[],
+    defaultInserter?: (page: CanvasPage) => void
+  ) {
     for (const pageInfo of pages) {
       if (!pageInfo.elem) {
-        pageInfo.elem = document.createElement('div');
-        pageInfo.elem.setAttribute('class', 'typst-page-canvas');
-        pageInfo.elem.style.transformOrigin = '0 0';
+        pageInfo.elem = document.createElement("div");
+        pageInfo.elem.setAttribute("class", "typst-page-canvas");
+        pageInfo.elem.style.transformOrigin = "0 0";
         pageInfo.elem.style.transform = `scale(${1 / this.pixelPerPt})`;
-        pageInfo.elem.setAttribute('data-page-number', pageInfo.index.toString());
+        pageInfo.elem.setAttribute(
+          "data-page-number",
+          pageInfo.index.toString()
+        );
 
-        const canvas = document.createElement('canvas');
+        const canvas = document.createElement("canvas");
         canvas.width = pageInfo.width * this.pixelPerPt;
         canvas.height = pageInfo.height * this.pixelPerPt;
         pageInfo.elem.appendChild(canvas);
 
-        pageInfo.container = document.createElement('div');
+        pageInfo.container = document.createElement("div");
         // todo: reuse by key
-        pageInfo.container.setAttribute(TypstPatchAttrs.Tid, `canvas:` + pageInfo.index);
-        pageInfo.container.setAttribute('class', 'typst-page canvas-mode');
-        pageInfo.container.setAttribute('data-page-number', pageInfo.index.toString());
+        pageInfo.container.setAttribute(
+          TypstPatchAttrs.Tid,
+          `canvas:` + pageInfo.index
+        );
+        pageInfo.container.setAttribute("class", "typst-page canvas-mode");
+        pageInfo.container.setAttribute(
+          "data-page-number",
+          pageInfo.index.toString()
+        );
         pageInfo.container.appendChild(pageInfo.elem);
 
         if (this.isContentPreview) {
-          const pageNumberIndicator = document.createElement('div');
-          pageNumberIndicator.setAttribute('class', 'typst-preview-canvas-page-number');
+          const pageNumberIndicator = document.createElement("div");
+          pageNumberIndicator.setAttribute(
+            "class",
+            "typst-preview-canvas-page-number"
+          );
           pageNumberIndicator.textContent = `${pageInfo.index + 1}`;
           pageInfo.container.appendChild(pageNumberIndicator);
 
-          pageInfo.container.style.cursor = 'pointer';
-          pageInfo.container.style.pointerEvents = 'visible';
-          pageInfo.container.style.overflow = 'hidden';
-          pageInfo.container.addEventListener('click', () => {
+          pageInfo.container.style.cursor = "pointer";
+          pageInfo.container.style.pointerEvents = "visible";
+          pageInfo.container.style.overflow = "hidden";
+          pageInfo.container.addEventListener("click", () => {
             // console.log('click', pageInfo.index);
             window.typstWebsocket.send(`outline-sync,${pageInfo.index + 1}`);
           });
@@ -857,18 +956,21 @@ class TypstDocumentImpl {
         } else if (defaultInserter) {
           defaultInserter(pageInfo);
         } else {
-          throw new Error('pageInfo.inserter is not defined');
+          throw new Error("pageInfo.inserter is not defined");
         }
       }
     }
   }
 
-  private async updateCanvas(pagesInfo: CanvasPage[], tok?: TypstCancellationToken) {
+  private async updateCanvas(
+    pagesInfo: CanvasPage[],
+    tok?: TypstCancellationToken
+  ) {
     const perf = performance.now();
-    console.log('updateCanvas start');
+    console.log("updateCanvas start");
     // todo: priority in window
     // await Promise.all(pagesInfo.map(async (pageInfo) => {
-    this.kModule.backgroundColor = '#ffffff';
+    this.kModule.backgroundColor = "#ffffff";
     this.kModule.pixelPerPt = this.pixelPerPt;
     const timeout = async (ms: number) => {
       return new Promise((resolve) => {
@@ -876,61 +978,62 @@ class TypstDocumentImpl {
           resolve(undefined);
         }, ms);
       });
-    }
+    };
     for (const pageInfo of pagesInfo) {
       if (tok?.isCancelRequested()) {
         await tok.consume();
-        console.log('updateCanvas cancelled', performance.now() - perf);
+        console.log("updateCanvas cancelled", performance.now() - perf);
         return;
       }
 
       const canvas = pageInfo.elem.firstElementChild as HTMLCanvasElement;
       // const tt1 = performance.now();
 
-      const pw = (pageInfo.width);
-      const ph = (pageInfo.height);
+      const pw = pageInfo.width;
+      const ph = pageInfo.height;
       const pws = pageInfo.width.toFixed(3);
       const phs = pageInfo.height.toFixed(3);
 
       let cached = true;
 
-      if (pageInfo.elem.getAttribute('data-page-width') !== pws) {
-        pageInfo.elem.setAttribute('data-page-width', pws);
+      if (pageInfo.elem.getAttribute("data-page-width") !== pws) {
+        pageInfo.elem.setAttribute("data-page-width", pws);
         cached = false;
         canvas.width = pw * this.pixelPerPt;
       }
 
-      if (pageInfo.elem.getAttribute('data-page-height') !== phs) {
-        pageInfo.elem.setAttribute('data-page-height', phs);
+      if (pageInfo.elem.getAttribute("data-page-height") !== phs) {
+        pageInfo.elem.setAttribute("data-page-height", phs);
         cached = false;
         canvas.height = ph * this.pixelPerPt;
       }
 
-      const cacheKey = pageInfo.elem.getAttribute('data-cache-key') || undefined;
+      const cacheKey =
+        pageInfo.elem.getAttribute("data-cache-key") || undefined;
       const result = await this.kModule.renderCanvas({
-        canvas: canvas.getContext('2d')!,
+        canvas: canvas.getContext("2d")!,
         pageOffset: pageInfo.index,
         cacheKey: cached ? cacheKey : undefined,
         dataSelection: {
           body: true,
-        }
+        },
       });
       if (cacheKey !== result.cacheKey) {
-        console.log('updateCanvas one miss', cacheKey, result.cacheKey);
+        console.log("updateCanvas one miss", cacheKey, result.cacheKey);
         // console.log('renderCanvas', pageInfo.index, performance.now() - tt1, result);
         // todo: cache key changed
         // canvas.width = pageInfo.width * this.pixelPerPt;
         // canvas.height = pageInfo.height * this.pixelPerPt;
-        pageInfo.elem.setAttribute('data-page-width', pws);
-        pageInfo.elem.setAttribute('data-page-height', phs);
-        canvas.setAttribute('data-cache-key', result.cacheKey);
-        pageInfo.elem.setAttribute('data-cache-key', result.cacheKey);
+        pageInfo.elem.setAttribute("data-page-width", pws);
+        pageInfo.elem.setAttribute("data-page-height", phs);
+        canvas.setAttribute("data-cache-key", result.cacheKey);
+        pageInfo.elem.setAttribute("data-cache-key", result.cacheKey);
       }
 
       await timeout(0);
     }
 
-    console.log('updateCanvas done', performance.now() - perf);
+    console.log("updateCanvas done", performance.now() - perf);
     await tok?.consume();
   }
 
@@ -946,7 +1049,9 @@ class TypstDocumentImpl {
     }
 
     const t2 = performance.now();
-    patchSvgToContainer(this.hookedElem, patchStr, elem => this.decorateSvgElement(elem, mode));
+    patchSvgToContainer(this.hookedElem, patchStr, (elem) =>
+      this.decorateSvgElement(elem, mode)
+    );
     const t3 = performance.now();
 
     return [t2, t3];
@@ -977,7 +1082,7 @@ class TypstDocumentImpl {
     hi.y = lo.y + page.height;
     hi.x = page.width;
 
-    console.log('render_in_window for slide mode', lo.x, lo.y, hi.x, hi.y);
+    console.log("render_in_window for slide mode", lo.x, lo.y, hi.x, hi.y);
 
     // with a bit padding to avoid edge error
     lo.x += 1e-1;
@@ -999,20 +1104,23 @@ class TypstDocumentImpl {
     let patchStr: string;
     // with 1px padding to avoid edge error
     if (this.partialRendering) {
-
       /// Adjust top and bottom
       const ch = this.hookedElem.firstElementChild?.children;
       let topEstimate = top - 1,
         bottomEstimate = top + height + 1;
       if (ch) {
-        const pages = Array.from(ch).filter(x => x.classList.contains('typst-page'));
+        const pages = Array.from(ch).filter((x) =>
+          x.classList.contains("typst-page")
+        );
         let minTop = 1e33,
           maxBottom = -1e33,
           accumulatedHeight = 0;
         const translateRegex = /translate\(([-0-9.]+), ([-0-9.]+)\)/;
         for (const page of pages) {
-          const pageHeight = Number.parseFloat(page.getAttribute('data-page-height')!);
-          const translate = page.getAttribute('transform')!;
+          const pageHeight = Number.parseFloat(
+            page.getAttribute("data-page-height")!
+          );
+          const translate = page.getAttribute("transform")!;
           const translateMatch = translate.match(translateRegex)!;
           const translateY = Number.parseFloat(translateMatch[2]);
           if (translateY + pageHeight > topEstimate) {
@@ -1039,19 +1147,26 @@ class TypstDocumentImpl {
         topEstimate,
         // hi.x, hi.y
         left + width + 1,
-        bottomEstimate,
+        bottomEstimate
       );
       console.log(
-        'render_in_window with partial rendering enabled window',
+        "render_in_window with partial rendering enabled window",
         revScale,
         left,
         top,
         width,
         height,
-        ', patch scale', patchStr.length,
+        ", patch scale",
+        patchStr.length
       );
     } else {
-      console.log('render_in_window with partial rendering disabled', 0, 0, 1e33, 1e33);
+      console.log(
+        "render_in_window with partial rendering disabled",
+        0,
+        0,
+        1e33,
+        1e33
+      );
       patchStr = this.kModule.render_in_window(0, 0, 1e33, 1e33);
     }
 
@@ -1064,7 +1179,7 @@ class TypstDocumentImpl {
       await ctoken.cancel();
       await ctoken.wait();
       this.canvasRenderCToken = undefined;
-      console.log('cancel canvas rendering');
+      console.log("cancel canvas rendering");
     }
     let t0 = performance.now();
     let t1 = undefined;
@@ -1172,7 +1287,7 @@ class TypstDocumentImpl {
 
     // todo: abstract this
     if (this.previewMode === PreviewMode.Slide) {
-      document.querySelectorAll('.typst-page-number-indicator').forEach(x => {
+      document.querySelectorAll(".typst-page-number-indicator").forEach((x) => {
         x.textContent = `${this.kModule.retrievePagesInfo().length}`;
       });
     }
@@ -1206,24 +1321,27 @@ class TypstDocumentImpl {
   }
 
   dispose() {
-    if (this.hookedElem) {
-      removeSourceMappingHandler(this.hookedElem);
-    }
-    this.disposeList.forEach(x => x());
+    const disposeList = this.disposeList;
+    this.disposeList = [];
+    disposeList.forEach((x) => x());
   }
 }
 
 interface Options {
-  renderMode?: RenderMode,
-  previewMode?: PreviewMode,
-  isContentPreview?: boolean,
-  retrieveDOMState?: () => ContainerDOMState,
+  renderMode?: RenderMode;
+  previewMode?: PreviewMode;
+  isContentPreview?: boolean;
+  retrieveDOMState?: () => ContainerDOMState;
 }
 
 export class TypstDocument {
   private impl: TypstDocumentImpl;
 
-  constructor(hookedElem: HTMLElement, public kModule: RenderSession, options?: Options) {
+  constructor(
+    hookedElem: HTMLElement,
+    public kModule: RenderSession,
+    options?: Options
+  ) {
     this.impl = new TypstDocumentImpl(hookedElem, kModule, options);
   }
 

@@ -1,8 +1,8 @@
-import { PreviewMode, TypstDocument } from "./typst-doc";
+import { PreviewMode, TypstDocument } from "typst-dom/typst-doc.mjs";
 import {
     rendererBuildInfo,
     createTypstRenderer,
-} from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs"; 0
+} from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 import renderModule from "@myriaddreamin/typst-ts-renderer/pkg/typst_ts_renderer_bg.wasm?url";
 // @ts-ignore
 // import { RenderSession as RenderSession2 } from "@myriaddreamin/typst-ts-renderer/pkg/wasm-pack-shim.mjs";
