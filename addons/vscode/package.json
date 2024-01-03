@@ -226,7 +226,7 @@
     "test": "node ./out/test/runTest.js"
   },
   "devDependencies": {
-    "typst-preview-frontend": "../frontend",
+    "typst-preview-frontend": "file:../frontend",
     "@types/cross-spawn": "^6.0.2",
     "@types/glob": "^8.1.0",
     "@types/mocha": "^10.0.1",
