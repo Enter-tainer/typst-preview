@@ -61,6 +61,8 @@ class TypstDocumentImpl {
   isMixinOutline: boolean = false;
   /// background color
   backgroundColor: string;
+  /// default page color (empty string means transparent)
+  pageColor: string = "white";
   /// pixel per pt
   pixelPerPt: number = 3;
   /// customized way to retrieving dom state
@@ -164,7 +166,10 @@ class TypstDocumentImpl {
       this.hookedElem.parentElement?.classList.add("hide-scrollbar-y");
     }
 
-    if (this.renderMode === RenderMode.Svg) {
+    if (
+      this.renderMode === RenderMode.Svg &&
+      options?.sourceMapping !== false
+    ) {
       installEditorJumpToHandler(this.kModule, this.hookedElem);
       this.disposeList.push(() => {
         if (this.hookedElem) {
@@ -624,8 +629,9 @@ class TypstDocumentImpl {
         "transform",
         `${translateAttr} ${INNER_RECT_SCALE}`
       );
-      // white background
-      innerRect.setAttribute("fill", "white");
+      if (this.pageColor) {
+        innerRect.setAttribute("fill", this.pageColor);
+      }
       // It is quite ugly
       // innerRect.setAttribute("stroke", "black");
       // innerRect.setAttribute("stroke-width", (2 * INNER_RECT_UNIT * scale).toString());
@@ -1331,6 +1337,7 @@ interface Options {
   renderMode?: RenderMode;
   previewMode?: PreviewMode;
   isContentPreview?: boolean;
+  sourceMapping?: boolean;
   retrieveDOMState?: () => ContainerDOMState;
 }
 
@@ -1359,6 +1366,11 @@ export class TypstDocument {
 
   addViewportChange() {
     this.impl.addViewportChange();
+  }
+
+  setPageColor(color: string) {
+    this.impl.pageColor = color;
+    this.addViewportChange();
   }
 
   setPartialRendering(partialRendering: boolean) {
