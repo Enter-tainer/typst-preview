@@ -1,4 +1,5 @@
-import { PreviewMode, TypstDocument } from "typst-dom/typst-doc.mjs";
+import { PreviewMode } from "typst-dom/typst-doc.mjs";
+import { TypstPreviewDocument as TypstDocument } from "typst-dom/index.preview.mjs";
 import {
     rendererBuildInfo,
     createTypstRenderer,
@@ -38,14 +39,16 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
     let $ws: WebSocketSubject<ArrayBuffer> | undefined = undefined;
     const subsribes: Subscription[] = [];
 
-    function createSvgDocument(wasmDocRef: RenderSession) {
+    function createSvgDocument(kModule: RenderSession) {
         const hookedElem = document.getElementById("typst-app")!;
         if (hookedElem.firstElementChild?.tagName !== "svg") {
             hookedElem.innerHTML = "";
         }
         const resizeTarget = document.getElementById('typst-container-main')!;
 
-        const svgDoc = new TypstDocument(hookedElem!, wasmDocRef, {
+        const svgDoc = new TypstDocument({
+            hookedElem,
+            kModule,
             previewMode,
             isContentPreview,
             // set rescale target to `body`

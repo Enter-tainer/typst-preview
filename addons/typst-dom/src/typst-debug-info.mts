@@ -1,4 +1,5 @@
 import { triggerRipple } from "./typst-animation.mjs";
+import type { GConstructor, TypstDocumentContext } from "./typst-doc.mjs";
 
 const enum SourceMappingType {
   Text = 0,
@@ -78,8 +79,6 @@ function findIndexOfChild(elem: Element, child: Element) {
 }
 
 export function installEditorJumpToHandler(svgDoc: any, docRoot: HTMLElement) {
-  void castChildrenToSourceMappingElement;
-
   const findSourceLocation = (elem: Element) => {
     const visitChain: [SourceMappingType, Element][] = [];
     while (elem) {
@@ -162,4 +161,24 @@ export function installEditorJumpToHandler(svgDoc: any, docRoot: HTMLElement) {
   });
 
   docRoot.addEventListener("click", sourceMappingHandler);
+}
+
+export interface TypstDebugJumpDocument {}
+
+export function provideDebugJumpDoc<
+  TBase extends GConstructor<TypstDocumentContext>
+>(Base: TBase): TBase & GConstructor<TypstDebugJumpDocument> {
+  return class DebugJumpDocument extends Base {
+    constructor(...args: any[]) {
+      super(...args);
+      if (this.opts.sourceMapping !== false) {
+        installEditorJumpToHandler(this.kModule, this.hookedElem);
+        this.disposeList.push(() => {
+          if (this.hookedElem) {
+            removeSourceMappingHandler(this.hookedElem);
+          }
+        });
+      }
+    }
+  };
 }
