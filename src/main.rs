@@ -12,13 +12,13 @@ use hyper::{
 
 use typst_preview::{preview, CliArguments, PreviewMode, Previewer};
 
-pub async fn make_static_host(
+pub fn make_static_host(
     previewer: &Previewer,
     static_file_addr: String,
     mode: PreviewMode,
-) -> SocketAddr {
+) -> (SocketAddr, tokio::task::JoinHandle<()>) {
     let frontend_html = previewer.frontend_html(mode);
-    let make_service = make_service_fn(|_| {
+    let make_service = make_service_fn(move |_| {
         let html = frontend_html.clone();
         async move {
             Ok::<_, hyper::http::Error>(service_fn(move |req| {
@@ -45,11 +45,12 @@ pub async fn make_static_host(
     let server = hyper::Server::bind(&static_file_addr.parse().unwrap()).serve(make_service);
 
     let addr = server.local_addr();
-    if let Err(e) = server.await {
-        error!("Static file server error: {}", e);
-    }
-
-    addr
+    let join_handle = tokio::spawn(async move {
+        if let Err(e) = server.await {
+            error!("Static file server error: {}", e);
+        }
+    });
+    (addr, join_handle)
 }
 
 /// Entry point.
@@ -109,17 +110,15 @@ async fn main() {
 
     let static_file_addr = arguments.static_file_host;
     let mode = arguments.preview_mode;
-    if !static_file_addr.is_empty() {
-        let addr = make_static_host(&previewer, static_file_addr, mode).await;
-        info!("Static file server listening on: {}", addr);
-        if !arguments.dont_open_in_browser {
-            if let Err(e) = open::that_detached(format!("http://{}", addr)) {
-                error!("failed to open browser: {}", e);
-            };
-        }
+    let (static_server_addr, static_server_handle) =
+        make_static_host(&previewer, static_file_addr, mode);
+    info!("Static file server listening on: {}", static_server_addr);
+    if !arguments.dont_open_in_browser {
+        if let Err(e) = open::that_detached(format!("http://{}", static_server_addr)) {
+            error!("failed to open browser: {}", e);
+        };
     }
-
-    previewer.join().await;
+    let _ = tokio::join!(previewer.join(), static_server_handle);
 }
 
 use std::{borrow::Cow, net::SocketAddr};
