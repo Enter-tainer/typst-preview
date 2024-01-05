@@ -3373,7 +3373,7 @@ dependencies = [
 
 [[package]]
 name = "typst-preview"
-version = "0.10.3"
+version = "0.10.4"
 dependencies = [
  "anyhow",
  "chrono",

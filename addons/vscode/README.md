@@ -266,3 +266,11 @@ Add preview button
 
 - Features:
   - We now automatically declare the previewing file as entrypoint when `typst-preview.pinPreviewFile` is set to `true`. This is like the eye icon in webapp. This should improve diagnostic messages for typst lsp. You can enable this by setting `typst-preview.pinPreviewFile` to `true`.
+
+### v0.10.4
+
+- Bug fixes:
+  - Fix open in browser. It's broken in v0.10.3.
+
+- Features:
+  - Improve incremental rendering performance.
