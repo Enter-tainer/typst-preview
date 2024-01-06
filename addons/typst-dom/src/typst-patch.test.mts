@@ -15,7 +15,7 @@ interface Attributes {
 class MockElement {
   tagName = "g";
 
-  constructor(public attrs: Attributes) {}
+  constructor(public attrs: Attributes) { }
 
   getAttribute(s: string): string | null {
     return this.attrs[s] ?? null;
