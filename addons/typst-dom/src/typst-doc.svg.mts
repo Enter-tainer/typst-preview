@@ -491,13 +491,15 @@ export function provideSvgDoc<
           "Noo!!: canvasRenderCToken should be undefined"
         );
         const tok = (this.canvasRenderCToken = new TypstCancellationToken());
-        this.updateCanvas(pagesInCanvasMode, {
-          cancel: tok,
-        }).finally(() => {
-          if (tok === this.canvasRenderCToken) {
-            this.canvasRenderCToken = undefined;
-          }
-        });
+        setTimeout(() => {
+          this.updateCanvas(pagesInCanvasMode, {
+            cancel: tok,
+          }).finally(() => {
+            if (tok === this.canvasRenderCToken) {
+              this.canvasRenderCToken = undefined;
+            }
+          });
+        }, 100);
       }
 
       if (this.isContentPreview) {
