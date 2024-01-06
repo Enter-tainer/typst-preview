@@ -315,17 +315,7 @@ export class TypstDocumentContext<O = any> {
     return this.currentRealScale * this.currentScaleRatio;
   }
 
-  private async processQueue(svgUpdateEvent: [string, string]) {
-    const ctoken = this.canvasRenderCToken;
-    if (ctoken) {
-      await ctoken.cancel();
-      await ctoken.wait();
-      this.canvasRenderCToken = undefined;
-      console.log("cancel canvas rendering");
-    }
-    let t0 = performance.now();
-    let t1 = undefined;
-    let t2 = undefined;
+  private processQueue(svgUpdateEvent: [string, string]): boolean {
     const eventName = svgUpdateEvent[0];
     switch (eventName) {
       case "new":
@@ -338,37 +328,20 @@ export class TypstDocumentContext<O = any> {
           data: svgUpdateEvent[1] as unknown as Uint8Array,
         });
 
-        // todo: trigger viewport change once
-        t1 = performance.now();
-        await this.r.rerender();
-        t2 = performance.now();
         this.moduleInitialized = true;
-        break;
+        return true;
       }
       case "viewport-change": {
         if (!this.moduleInitialized) {
           console.log("viewport-change before initialization");
-          t0 = t1 = t2 = performance.now();
-          break;
+          return false;
         }
-        t1 = performance.now();
-        await this.r.rerender();
-        t2 = performance.now();
-        break;
+        return true;
       }
       default:
         console.log("svgUpdateEvent", svgUpdateEvent);
-        t0 = t1 = t2 = performance.now();
-        break;
+        return false;
     }
-
-    /// perf event
-    const d = (e: string, x: number, y: number) =>
-      `${e} ${(y - x).toFixed(2)} ms`;
-    this.sampledRenderTime = t2 - t0;
-    console.log(
-      [d("parse", t0, t1), d("rerender", t1, t2), d("total", t0, t2)].join(", ")
-    );
   }
 
   private triggerUpdate() {
@@ -385,12 +358,40 @@ export class TypstDocumentContext<O = any> {
         this.postprocessChanges();
         return;
       }
+
       try {
+        let t0 = performance.now();
+
+        const ctoken = this.canvasRenderCToken;
+        if (ctoken) {
+          await ctoken.cancel();
+          await ctoken.wait();
+          this.canvasRenderCToken = undefined;
+          console.log("cancel canvas rendering");
+        }
+
+        let needRerender = false;
         // console.log('patchQueue', JSON.stringify(this.patchQueue.map(x => x[0])));
         while (this.patchQueue.length > 0) {
-          await this.processQueue(this.patchQueue.shift()!);
+          needRerender = this.processQueue(this.patchQueue.shift()!) || needRerender;
+        }
+
+        // todo: trigger viewport change once
+        let t1 = performance.now();
+        if (needRerender) {
+          this.r.rescale();
+          await this.r.rerender();
           this.r.rescale();
         }
+        let t2 = performance.now();
+
+        /// perf event
+        const d = (e: string, x: number, y: number) =>
+          `${e} ${(y - x).toFixed(2)} ms`;
+        this.sampledRenderTime = t2 - t0;
+        console.log(
+          [d("parse", t0, t1), d("rerender", t1, t2), d("total", t0, t2)].join(", ")
+        );
 
         requestAnimationFrame(doUpdate);
       } catch (e) {
