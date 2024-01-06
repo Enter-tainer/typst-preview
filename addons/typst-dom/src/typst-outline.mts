@@ -43,7 +43,7 @@ class GenElem {
     public tag: string,
     public container: HTMLElement,
     public additions?: Record<string, any>
-  ) {}
+  ) { }
 
   push(child: GenNode) {
     this.children.push(child);

@@ -31,7 +31,7 @@ export function isDummyPatchElem(elem: Element) {
 }
 
 /// Compare two elements by their data-tid attribute.
-export function equalPatchElem(prev: Element, next: Element) {
+export function equalPatchElem(prev: ElementChildren, next: ElementChildren) {
   const prevDataTid = prev.getAttribute(TypstPatchAttrs.Tid);
   const nextDataTid = next.getAttribute(TypstPatchAttrs.Tid);
   /// Whenever we see a bad equality, we don't reuse it.
@@ -142,6 +142,7 @@ export function interpretTargetView<T extends ElementChildren, U extends T = T>(
     if (prevIdx === undefined) {
       /// clean one is reused directly
       if (nextDataTid === reuseTargetTid && isPatchingSvg) {
+        console.log("reuse directly", nextChild);
         const clonedNode = rsrc[0].cloneNode(true) as U;
         toPatch.push([clonedNode, nextChild]);
         targetView.push(["append", clonedNode]);
@@ -365,7 +366,7 @@ export function patchAttributes(prev: Element, next: Element) {
   }
   // console.log("different attributes, replace");
 
-  const removedAttrs = [];
+  const removedAttrs: string[] = [];
 
   for (let i = 0; i < prevAttrs.length; i++) {
     removedAttrs.push(prevAttrs[i].name);

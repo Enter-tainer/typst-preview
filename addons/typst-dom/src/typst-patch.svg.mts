@@ -31,7 +31,7 @@ function patchChildren(prev: Element, next: Element) {
     prev.children as unknown as SVGGElement[],
     next.children as unknown as SVGGElement[],
     true,
-    isGElem
+    isGElem,
   );
 
   for (let [prevChild, nextChild] of toPatch) {
@@ -80,7 +80,7 @@ function preReplaceNonSVGElements(
   prev: Element,
   next: Element
 ): FrozenReplacement {
-  const removedIndecies = [];
+  const removedIndices: number[] = [];
   const frozenReplacement: FrozenReplacement = {
     inserts: [],
     //     debug: `preReplaceNonSVGElements ${since}
@@ -90,11 +90,11 @@ function preReplaceNonSVGElements(
   for (let i = 0; i < prev.children.length; i++) {
     const prevChild = prev.children[i];
     if (!isGElem(prevChild)) {
-      removedIndecies.push(i);
+      removedIndices.push(i);
     }
   }
 
-  for (const index of removedIndecies.reverse()) {
+  for (const index of removedIndices.reverse()) {
     prev.children[index].remove();
   }
 
@@ -118,11 +118,9 @@ function postReplaceNonSVGElements(prev: Element, frozen: FrozenReplacement) {
   /// Retrive the `<g>` elements from the `prev` element.
   const gElements = Array.from(prev.children).filter(isGElem);
   if (gElements.length + 1 !== frozen.inserts.length) {
-    throw new Error(`invalid frozen replacement: gElements.length (${
-      gElements.length
-    }) + 1 !=== frozen.inserts.length (${frozen.inserts.length}) ${
-      frozen.debug || ""
-    }
+    throw new Error(`invalid frozen replacement: gElements.length (${gElements.length
+      }) + 1 !=== frozen.inserts.length (${frozen.inserts.length}) ${frozen.debug || ""
+      }
   current: ${prev.outerHTML}`);
   }
 
