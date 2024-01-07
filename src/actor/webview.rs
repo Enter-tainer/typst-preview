@@ -123,6 +123,14 @@ impl WebviewActor {
                         let pos = DocumentPosition { page_no, x, y };
 
                         self.broadcast_sender.send(WebviewActorRequest::ViewportPosition(pos)).unwrap();
+                    } else if msg.starts_with("srcpath") {
+                        let path = msg.split(' ').nth(1).unwrap();
+                        let path = serde_json::from_str(
+                            path
+                        );
+                        if let Ok(path) = path {
+                            self.render_sender.send(RenderActorRequest::ResolveSpan(path)).unwrap();
+                        };
                     } else {
                         info!("WebviewActor: received unknown message from websocket: {}", msg);
                         self.webview_websocket_conn.send(Message::Text(format!("error, received unknown message: {}", msg))).await.unwrap();

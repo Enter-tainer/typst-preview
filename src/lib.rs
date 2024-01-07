@@ -105,7 +105,7 @@ pub trait CompileHost {
         Ok(None)
     }
 
-    fn resolve_doc_to_src_jump(&mut self, _span_id: Span) -> ZResult<Option<DocToSrcJumpInfo>> {
+    fn resolve_span(&mut self, _span_id: Span) -> ZResult<Option<DocToSrcJumpInfo>> {
         Ok(None)
     }
 }
@@ -166,13 +166,14 @@ pub async fn preview(arguments: PreviewArgs, compiler_driver: CompileDriver) -> 
                     svg.1,
                     webview_tx,
                     webview_rx,
-                    typst_tx,
+                    typst_tx.clone(),
                     renderer_mailbox.0.clone(),
                 );
                 tokio::spawn(webview_actor.run());
                 let render_actor = actor::render::RenderActor::new(
                     renderer_mailbox.0.subscribe(),
                     doc_watch_rx.clone(),
+                    typst_tx,
                     svg.0,
                 );
                 render_actor.spawn();
