@@ -1,23 +1,31 @@
-import { OriginViewInstruction, TypstPatchAttrs, changeViewPerspective, equalPatchElem, interpretTargetView, patchAttributes } from "./typst-patch";
+import type { GConstructor, TypstDocumentContext } from "./typst-doc.mjs";
+import {
+  OriginViewInstruction,
+  TypstPatchAttrs,
+  changeViewPerspective,
+  equalPatchElem,
+  interpretTargetView,
+  patchAttributes,
+} from "./typst-patch.mjs";
 
 interface CursorPosition {
   // eslint-disable-next-line @typescript-eslint/naming-convention
-  page_no: number,
-  x: number,
-  y: number,
+  page_no: number;
+  x: number;
+  y: number;
 }
 
 export interface OutlineItemData {
-  span?: string,
-  title: string,
-  position?: CursorPosition,
-  children: OutlineItemData[],
+  span?: string;
+  title: string;
+  position?: CursorPosition;
+  children: OutlineItemData[];
 }
 
 type GenNode = CanvasPage | GenElem;
 
 export interface CanvasPage {
-  tag: 'canvas',
+  tag: "canvas";
   index: number;
   width: number;
   height: number;
@@ -25,13 +33,17 @@ export interface CanvasPage {
   elem: HTMLElement;
 
   // extra properties for patching
-  inserter?: (t: CanvasPage) => void,
-  stub?: HTMLElement,
+  inserter?: (t: CanvasPage) => void;
+  stub?: HTMLElement;
 }
 
 class GenElem {
   children: GenNode[] = [];
-  constructor(public tag: string, public container: HTMLElement, public additions?: Record<string, any>) { }
+  constructor(
+    public tag: string,
+    public container: HTMLElement,
+    public additions?: Record<string, any>
+  ) {}
 
   push(child: GenNode) {
     this.children.push(child);
@@ -39,10 +51,10 @@ class GenElem {
   }
 
   pushCanvas(pg: CanvasPage) {
-    const stub = document.createElement('div');
+    const stub = document.createElement("div");
     stub.setAttribute(TypstPatchAttrs.Tid, `canvas:` + pg.index);
     // stubCanvas.setAttribute(TypstPatchAttrs.ReuseFrom, `canvas:` + pg.index);
-    stub.setAttribute('data-page-number', pg.index.toString());
+    stub.setAttribute("data-page-number", pg.index.toString());
     pg.stub = stub;
 
     this.children.push(pg);
@@ -53,12 +65,12 @@ class GenElem {
 function tagPatchId(elem: HTMLElement, tid: string) {
   elem.setAttribute(TypstPatchAttrs.Tid, tid);
   elem.setAttribute(TypstPatchAttrs.ReuseFrom, tid);
-  elem.setAttribute(TypstPatchAttrs.BadEquality, '1');
+  elem.setAttribute(TypstPatchAttrs.BadEquality, "1");
 }
 
 function poisionCanvasMoved(t: CanvasPage) {
-  console.error('never called moved canvas', t);
-  throw new Error('never called moved canvas');
+  console.error("never called moved canvas", t);
+  throw new Error("never called moved canvas");
 }
 
 function replaceStubToRealCanvas(t: CanvasPage) {
@@ -75,7 +87,7 @@ class GenContext {
   allElemList: GenElem[] = [];
 
   constructor(public pages: CanvasPage[]) {
-    this.insertionPoint = new GenElem('outline', document.createElement('div'));
+    this.insertionPoint = new GenElem("outline", document.createElement("div"));
     this.parent = this.insertionPoint;
   }
 
@@ -94,11 +106,11 @@ class GenContext {
 
     const id = `span:${item.span},title:${item.title}`;
 
-    const outlineDiv = document.createElement('div');
-    outlineDiv.classList.add('typst-outline');
-    outlineDiv.setAttribute('data-title', item.title);
-    tagPatchId(outlineDiv, 'outline:' + id);
-    const outlineNode = new GenElem('outline', outlineDiv, {});
+    const outlineDiv = document.createElement("div");
+    outlineDiv.classList.add("typst-outline");
+    outlineDiv.setAttribute("data-title", item.title);
+    tagPatchId(outlineDiv, "outline:" + id);
+    const outlineNode = new GenElem("outline", outlineDiv, {});
 
     let pos = item.position?.page_no || 0;
 
@@ -106,15 +118,15 @@ class GenContext {
     this.spliceCanvas(this.insertionPoint, pos);
 
     // create title at the beginning of this node
-    const titleDiv = document.createElement('div');
-    titleDiv.classList.add('typst-outline-title', 'level-' + level);
-    const destSpan = document.createElement('span');
-    destSpan.textContent = '↬';
-    const titleContentSpan = document.createElement('span');
+    const titleDiv = document.createElement("div");
+    titleDiv.classList.add("typst-outline-title", "level-" + level);
+    const destSpan = document.createElement("span");
+    destSpan.textContent = "↬";
+    const titleContentSpan = document.createElement("span");
     titleContentSpan.textContent = item.title;
-    titleDiv.append(destSpan, ' ', titleContentSpan);
+    titleDiv.append(destSpan, " ", titleContentSpan);
     tagPatchId(titleDiv, id);
-    const title = new GenElem('outline-title', titleDiv, {
+    const title = new GenElem("outline-title", titleDiv, {
       content: titleContentSpan,
     });
     outlineNode.push(title);
@@ -139,10 +151,10 @@ class GenContext {
     this.parent = parent;
 
     if (item.span) {
-      destSpan.style.textDecoration = 'underline';
-      destSpan.style.cursor = 'pointer';
+      destSpan.style.textDecoration = "underline";
+      destSpan.style.cursor = "pointer";
 
-      destSpan.addEventListener('click', () => {
+      destSpan.addEventListener("click", () => {
         window.typstWebsocket.send(`srclocation ${item.span}`);
       });
     } else {
@@ -155,7 +167,11 @@ class GenContext {
 
 /// Receiving a sequence of canvas pages, and a sequence of outline items
 /// Produce or patch the outline element to the `prev` container.
-export function patchOutlineEntry(prev: HTMLDivElement, pages: CanvasPage[], items: OutlineItemData[]) {
+export function patchOutlineEntry(
+  prev: HTMLDivElement,
+  pages: CanvasPage[],
+  items: OutlineItemData[]
+) {
   const ctx = new GenContext(pages);
   // the root element of the generated outline
   const next = ctx.insertionPoint;
@@ -167,21 +183,21 @@ export function patchOutlineEntry(prev: HTMLDivElement, pages: CanvasPage[], ite
   // populate canvas stubs after the last node
   ctx.spliceCanvas(ctx.lastVisit || next, pages.length + 1);
 
-
   // post process outline
-  const dataTags = ['outline', 'canvas'];
+  const dataTags = ["outline", "canvas"];
   const isDataNode = (x: GenNode) => dataTags.includes(x.tag);
   for (const elem of ctx.allElemList) {
     // apply clickable behavior to node containing children
     if (elem.children.some(isDataNode)) {
-      const titleContentSpan = elem.additions!.title!.additions!.content as HTMLSpanElement;
+      const titleContentSpan = elem.additions!.title!.additions!
+        .content as HTMLSpanElement;
 
-      titleContentSpan.style.textDecoration = 'underline';
-      titleContentSpan.style.cursor = 'pointer';
+      titleContentSpan.style.textDecoration = "underline";
+      titleContentSpan.style.cursor = "pointer";
 
       const c = elem.container;
-      titleContentSpan.addEventListener('click', () => {
-        c.classList.toggle('collapsed');
+      titleContentSpan.addEventListener("click", () => {
+        c.classList.toggle("collapsed");
       });
     }
   }
@@ -196,7 +212,7 @@ export function patchOutlineEntry(prev: HTMLDivElement, pages: CanvasPage[], ite
   }
 
   for (const page of pages) {
-    // all of stubs is already inserted to the dom, so we just 
+    // all of stubs is already inserted to the dom, so we just
     page.inserter ||= replaceStubToRealCanvas;
   }
 }
@@ -204,19 +220,25 @@ export function patchOutlineEntry(prev: HTMLDivElement, pages: CanvasPage[], ite
 /// Replace the `prev` element with `next` element.
 /// Return true if the `prev` element is reused.
 /// Return false if the `prev` element is replaced.
-function reuseOrPatchOutlineElem(ctx: GenContext, prev: Element, next: Element) {
+function reuseOrPatchOutlineElem(
+  ctx: GenContext,
+  prev: Element,
+  next: Element
+) {
   const canReuse = equalPatchElem(prev, next);
 
   /// Even if the element is reused, we still need to replace its attributes.
   next.removeAttribute(TypstPatchAttrs.ReuseFrom);
-  const isPageElem = prev.classList.contains('typst-page');
+  const isPageElem = prev.classList.contains("typst-page");
   if (!isPageElem) {
     patchAttributes(prev, next);
   }
 
   if (canReuse) {
     if (isPageElem) {
-      const pageNumber = Number.parseInt(next.getAttribute('data-page-number')!);
+      const pageNumber = Number.parseInt(
+        next.getAttribute("data-page-number")!
+      );
       // console.log('reuse canvas', ctx.pages[pageNumber], prev, next);
       const page = ctx.pages[pageNumber];
       page.inserter = poisionCanvasMoved;
@@ -241,7 +263,7 @@ function patchOutlineChildren(ctx: GenContext, prev: Element, next: Element) {
     prev.children as unknown as Element[],
     next.children as unknown as Element[],
     // todo: accurate calcuation
-    false,
+    false
   );
 
   // console.log("interpreted origin view", targetView, toPatch);
@@ -254,14 +276,16 @@ function patchOutlineChildren(ctx: GenContext, prev: Element, next: Element) {
 
   const originView = changeViewPerspective(
     prev.children as unknown as Element[],
-    targetView,
+    targetView
   );
 
   runOriginViewInstructionsOnOutline(ctx, prev, originView);
 }
 
 function runOriginViewInstructionsOnOutline(
-  ctx: GenContext, prev: Element, originView: OriginViewInstruction<Node>[]
+  ctx: GenContext,
+  prev: Element,
+  originView: OriginViewInstruction<Node>[]
 ) {
   // console.log("interpreted origin view", originView);
   for (const [op, off, fr] of originView) {
@@ -274,8 +298,10 @@ function runOriginViewInstructionsOnOutline(
         prev.insertBefore(prev.children[fr], elem);
         break;
       case "remove":
-        if (elem?.classList?.contains('typst-page')) {
-          const pageNumber = Number.parseInt(elem.getAttribute('data-page-number')!);
+        if (elem?.classList?.contains("typst-page")) {
+          const pageNumber = Number.parseInt(
+            elem.getAttribute("data-page-number")!
+          );
           if (pageNumber < ctx.pages.length) {
             const page = ctx.pages[pageNumber];
             // console.log('recover canvas', page, pageNumber);
@@ -291,4 +317,26 @@ function runOriginViewInstructionsOnOutline(
         throw new Error("unknown op " + op);
     }
   }
+}
+
+export interface TypstOutlineDocument {
+  patchOutlineEntry(
+    prev: HTMLDivElement,
+    pages: CanvasPage[],
+    items: OutlineItemData[]
+  ): void;
+}
+
+export function provideOutlineDoc<
+  TBase extends GConstructor<TypstDocumentContext>
+>(Base: TBase): TBase & GConstructor<TypstOutlineDocument> {
+  return class DebugJumpDocument extends Base {
+    patchOutlineEntry(
+      prev: HTMLDivElement,
+      pages: CanvasPage[],
+      items: OutlineItemData[]
+    ) {
+      patchOutlineEntry(prev, pages, items);
+    }
+  };
 }
