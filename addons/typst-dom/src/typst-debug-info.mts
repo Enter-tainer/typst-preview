@@ -25,13 +25,13 @@ const CssClassToType = [
 
 function castToSourceMappingElement(
   elem: Element
-): [SourceMappingType, Element] | undefined {
+): [SourceMappingType, Element, string] | undefined {
   if (elem.classList.length === 0) {
     return undefined;
   }
   for (const [cls, ty] of CssClassToType) {
     if (elem.classList.contains(cls)) {
-      return [ty, elem];
+      return [ty, elem, ""];
     }
   }
   return undefined;
@@ -39,7 +39,7 @@ function castToSourceMappingElement(
 
 function castToNestSourceMappingElement(
   elem: Element
-): [SourceMappingType, Element] | undefined {
+): [SourceMappingType, Element, string] | undefined {
   while (elem) {
     const result = castToSourceMappingElement(elem);
     if (result) {
@@ -57,10 +57,10 @@ function castToNestSourceMappingElement(
 
 function castChildrenToSourceMappingElement(
   elem: Element
-): [SourceMappingType, Element][] {
+): [SourceMappingType, Element, string][] {
   return Array.from(elem.children)
     .map(castToNestSourceMappingElement)
-    .filter((x) => x) as [SourceMappingType, Element][];
+    .filter((x) => x) as [SourceMappingType, Element, string][];
 }
 
 export function removeSourceMappingHandler(docRoot: HTMLElement) {
@@ -74,13 +74,13 @@ export function removeSourceMappingHandler(docRoot: HTMLElement) {
 
 function findIndexOfChild(elem: Element, child: Element) {
   const children = castChildrenToSourceMappingElement(elem);
-  console.log(elem, "::", children, "=>", child);
+  // console.log(elem, "::", children, "=>", child);
   return children.findIndex((x) => x[1] === child);
 }
 
 export function installEditorJumpToHandler(svgDoc: any, docRoot: HTMLElement) {
-  const findSourceLocation = (elem: Element) => {
-    const visitChain: [SourceMappingType, Element][] = [];
+  const findSourceLocation = async (elem: Element) => {
+    const visitChain: [SourceMappingType, Element, string][] = [];
     while (elem) {
       let srcElem = castToSourceMappingElement(elem);
       if (srcElem) {
@@ -119,23 +119,29 @@ export function installEditorJumpToHandler(svgDoc: any, docRoot: HTMLElement) {
     }
     (visitChain[0][1] as any) = childIdx;
 
-    const sourceNodePath = visitChain.flat();
+    const sourceNodePath = visitChain;
 
     // The page always shadowed by group, so we remove it.
     // todo: where should I remove group under page? Putting here is a bit magical.
-    sourceNodePath.splice(2, 2);
-    console.log(sourceNodePath);
+    // sourceNodePath.splice(2, 2);
 
-    return svgDoc.get_source_loc(sourceNodePath);
+    console.log("source location", sourceNodePath);
+
+    void (svgDoc);
+    // svgDoc.get_source_loc(sourceNodePath);
+    window.typstWebsocket.send(`srcpath ${JSON.stringify(sourceNodePath)}`);
+    // todo: response from server;
+
+    return undefined;
   };
 
   removeSourceMappingHandler(docRoot);
-  const sourceMappingHandler = ((docRoot as any).sourceMappingHandler = (
+  const sourceMappingHandler = ((docRoot as any).sourceMappingHandler = async (
     event: MouseEvent
   ) => {
     let elem = event.target! as Element;
 
-    const sourceLoc = findSourceLocation(elem);
+    const sourceLoc = await findSourceLocation(elem);
     if (!sourceLoc) {
       return;
     }
@@ -163,7 +169,7 @@ export function installEditorJumpToHandler(svgDoc: any, docRoot: HTMLElement) {
   docRoot.addEventListener("click", sourceMappingHandler);
 }
 
-export interface TypstDebugJumpDocument {}
+export interface TypstDebugJumpDocument { }
 
 export function provideDebugJumpDoc<
   TBase extends GConstructor<TypstDocumentContext>

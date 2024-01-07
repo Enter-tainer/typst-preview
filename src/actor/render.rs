@@ -1,16 +1,21 @@
 use std::sync::Arc;
 
 use log::{debug, info, trace};
+use serde::Deserialize;
 use tokio::sync::{broadcast, mpsc, watch};
 use typst::model::Document;
 use typst_ts_svg_exporter::IncrSvgDocServer;
 
-use super::editor::EditorActorRequest;
+use super::{editor::EditorActorRequest, typst::TypstActorRequest};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Deserialize)]
+pub struct ResolveSpanRequest(Vec<(u32, u32, String)>);
+
+#[derive(Debug, Clone)]
 pub enum RenderActorRequest {
     RenderFullLatest,
     RenderIncremental,
+    ResolveSpan(ResolveSpanRequest),
 }
 
 impl RenderActorRequest {
@@ -18,6 +23,7 @@ impl RenderActorRequest {
         match self {
             Self::RenderFullLatest => true,
             Self::RenderIncremental => false,
+            Self::ResolveSpan(_) => false,
         }
     }
 }
@@ -26,6 +32,7 @@ pub struct RenderActor {
     mailbox: broadcast::Receiver<RenderActorRequest>,
     document: watch::Receiver<Option<Arc<Document>>>,
     renderer: IncrSvgDocServer,
+    resolve_sender: mpsc::UnboundedSender<TypstActorRequest>,
     svg_sender: mpsc::UnboundedSender<Vec<u8>>,
 }
 
@@ -33,12 +40,14 @@ impl RenderActor {
     pub fn new(
         mailbox: broadcast::Receiver<RenderActorRequest>,
         document: watch::Receiver<Option<Arc<Document>>>,
+        resolve_sender: mpsc::UnboundedSender<TypstActorRequest>,
         svg_sender: mpsc::UnboundedSender<Vec<u8>>,
     ) -> Self {
         let mut res = Self {
             mailbox,
             document,
             renderer: IncrSvgDocServer::default(),
+            resolve_sender,
             svg_sender,
         };
         res.renderer.set_should_attach_debug_info(true);
@@ -52,6 +61,37 @@ impl RenderActor {
             .unwrap();
     }
 
+    async fn process_message(&mut self, msg: RenderActorRequest) -> bool {
+        trace!("RenderActor: received message: {:?}", msg);
+
+        let res = msg.is_full_render();
+
+        if let RenderActorRequest::ResolveSpan(ResolveSpanRequest(spans)) = msg {
+            info!("RenderActor: resolving span: {:?}", spans);
+            let spans = match self.renderer.source_span(&spans) {
+                Ok(spans) => spans,
+                Err(e) => {
+                    info!("RenderActor: failed to resolve span: {}", e);
+                    return false;
+                }
+            };
+
+            info!("RenderActor: resolved span: {:?}", spans);
+            // end position is used
+            if let Some((_, s)) = spans {
+                let Ok(_) = self
+                    .resolve_sender
+                    .send(TypstActorRequest::DocToSrcJumpResolve(s))
+                else {
+                    info!("RenderActor: resolve_sender is dropped");
+                    return false;
+                };
+            }
+        }
+
+        res
+    }
+
     #[tokio::main(flavor = "current_thread")]
     async fn run(mut self) {
         loop {
@@ -59,8 +99,7 @@ impl RenderActor {
             debug!("RenderActor: waiting for message");
             match self.mailbox.recv().await {
                 Ok(msg) => {
-                    trace!("RenderActor: received message: {:?}", msg);
-                    has_full_render |= msg.is_full_render();
+                    has_full_render |= self.process_message(msg).await;
                 }
                 Err(broadcast::error::RecvError::Closed) => {
                     info!("RenderActor: no more messages");
@@ -72,7 +111,7 @@ impl RenderActor {
             }
             // read the queue to empty
             while let Ok(msg) = self.mailbox.try_recv() {
-                has_full_render |= msg.is_full_render();
+                has_full_render |= self.process_message(msg).await;
             }
             // if a full render is requested, we render the latest document
             // otherwise, we render the incremental changes for only once

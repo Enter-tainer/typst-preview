@@ -74,9 +74,6 @@ body {
   background: #7db9dea0;
 }
 
-svg {
-  --glyph_fill: black;
-}
 
 .pseudo-link {
   fill: transparent;
@@ -93,14 +90,17 @@ path.outline_glyph {
 .outline_glyph path,
 path.outline_glyph {
   fill: var(--glyph_fill);
+  stroke: var(--glyph_stroke);
 }
 
 .hover .typst-text {
   --glyph_fill: #66bab7;
+  --glyph_stroke: #66bab7;
 }
 
 .typst-text:hover {
   --glyph_fill: #f75c2f;
+  --glyph_stroke: #f75c2f;
 }
 
 .typst-jump-ripple,

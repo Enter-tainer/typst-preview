@@ -11,7 +11,6 @@ use typst_ts_compiler::service::{
 };
 use typst_ts_compiler::service::{CompileDriver, CompileMiddleware};
 use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
-use typst_ts_core::vector::span_id_to_u64;
 
 use super::editor::CompileStatus;
 use super::render::RenderActorRequest;
@@ -180,10 +179,9 @@ impl TypstClient {
             TypstActorRequest::DocToSrcJumpResolve(id) => {
                 debug!("TypstActor: processing doc2src: {:?}", id);
 
-                // todo: let typst.ts accept `Span` instead of that u64
                 let res = self
                     .inner()
-                    .resolve_doc_to_src_jump(span_id_to_u64(&id))
+                    .resolve_span(id)
                     .await
                     .map_err(|err| {
                         error!("TypstActor: failed to resolve doc to src jump: {:#}", err);
