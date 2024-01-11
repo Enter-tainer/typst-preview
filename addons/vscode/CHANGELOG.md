@@ -187,56 +187,56 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 - Upgrade to typst v0.5.0
 
-## 0.4.1 - [2023-06-07]
+## v0.4.1 - [2023-06-07]
 
 - Makes the WebSocket connection retry itself when it is closed, with a delay of 1 second.
 
-## 0.4.0 - [2023-06-07]
+## v0.4.0 - [2023-06-07]
 
 - Upgrade to typst v0.4.0
 
-## 0.3.3 - [2023-05-11]
+## v0.3.3 - [2023-05-11]
 
 - Fix nix-ld compatibility by inheriting env vars(#33)
 
-## 0.3.1 - [2023-05-04]
+## v0.3.1 - [2023-05-04]
 
 - Publish to OpenVSX
 - allow configuring font paths
 
-## 0.3.0 - [2023-04-26]
+## v0.3.0 - [2023-04-26]
 
 - Upgrade typst to v0.3.0
 - Fix panic when pages are removed
 
-## 0.2.4 - [2023-04-21]
+## v0.2.4 - [2023-04-21]
 
 - Automatically choose a free port to listen. This should fix the problem where you can't preview multiple files at the same time.
 - Server will exit right after client disconnects, preventing resource leak.
 
-## 0.2.3 - [2023-04-20]
+## v0.2.3 - [2023-04-20]
 
 - Performance Improvement: only update pages when they are visible. This should improve performance when you have a lot of pages.
 
-## 0.2.2 - [2023-04-16]
+## v0.2.2 - [2023-04-16]
 
 - Fix server process not killed on exit(maybe)
 - Add config for OnSave/OnType
 - Add output channel for logging
 
-## 0.2.1 - [2023-04-16]
+## v0.2.1 - [2023-04-16]
 
 - Bundle typst-ws within vsix. You no longer need to install typst-ws
 
-## 0.1.7 - [2023-04-10]
+## v0.1.7 - [2023-04-10]
 
 - Preview on type
 - Add config entry for `typst-ws` path
 
-## 0.1.6 - [2023-04-09]
+## v0.1.6 - [2023-04-09]
 
 Add preview button
 
-## 0.1.0 - [2023-04-09]
+## v0.1.0 - [2023-04-09]
 
 Initial release
