@@ -62,10 +62,6 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 16
-      - run: |
-          yarn
-          yarn build
-        working-directory: ./addons/typst-dom
       - run: yarn
         working-directory: ./addons/frontend
       - run: |
@@ -123,10 +119,6 @@ jobs:
           submodules: recursive
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.3
-      - run: |
-          yarn
-          yarn build
-        working-directory: ./addons/typst-dom
       - run: yarn
         working-directory: ./addons/frontend
       - run: |
