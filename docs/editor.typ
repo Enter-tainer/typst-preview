@@ -18,6 +18,7 @@ The editor extension mainly does these things:
 + _Source to preview jumping_: This is not necessary, but it's a nice feature to have. With this, the preview panel will be scrolled to the corresponding position when user clicks on the source code.
 + _Preview to source jumping_: This is quite similar to the previous one. With this, the source code will be scrolled to the corresponding position when user clicks on the preview panel.
 + _Compile status reporting_: With this, the preview server can report the compile status to the editor extension. The editor extension can show the compile status to the user.
++ _Outline_: The preview server reports current outline to the editor extension. 
 
 == In memory editing
 
@@ -127,16 +128,66 @@ Example:
 }
 ```
 
+== Outline
+
+To implement outline reporting, the editor extension should listen to the `outline` event from the preview server. The `event` field should be `outline`. A typical outline looks like this. Note that `page_no` is 1-based.
+
+```json
+{
+  "event": "outline",
+  "items": [
+    {
+      "title": "Asymptotic Notation: O",
+      "span": "1fa5c53ef2bf",
+      "position": {
+        "page_no": 1,
+        "x": 70.86625,
+        "y": 70.86625
+      },
+      "children": []
+    },
+    {
+      "title": "My fabulous talk",
+      "span": "79e192e29ce5",
+      "position": {
+        "page_no": 9,
+        "x": 252.39397,
+        "y": 283.81598
+      },
+      "children": [
+        {
+          "title": "A quiz",
+          "span": "7d0905e0183a",
+          "position": {
+            "page_no": 10,
+            "x": 70.86625,
+            "y": 70.86625
+          },
+          "children": []
+        }
+      ]
+    }
+  ]
+}
+```
+
 
 == References
 
 Messages sent from the editor extension to the preview server, defined in `src/actor/editor.rs`.
 
 ```rs
+#[derive(Debug, Deserialize)]
 #[serde(tag = "event")]
 enum ControlPlaneMessage {
+    #[serde(rename = "changeCursorPosition")]
+    ChangeCursorPosition(ChangeCursorPositionRequest),
     #[serde(rename = "panelScrollTo")]
     SrcToDocJump(SrcToDocJumpRequest),
+    #[serde(rename = "panelScrollByPosition")]
+    PanelScrollByPosition(PanelScrollByPositionRequest),
+    #[serde(rename = "sourceScrollBySpan")]
+    DocToSrcJumpResolve(DocToSrcJumpResolveRequest),
     #[serde(rename = "syncMemoryFiles")]
     SyncMemoryFiles(MemoryFiles),
     #[serde(rename = "updateMemoryFiles")]
@@ -145,44 +196,21 @@ enum ControlPlaneMessage {
     RemoveMemoryFiles(MemoryFilesShort),
 }
 
-pub struct SrcToDocJumpRequest {
-    filepath: String,
-    line: usize,
-    /// fixme: character is 0-based, UTF-16 code unit.
-    /// We treat it as UTF-8 now.
-    character: usize,
-}
-
-pub struct MemoryFilesShort {
-    files: Vec<String>,
-}
-
-pub struct MemoryFiles {
-    files: HashMap<String, String>,
-}
 ```
 
 Messages sent from the preview server to the editor extension, defined in `src/actor/editor.rs`.
 
 ```rs
+#[derive(Debug, Serialize)]
 #[serde(tag = "event")]
 enum ControlPlaneResponse {
     #[serde(rename = "editorScrollTo")]
     EditorScrollTo(DocToSrcJumpInfo),
     #[serde(rename = "syncEditorChanges")]
     SyncEditorChanges(()),
-}
-
-pub struct DocToSrcJumpInfo {
-    filepath: String,
-    start: Option<(usize, usize)>, // row, column
-    end: Option<(usize, usize)>,
-}
-
-#[serde(tag = "kind", content = "data")]
-pub enum CompileStatus {
-    Compiling,
-    CompileSuccess,
-    CompileError,
+    #[serde(rename = "compileStatus")]
+    CompileStatus(CompileStatus),
+    #[serde(rename = "outline")]
+    Outline(Outline),
 }
 ```
