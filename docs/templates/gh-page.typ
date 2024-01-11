@@ -1,6 +1,6 @@
 // This is important for typst-book to produce a responsive layout
 // and multiple targets.
-#import "@preview/book:0.2.2": get-page-width, target, is-web-target, is-pdf-target
+#import "@preview/book:0.2.3": get-page-width, target, is-web-target, is-pdf-target, plain-text
 
 #let page-width = get-page-width()
 #let is-pdf-target = is-pdf-target()
@@ -62,6 +62,17 @@
   )
 }
 
+#let make-unique-label(it, disambiguator: 1) = label({
+  let k = plain-text(it).trim()
+  if disambiguator > 1 {
+    k + "_d" + str(disambiguator)
+  } else {
+    k
+  }
+})
+
+#let heading-reference(it, d: 1) = make-unique-label(it.body, disambiguator: d)
+
 // The project function defines how your document looks.
 // It takes your content and some metadata and formats it.
 // Go ahead and customize it to your liking!
@@ -87,7 +98,6 @@
       left: 20pt,
       // Typst is setting the page's bottom to the baseline of the last line of text. So bad :(.
       bottom: 0.5em,
-      right: 0.5em,
       // remove rest margins.
       rest: 0pt,
     ),
@@ -96,20 +106,34 @@
   ) if is-web-target;
 
   // set text style
-  let text_size = if is-pdf-target { 12pt } else { 18pt }
-  set text(font: main-font, size: text_size, fill: main-color, lang: "en")
+  set text(font: main-font, size: 16pt, fill: main-color, lang: "en")
+
+  let ld = state("label-disambiguator", (:))
+  let update-ld(k) = ld.update(it => {
+    it.insert(k, it.at(k, default: 0) + 1);
+    it
+  })
+  let get-ld(loc, k) = make-unique-label(k, disambiguator: ld.at(loc).at(k))
 
   // render a dash to hint headings instead of bolding it.
   show heading : set text(weight: "regular") if is-web-target
-  show heading : it => locate(loc => {
-    if is-web-target {
-      place(left, dx: -20pt, [
-        #set text(fill: dash-color)
-        #link(loc)[\#]
-      ])
-    }
+  show heading : it => {
     it
-  })
+    if is-web-target {
+      let title = plain-text(it.body).trim();
+      update-ld(title)
+      locate(loc => {
+        let dest = get-ld(loc, title);
+        style(styles => {
+          let h = measure(it.body, styles).height;
+          place(left, dx: -20pt, dy: -h - 12pt, [
+            #set text(fill: dash-color)
+            #link(loc)[\#] #dest
+          ])
+        })
+      });
+    }
+  }
 
   // link setting
   show link : set text(fill: dash-color)
@@ -128,9 +152,8 @@
         fill: code-extra-colors.at("bg"),
         [
           #set text(fill: code-extra-colors.at("fg")) if code-extra-colors.at("fg") != none
-          #if page-width > 450pt {
-            place(right, text(luma(110), it.lang))
-          }
+          #set par(justify: false)
+          #place(right, text(luma(110), it.lang))
           #it
         ],
       )
