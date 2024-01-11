@@ -4,10 +4,9 @@ All notable changes to the "typst-preview" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-
 ## 0.1.0
 
-Initial release 
+Initial release
 
 ## 0.1.6
 
@@ -66,7 +65,7 @@ Add preview button
 ## v0.5.1
 
 - Performance improvement(#14): We now use typst.ts. We utilize a  [virtual DOM](https://en.wikipedia.org/wiki/Virtual_DOM) approach to diff and render the document. This is a **significant enhancement** of previewing document in `onType` mode in terms of resource savings and response time for changes.
-- Cross jump between code and preview (#36): We implement SyncTeX-like feature for typst-preview. You can now click on the preview panel to jump to the corresponding code location, and vice versa. This feature is still experimental and may not work well in some cases. Please report any issues you encounter. 
+- Cross jump between code and preview (#36): We implement SyncTeX-like feature for typst-preview. You can now click on the preview panel to jump to the corresponding code location, and vice versa. This feature is still experimental and may not work well in some cases. Please report any issues you encounter.
 - Sync preview position with cursor: We now automatically scroll the preview panel to the corresponding position of the cursor. This feature is controlled by `typst-preview.scrollSync`
 - Open preview in separate window(#39): You can type `typst-preview.browser` in command palette to open the preview page in a separate browser.
 - Links in preview panel: You can now click on links in the preview panel to open them in browser. The cross reference links are also clickable.
@@ -119,7 +118,7 @@ Add preview button
 ## v0.7.2
 
 - Bug fixes:
-  - #79: We now put typst compiler and renderer in a dedicate thread. Therefore we should get more stable performance. 
+  - #79: We now put typst compiler and renderer in a dedicate thread. Therefore we should get more stable performance.
   - #78: Currently only the latest compile/render request is processed. This should fix the problem where the preview request will queue up when you type too fast and the doc takes a lot of time to compile.
   - #81: We now use a more robust way to detect the whether to kill stale server process. This should fix the problem where the when preview tab will become blank when it becomes inactive for a while.
   - #87: Add enum description for `typst-preview.scrollSync`. Previously the description is missing.
@@ -130,8 +129,8 @@ Add preview button
 
 ## v0.7.4
 
-- Typst Preview Book is now available at https://enter-tainer.github.io/typst-preview/ ! You can find the documentation of Typst Preview there.
-- Improved standalone usage: Use `typst-preview` without VSCode now becomes easier. All you need is `typst-preview --partial-rendering cool-doc.typ`. Take a look at https://enter-tainer.github.io/typst-preview/standalone.html
+- Typst Preview Book is now available at <https://enter-tainer.github.io/typst-preview/> ! You can find the documentation of Typst Preview there.
+- Improved standalone usage: Use `typst-preview` without VSCode now becomes easier. All you need is `typst-preview --partial-rendering cool-doc.typ`. Take a look at <https://enter-tainer.github.io/typst-preview/standalone.html>
 - Upgrade to typst.ts 0.4.0-rc2. This fixes a subtle incremental parsing bug.
 - Partial rendering is now enabled by default. This should improve performance on long document. You can disable it by setting `typst-preview.partialRendering` to `false`.
 
@@ -145,7 +144,7 @@ Add preview button
 - Upgrade to typst v0.8.0
 - Fix #111: Previously stroke related attributes are not rendered correctly. This is now fixed.
 - Fix #105: The compiler will panic randomly. This is now fixed.
-- Upstream bug fixes: https://github.com/Myriad-Dreamin/typst.ts/releases/tag/v0.4.0-rc3
+- Upstream bug fixes: <https://github.com/Myriad-Dreamin/typst.ts/releases/tag/v0.4.0-rc3>
 
 ## v0.8.1
 
@@ -155,7 +154,7 @@ Add preview button
   - #124: Fix a race condition which may cause the webview process messages out of order, resulting in blank screen.
   - #125: Resizing the preview panel is not that laggy now.
 - Features:
-  - #120: We now show page breaks and center pages horizontally. By default we will choose the `vscode-sideBar-background` color as the page break color. If it is not distinguishable from white, we will use rgb(82, 86, 89) instead. 
+  - #120: We now show page breaks and center pages horizontally. By default we will choose the `vscode-sideBar-background` color as the page break color. If it is not distinguishable from white, we will use rgb(82, 86, 89) instead.
 
 ## v0.8.2
 
