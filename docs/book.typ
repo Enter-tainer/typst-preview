@@ -1,5 +1,5 @@
 
-#import "@preview/book:0.2.2": *
+#import "@preview/book:0.2.3": *
 
 #show: book
 
@@ -12,18 +12,18 @@
   summary: [
     #prefix-chapter("intro.typ")[Get Started],
     = User Guide
-    - #chapter("vscode.typ", section: "1")[Use In VScode]
-      - #chapter("config.typ", section: "1.1")[Configuration]
-    - #chapter("standalone.typ", section: "2")[Standalone]
+    - #chapter("vscode.typ")[Use In VScode]
+      - #chapter("config.typ")[Configuration]
+    - #chapter("standalone.typ")[Standalone]
     = Developer Guide
-    - #chapter("arch.typ", section: "3")[Typst-Preview Architecture]
-    - #chapter("dev.typ", section: "4")[Set Up Development Environment]
-    - #chapter("editor.typ", section: "5")[Port Typst-Preview To Other Editors]
+    - #chapter("arch.typ")[Typst-Preview Architecture]
+    - #chapter("dev.typ")[Set Up Development Environment]
+    - #chapter("editor.typ")[Port Typst-Preview To Other Editors]
   ]
 )
 
 
 
 // re-export page template
-#import "./templates/page.typ": project
+#import "./templates/gh-page.typ": project
 #let book-page = project

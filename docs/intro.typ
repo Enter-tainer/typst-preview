@@ -1,5 +1,5 @@
 #import "./book.typ": book-page
-#import "./templates/page.typ": page-width, is-dark-theme
+#import "./templates/gh-page.typ": page-width, is-dark-theme
 #import "@preview/fontawesome:0.1.0": *
 #import "@preview/colorful-boxes:1.1.0": *
 

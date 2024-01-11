@@ -1,6 +1,6 @@
 #import "@preview/book:0.2.2": *
 
-#import "./templates/ebook.typ"
+#import "./templates/gh-ebook.typ"
 
 #show: ebook.project.with(title: "Typst Preview Book", spec: "book.typ")
 
