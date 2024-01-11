@@ -16,10 +16,12 @@
 + Install npm dependencies for `addons/frontend` and `addons/vscode`
 
   ```bash
+  cd addons/typst-dom
+  yarn && yarn build
   cd addons/frontend
-  yarn install
+  yarn && yarn build
   cd ../vscode
-  yarn install
+  yarn
   ```
 
 + Install rust toolchain. The common option is to use #link("https://rustup.rs/")[rustup].

@@ -4,6 +4,7 @@
 		{
 			"label": "VS Code Extension Prelaunch",
 			"dependsOn": [
+				"Compile typst-dom",
 				"Compile VS Code Extension",
 				"Build Binary",
 				"Copy Binary to VS Code Extension"
@@ -12,9 +13,15 @@
 			"problemMatcher": []
 		},
 		{
+			"label": "Compile typst-dom",
+			"type": "npm",
+			"script": "build",
+			"path": "addons/typst-dom",
+		},
+		{
 			"label": "Compile VS Code Extension",
 			"type": "npm",
-			"script": "compile",
+			"script": "build",
 			"path": "addons/vscode",
 			"group": "build",
 			"problemMatcher": []
