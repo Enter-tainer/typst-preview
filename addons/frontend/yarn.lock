@@ -117,15 +117,15 @@
   resolved "https://registry.yarnpkg.com/@jridgewell/sourcemap-codec/-/sourcemap-codec-1.4.15.tgz#d7c6e6755c78567a951e04ab52ef0fd26de59f32"
   integrity sha512-eF2rxCRulEKXHTRiDrDy6erMYWqNw4LPdQ8UQA4huuxaQsVeRPFl2oM8oDGxMFhJUWZf9McpLtJasDDZb/Bpeg==
 
-"@myriaddreamin/typst-ts-renderer@0.4.2-rc4":
-  version "0.4.2-rc4"
-  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst-ts-renderer/-/typst-ts-renderer-0.4.2-rc4.tgz#c296e6f67d7e1d94138dca88aa45f966866e5f06"
-  integrity sha512-H4ATfY/bsjKxpIgd6z//G8GH3U53OaKpqEM/rqRz43HRjX8AXU7ZaIsoPZo0Bgnap06wVEW15EVDFzNqEFnonA==
+"@myriaddreamin/typst-ts-renderer@0.4.2-rc5":
+  version "0.4.2-rc5"
+  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst-ts-renderer/-/typst-ts-renderer-0.4.2-rc5.tgz#f6671411ce4ae607a6618796cf53f93e611db186"
+  integrity sha512-u7UPPGF3ZrXbhbGqZscUVf0q5GM1V/ITFTe1R+m9zoJKwUfSGibcldtIQT6E9iwNfeSggYkn/eWNSFhYXaFHRQ==
 
-"@myriaddreamin/typst.ts@0.4.2-rc4":
-  version "0.4.2-rc4"
-  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst.ts/-/typst.ts-0.4.2-rc4.tgz#ac4d009bdb6a7429bb92ed9555aba76f0a070cbb"
-  integrity sha512-ZvMrKAq6ZQj/pTYWgTBUySQI5HJkLEKQndqJa8sYxbktcYbphTpX1R+hN9bmkvHtZ/Kll6aX+hwJemQVZDxo8w==
+"@myriaddreamin/typst.ts@0.4.2-rc5":
+  version "0.4.2-rc5"
+  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst.ts/-/typst.ts-0.4.2-rc5.tgz#97c41cd11144aced046e2faf6daa78c637696c77"
+  integrity sha512-DtACv50NI4uKaccY+ijiLQII5yolcjjswhE7kcXrlYR5wxhebNrlaLGGsU0XOslv/PWuUrDLKV2mUSDIJg2hxw==
   dependencies:
     idb "^7.1.1"
 

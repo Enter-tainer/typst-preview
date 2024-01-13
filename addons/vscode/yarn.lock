@@ -65,15 +65,15 @@
     wrap-ansi "^8.1.0"
     wrap-ansi-cjs "npm:wrap-ansi@^7.0.0"
 
-"@myriaddreamin/typst-ts-renderer@0.4.2-rc4":
-  version "0.4.2-rc4"
-  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst-ts-renderer/-/typst-ts-renderer-0.4.2-rc4.tgz#c296e6f67d7e1d94138dca88aa45f966866e5f06"
-  integrity sha512-H4ATfY/bsjKxpIgd6z//G8GH3U53OaKpqEM/rqRz43HRjX8AXU7ZaIsoPZo0Bgnap06wVEW15EVDFzNqEFnonA==
+"@myriaddreamin/typst-ts-renderer@0.4.2-rc5":
+  version "0.4.2-rc5"
+  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst-ts-renderer/-/typst-ts-renderer-0.4.2-rc5.tgz#f6671411ce4ae607a6618796cf53f93e611db186"
+  integrity sha512-u7UPPGF3ZrXbhbGqZscUVf0q5GM1V/ITFTe1R+m9zoJKwUfSGibcldtIQT6E9iwNfeSggYkn/eWNSFhYXaFHRQ==
 
-"@myriaddreamin/typst.ts@0.4.2-rc4":
-  version "0.4.2-rc4"
-  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst.ts/-/typst.ts-0.4.2-rc4.tgz#ac4d009bdb6a7429bb92ed9555aba76f0a070cbb"
-  integrity sha512-ZvMrKAq6ZQj/pTYWgTBUySQI5HJkLEKQndqJa8sYxbktcYbphTpX1R+hN9bmkvHtZ/Kll6aX+hwJemQVZDxo8w==
+"@myriaddreamin/typst.ts@0.4.2-rc5":
+  version "0.4.2-rc5"
+  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst.ts/-/typst.ts-0.4.2-rc5.tgz#97c41cd11144aced046e2faf6daa78c637696c77"
+  integrity sha512-DtACv50NI4uKaccY+ijiLQII5yolcjjswhE7kcXrlYR5wxhebNrlaLGGsU0XOslv/PWuUrDLKV2mUSDIJg2hxw==
   dependencies:
     idb "^7.1.1"
 
@@ -2051,10 +2051,10 @@ typescript@^5.0.2:
 "typst-preview-frontend@file:../frontend":
   version "0.0.0"
   dependencies:
-    "@myriaddreamin/typst-ts-renderer" "0.4.2-rc4"
-    "@myriaddreamin/typst.ts" "0.4.2-rc4"
+    "@myriaddreamin/typst-ts-renderer" "0.4.2-rc5"
+    "@myriaddreamin/typst.ts" "0.4.2-rc5"
     rxjs "^7.8.1"
-    typst-dom "file:../../../../.cache/yarn/v6/npm-typst-preview-frontend-0.0.0-d57a1d1d-7d43-46c9-a755-875a29f2b6f6-1704983754668/node_modules/typst-dom"
+    typst-dom "file:../../../../../AppData/Local/Yarn/Cache/v6/npm-typst-preview-frontend-0.0.0-28c3591a-9ced-44c4-b534-5269086d4b05-1705158597754/node_modules/typst-dom"
 
 uc.micro@^1.0.1, uc.micro@^1.0.5:
   version "1.0.6"
