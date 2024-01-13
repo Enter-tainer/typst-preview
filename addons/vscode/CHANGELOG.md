@@ -4,6 +4,15 @@ All notable changes to the "typst-preview" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.10.5 - [2024-01-14]
+
+- Bug fixes:
+  - fix a bug that fails to incrementally rendering pages with transformed content
+  - fix #141: glyph data desync problem, corrupting state of webview typically after your editor hibernating and coming back.
+
+- Features:
+  - performance is now improved even further. We now use a more efficient way to render the document.
+
 ## v0.10.4 - [2024-01-05]
 
 - Bug fixes:
