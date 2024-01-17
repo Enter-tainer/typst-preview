@@ -38,6 +38,11 @@ This project is not affiliated with, created by, or endorsed by Typst the brand.
 
 ## Release Notes
 
+## v0.10.6 - [2024-01-17]
+
+- Bug fixes:
+  - fix a bug which cause the preview panel no longer updates as you type
+
 ### v0.10.5 - [2024-01-14]
 
 - Bug fixes:

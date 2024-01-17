@@ -640,6 +640,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "dashmap"
+version = "5.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "978747c1d849a7d2ee5e8adc0159961c48fb7e5db2f06af6723b80123bb53856"
+dependencies = [
+ "cfg-if",
+ "hashbrown 0.14.3",
+ "lock_api",
+ "once_cell",
+ "parking_lot_core",
+]
+
+[[package]]
 name = "data-encoding"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3334,7 +3347,7 @@ dependencies = [
 
 [[package]]
 name = "typst-preview"
-version = "0.10.5"
+version = "0.10.6"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3388,7 +3401,7 @@ dependencies = [
 [[package]]
 name = "typst-ts-compiler"
 version = "0.4.2-rc5"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=54471328e55df43479ff56dc44920f803ccf1fe4#54471328e55df43479ff56dc44920f803ccf1fe4"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=8c6e9a41b3a65a631afd5812e43afba38c40bf11#8c6e9a41b3a65a631afd5812e43afba38c40bf11"
 dependencies = [
  "append-only-vec",
  "base64",
@@ -3426,7 +3439,7 @@ dependencies = [
 [[package]]
 name = "typst-ts-core"
 version = "0.4.2-rc5"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=54471328e55df43479ff56dc44920f803ccf1fe4#54471328e55df43479ff56dc44920f803ccf1fe4"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=8c6e9a41b3a65a631afd5812e43afba38c40bf11#8c6e9a41b3a65a631afd5812e43afba38c40bf11"
 dependencies = [
  "base64",
  "base64-serde",
@@ -3434,6 +3447,7 @@ dependencies = [
  "byteorder",
  "comemo",
  "crossbeam-queue",
+ "dashmap",
  "ecow",
  "elsa",
  "flate2",
@@ -3463,7 +3477,7 @@ dependencies = [
 [[package]]
 name = "typst-ts-svg-exporter"
 version = "0.4.2-rc5"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=54471328e55df43479ff56dc44920f803ccf1fe4#54471328e55df43479ff56dc44920f803ccf1fe4"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=8c6e9a41b3a65a631afd5812e43afba38c40bf11#8c6e9a41b3a65a631afd5812e43afba38c40bf11"
 dependencies = [
  "base64",
  "comemo",

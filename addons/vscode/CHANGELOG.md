@@ -4,6 +4,11 @@ All notable changes to the "typst-preview" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.10.6 - [2024-01-17]
+
+- Bug fixes:
+  - fix a bug which cause the preview panel no longer updates as you type
+
 ## v0.10.5 - [2024-01-14]
 
 - Bug fixes:
