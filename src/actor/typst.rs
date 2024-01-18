@@ -4,13 +4,14 @@ use crate::{ChangeCursorPositionRequest, MemoryFiles, MemoryFilesShort, SrcToDoc
 use log::{debug, error, info};
 use tokio::sync::{broadcast, mpsc, watch};
 use typst::diag::SourceResult;
-use typst::syntax::Span;
 use typst::{model::Document, World};
 use typst_ts_compiler::service::{
-    CompileActor, CompileClient as TsCompileClient, CompileExporter, Compiler, WorldExporter,
+    CompileActor, CompileClient as TsCompileClient, CompileExporter, Compiler, DocToSrcJumpInfo,
+    WorldExporter,
 };
 use typst_ts_compiler::service::{CompileDriver, CompileMiddleware};
 use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
+use typst_ts_core::debug_loc::SourceSpanOffset;
 
 use super::editor::CompileStatus;
 use super::render::RenderActorRequest;
@@ -18,7 +19,7 @@ use super::{editor::EditorActorRequest, webview::WebviewActorRequest};
 
 #[derive(Debug)]
 pub enum TypstActorRequest {
-    DocToSrcJumpResolve(Span),
+    DocToSrcJumpResolve((SourceSpanOffset, SourceSpanOffset)),
     ChangeCursorPosition(ChangeCursorPositionRequest),
     SrcToDocJumpResolve(SrcToDocJumpRequest),
 
@@ -176,18 +177,105 @@ impl TypstClient {
 
     async fn process_mail(&mut self, mail: TypstActorRequest) {
         match mail {
-            TypstActorRequest::DocToSrcJumpResolve(id) => {
-                debug!("TypstActor: processing doc2src: {:?}", id);
+            TypstActorRequest::DocToSrcJumpResolve(span_range) => {
+                debug!("TypstActor: processing doc2src: {:?}", span_range);
 
-                let res = self
+                let st_res = self
                     .inner()
-                    .resolve_span(id)
+                    .resolve_span_and_offset(span_range.0.span, Some(span_range.0.offset))
                     .await
                     .map_err(|err| {
                         error!("TypstActor: failed to resolve doc to src jump: {:#}", err);
                     })
                     .ok()
                     .flatten();
+
+                let ed_res = self
+                    .inner()
+                    .resolve_span_and_offset(span_range.1.span, Some(span_range.1.offset))
+                    .await
+                    .map_err(|err| {
+                        error!("TypstActor: failed to resolve doc to src jump: {:#}", err);
+                    })
+                    .ok()
+                    .flatten();
+
+                let loc_leq =
+                    |x: (usize, usize), y: (usize, usize)| x.0 < y.0 || (x.0 == y.0 && x.1 <= y.1);
+
+                let range_res = match (st_res, ed_res) {
+                    (Some(st), Some(ed)) => {
+                        if st.filepath == ed.filepath
+                            && matches!((&st.start, &st.end), (Some(x), Some(y)) if loc_leq(*x, *y))
+                        {
+                            Some(DocToSrcJumpInfo {
+                                filepath: st.filepath,
+                                start: st.start,
+                                end: ed.start,
+                            })
+                        } else {
+                            Some(ed)
+                        }
+                    }
+                    (Some(e), None) | (None, Some(e)) => Some(e),
+                    (None, None) => None,
+                };
+
+                // this could happen because typst supports scripting, which make text out of
+                // order
+                let range_res = {
+                    let mut range_res = range_res;
+                    if let Some(info) = &mut range_res {
+                        if let Some((x, y)) = info.start.zip(info.end) {
+                            if loc_leq(y, x) {
+                                std::mem::swap(&mut info.start, &mut info.end);
+                            }
+                        }
+                    }
+
+                    range_res
+                };
+
+                let elem_res = self
+                    .inner()
+                    .resolve_span(span_range.1.span)
+                    .await
+                    .map_err(|err| {
+                        error!("TypstActor: failed to resolve doc to src jump: {:#}", err);
+                    })
+                    .ok()
+                    .flatten();
+
+                let res = match (elem_res, range_res) {
+                    (Some(elem), Some(mut rng)) if elem.filepath == rng.filepath => {
+                        let elem_start = elem.start.or(elem.end);
+                        let elem_end = elem.end.or(elem_start);
+
+                        let rng_start = rng.start.or(rng.end);
+                        let rng_end = rng.end.or(rng_start);
+
+                        if let Some((((x, x_in), y_in), y)) =
+                            elem_start.zip(rng_start).zip(rng_end).zip(elem_end)
+                        {
+                            let restrict_in_range = |p: (usize, usize)| {
+                                if loc_leq(p, x) {
+                                    x
+                                } else if loc_leq(y, p) {
+                                    y
+                                } else {
+                                    p
+                                }
+                            };
+
+                            rng.start = Some(restrict_in_range(x_in));
+                            rng.end = Some(restrict_in_range(y_in));
+                        }
+                        Some(rng)
+                    }
+                    (.., Some(e)) => Some(e),
+                    (Some(e), None) => Some(e),
+                    (None, None) => None,
+                };
 
                 if let Some(info) = res {
                     let _ = self

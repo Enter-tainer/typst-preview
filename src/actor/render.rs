@@ -78,10 +78,10 @@ impl RenderActor {
 
             info!("RenderActor: resolved span: {:?}", spans);
             // end position is used
-            if let Some((_, s)) = spans {
+            if let Some(spans) = spans {
                 let Ok(_) = self
                     .resolve_sender
-                    .send(TypstActorRequest::DocToSrcJumpResolve(s))
+                    .send(TypstActorRequest::DocToSrcJumpResolve(spans))
                 else {
                     info!("RenderActor: resolve_sender is dropped");
                     return false;

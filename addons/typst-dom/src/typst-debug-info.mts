@@ -7,6 +7,7 @@ const enum SourceMappingType {
   Image = 2,
   Shape = 3,
   Page = 4,
+  CharIndex = 5,
 }
 
 // one-of following classes must be present:
@@ -21,6 +22,7 @@ const CssClassToType = [
   ["typst-image", SourceMappingType.Image],
   ["typst-shape", SourceMappingType.Shape],
   ["typst-page", SourceMappingType.Page],
+  ["tsel", SourceMappingType.CharIndex],
 ] as const;
 
 function castToSourceMappingElement(
@@ -78,13 +80,162 @@ function findIndexOfChild(elem: Element, child: Element) {
   return children.findIndex((x) => x[1] === child);
 }
 
+// const rotateColors = [
+//   "green",
+//   "blue",
+//   "red",
+//   "orange",
+//   "purple",
+//   "yellow",
+//   "cyan",
+//   "magenta",
+// ];
+
+function getCharIndex(elem: Element, mouseX: number, mouseY: number) {
+  let useIndex = 0;
+  let foundIndex = -1;
+  const textRect = elem.getBoundingClientRect();
+
+  type SelRect = Pick<DOMRect, 'left' | 'right' | 'top' | 'bottom'>;
+  let previousSelRect: SelRect | undefined = undefined;
+  const unionRect = (a: SelRect, b?: SelRect) => {
+    if (!b) {
+      return a;
+    }
+    return {
+      left: Math.min(a.left, b.left),
+      top: Math.min(a.top, b.top),
+      right: Math.max(a.right, b.right),
+      bottom: Math.max(a.bottom, b.bottom),
+    };
+  }
+  const inRect = (rect: SelRect, x: number, y: number) => {
+    return rect.left <= x && x <= rect.right &&
+      rect.top <= y && y <= rect.bottom;
+  }
+
+  const enum TextFlowDirection {
+    LeftToRight = 0,
+    RightToLeft = 1,
+    TopToBottom = 2,
+    BottomToTop = 3,
+  };
+
+  let textFlowDir = TextFlowDirection.LeftToRight;
+  const isHorizontalFlow = () => {
+    return textFlowDir === TextFlowDirection.LeftToRight ||
+      textFlowDir === TextFlowDirection.RightToLeft;
+  }
+
+  {
+    let use0: Element = undefined!;
+    let use1: Element = undefined!;
+    for (const use of elem.children) {
+      if (use.tagName !== 'use') {
+        continue;
+      }
+      if (!use0) {
+        use0 = use;
+        continue;
+      }
+      use1 = use;
+      break;
+    }
+
+    if (use0 && use1) {
+      const use0Rect = use0.getBoundingClientRect();
+      const use1Rect = use1.getBoundingClientRect();
+
+      const use0Center = {
+        x: (use0Rect.left + use0Rect.right) / 2,
+        y: (use0Rect.top + use0Rect.bottom) / 2,
+      };
+      const use1Center = {
+        x: (use1Rect.left + use1Rect.right) / 2,
+        y: (use1Rect.top + use1Rect.bottom) / 2,
+      };
+      const vec = {
+        x: use1Center.x - use0Center.x,
+        y: use1Center.y - use0Center.y,
+      };
+      const angle = Math.atan2(vec.y, vec.x);
+      // console.log('angle', angle);i
+      if (angle > -Math.PI / 4 && angle < Math.PI / 4) {
+        textFlowDir = TextFlowDirection.LeftToRight;
+      } else if (angle < -Math.PI / 4 && angle > -Math.PI * 3 / 4) {
+        textFlowDir = TextFlowDirection.TopToBottom;
+      } else if (angle > Math.PI / 4 && angle < Math.PI * 3 / 4) {
+        textFlowDir = TextFlowDirection.BottomToTop;
+      } else {
+        textFlowDir = TextFlowDirection.RightToLeft;
+      }
+    }
+  }
+
+  for (const use of elem.children) {
+    if (use.tagName !== 'use') {
+      continue;
+    }
+    const useRect = use.getBoundingClientRect();
+    const selRect = isHorizontalFlow() ? {
+      left: useRect.left,
+      right: useRect.right,
+      top: textRect.top,
+      bottom: textRect.bottom,
+    } : {
+      left: textRect.left,
+      right: textRect.right,
+      top: useRect.top,
+      bottom: useRect.bottom,
+    };
+    previousSelRect = unionRect(selRect, previousSelRect);
+
+    // draw sel rect for debugging
+    // const selRectElem = document.createElement('div');
+    // selRectElem.style.position = 'absolute';
+    // selRectElem.style.left = `${selRect.left}px`;
+    // selRectElem.style.top = `${selRect.top}px`;
+    // selRectElem.style.width = `${selRect.right - selRect.left}px`;
+    // selRectElem.style.height = `${selRect.bottom - selRect.top}px`;
+    // selRectElem.style.border = `1px solid ${rotateColors[useIndex % rotateColors.length]}`;
+    // selRectElem.style.zIndex = '100';
+    // document.body.appendChild(selRectElem);
+    // console.log(textRect, selRect);
+
+    // set index to end range of this char
+    useIndex++;
+    if (inRect(selRect, mouseX, mouseY)) {
+      foundIndex = useIndex;
+    } else if (previousSelRect) { // may fallback to space in between chars
+      if (inRect(previousSelRect, mouseX, mouseY)) {
+        foundIndex = useIndex - 1;
+        previousSelRect = selRect;
+      }
+    }
+  }
+
+  return foundIndex;
+}
+
 export function installEditorJumpToHandler(svgDoc: any, docRoot: HTMLElement) {
-  const findSourceLocation = async (elem: Element) => {
+  const findSourceLocation = async (event: MouseEvent, elem: Element) => {
     const visitChain: [SourceMappingType, Element, string][] = [];
     while (elem) {
       let srcElem = castToSourceMappingElement(elem);
       if (srcElem) {
-        visitChain.push(srcElem);
+        if (srcElem[0] === SourceMappingType.CharIndex) {
+          const textElem = elem.parentElement?.parentElement?.parentElement!;
+          let foundIndex = -1;
+          if (textElem) {
+            foundIndex = getCharIndex(textElem, event.clientX, event.clientY);
+          }
+          if (foundIndex !== -1) {
+            (srcElem[1] as any) = foundIndex;
+            visitChain.push(srcElem);
+          }
+        } else {
+          visitChain.push(srcElem);
+        }
       }
       if (elem === docRoot) {
         break;
@@ -96,7 +247,17 @@ export function installEditorJumpToHandler(svgDoc: any, docRoot: HTMLElement) {
       return undefined;
     }
 
-    for (let idx = 1; idx < visitChain.length; idx++) {
+    console.log('visitChain', visitChain);
+
+    let startIdx = 1;
+    if (visitChain.length >= 1 && visitChain[0][0] === SourceMappingType.CharIndex) {
+      startIdx = 2;
+    }
+    for (let idx = startIdx; idx < visitChain.length; idx++) {
+      if (visitChain[idx - 1][0] === SourceMappingType.CharIndex) {
+        throw new Error("unexpected");
+      }
+
       const childIdx = findIndexOfChild(
         visitChain[idx][1],
         visitChain[idx - 1][1]
@@ -141,7 +302,7 @@ export function installEditorJumpToHandler(svgDoc: any, docRoot: HTMLElement) {
   ) => {
     let elem = event.target! as Element;
 
-    const sourceLoc = await findSourceLocation(elem);
+    const sourceLoc = await findSourceLocation(event, elem);
     if (!sourceLoc) {
       return;
     }
