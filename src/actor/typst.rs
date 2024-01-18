@@ -7,10 +7,12 @@ use typst::diag::SourceResult;
 use typst::syntax::Span;
 use typst::{model::Document, World};
 use typst_ts_compiler::service::{
-    CompileActor, CompileClient as TsCompileClient, CompileExporter, Compiler, WorldExporter,
+    CompileActor, CompileClient as TsCompileClient, CompileExporter, Compiler, DocToSrcJumpInfo,
+    WorldExporter,
 };
 use typst_ts_compiler::service::{CompileDriver, CompileMiddleware};
 use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
+use typst_ts_core::debug_loc::SourceSpanOffset;
 
 use super::editor::CompileStatus;
 use super::render::RenderActorRequest;
@@ -18,7 +20,7 @@ use super::{editor::EditorActorRequest, webview::WebviewActorRequest};
 
 #[derive(Debug)]
 pub enum TypstActorRequest {
-    DocToSrcJumpResolve(Span),
+    DocToSrcJumpResolve((SourceSpanOffset, SourceSpanOffset)),
     ChangeCursorPosition(ChangeCursorPositionRequest),
     SrcToDocJumpResolve(SrcToDocJumpRequest),
 
@@ -176,18 +178,9 @@ impl TypstClient {
 
     async fn process_mail(&mut self, mail: TypstActorRequest) {
         match mail {
-            TypstActorRequest::DocToSrcJumpResolve(id) => {
-                debug!("TypstActor: processing doc2src: {:?}", id);
-
-                let res = self
-                    .inner()
-                    .resolve_span(id)
-                    .await
-                    .map_err(|err| {
-                        error!("TypstActor: failed to resolve doc to src jump: {:#}", err);
-                    })
-                    .ok()
-                    .flatten();
+            TypstActorRequest::DocToSrcJumpResolve(span_range) => {
+                debug!("TypstActor: processing doc2src: {:?}", span_range);
+                let res = self.resolve_span_range(span_range).await;
 
                 if let Some(info) = res {
                     let _ = self
@@ -252,6 +245,90 @@ impl TypstClient {
                 debug!("TypstActor: processing REMOVE memory files: {:?}", m.files);
                 self.remove_shadow_files(m);
             }
+        }
+    }
+
+    async fn resolve_span(&mut self, s: Span, offset: Option<usize>) -> Option<DocToSrcJumpInfo> {
+        self.inner()
+            .resolve_span_and_offset(s, offset)
+            .await
+            .map_err(|err| {
+                error!("TypstActor: failed to resolve doc to src jump: {:#}", err);
+            })
+            .ok()
+            .flatten()
+    }
+
+    async fn resolve_span_offset(&mut self, s: SourceSpanOffset) -> Option<DocToSrcJumpInfo> {
+        self.resolve_span(s.span, Some(s.offset)).await
+    }
+
+    async fn resolve_span_range(
+        &mut self,
+        span_range: (SourceSpanOffset, SourceSpanOffset),
+    ) -> Option<DocToSrcJumpInfo> {
+        // Resolves FileLoC of start, end, and the element wide
+        let st_res = self.resolve_span_offset(span_range.0).await;
+        let ed_res = self.resolve_span_offset(span_range.1).await;
+        let elem_res = self.resolve_span(span_range.1.span, None).await;
+
+        // Combines the result of start and end
+        let range_res = match (st_res, ed_res) {
+            (Some(st), Some(ed)) => {
+                if st.filepath == ed.filepath
+                    && matches!((&st.start, &st.end), (Some(x), Some(y)) if x <= y)
+                {
+                    Some(DocToSrcJumpInfo {
+                        filepath: st.filepath,
+                        start: st.start,
+                        end: ed.start,
+                    })
+                } else {
+                    Some(ed)
+                }
+            }
+            (Some(e), None) | (None, Some(e)) => Some(e),
+            (None, None) => None,
+        };
+
+        // Account for the case where the start and end are out of order.
+        //
+        // This could happen because typst supports scripting, which makes text out of
+        // order
+        let range_res = {
+            let mut range_res = range_res;
+            if let Some(info) = &mut range_res {
+                if let Some((x, y)) = info.start.zip(info.end) {
+                    if y <= x {
+                        std::mem::swap(&mut info.start, &mut info.end);
+                    }
+                }
+            }
+
+            range_res
+        };
+
+        // Restricts the range to the element's range
+        match (elem_res, range_res) {
+            (Some(elem), Some(mut rng)) if elem.filepath == rng.filepath => {
+                // Account for the case where the element's range is out of order.
+                let elem_start = elem.start.or(elem.end);
+                let elem_end = elem.end.or(elem_start);
+
+                // Account for the case where the range is out of order.
+                let rng_start = rng.start.or(rng.end);
+                let rng_end = rng.end.or(rng_start);
+
+                if let Some((((u, inner_u), inner_v), v)) =
+                    elem_start.zip(rng_start).zip(rng_end).zip(elem_end)
+                {
+                    rng.start = Some(inner_u.max(u).min(v));
+                    rng.end = Some(inner_v.max(u).min(v));
+                }
+                Some(rng)
+            }
+            (.., Some(e)) | (Some(e), None) => Some(e),
+            (None, None) => None,
         }
     }
 

@@ -154,7 +154,8 @@ impl EditorActor {
                             debug!("EditorActor: received message from editor: {:?}", jump_info);
                             let jump_info = u64::from_str_radix(&jump_info.span, 16).unwrap();
                             if let Some(span) = span_id_from_u64(jump_info) {
-                                self.world_sender.send(TypstActorRequest::DocToSrcJumpResolve(span)).unwrap();
+                                let span_and_offset = span.into();
+                                self.world_sender.send(TypstActorRequest::DocToSrcJumpResolve((span_and_offset, span_and_offset))).unwrap();
                             };
                         }
                         ControlPlaneMessage::SyncMemoryFiles(memory_files) => {

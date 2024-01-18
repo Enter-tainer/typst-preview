@@ -109,7 +109,8 @@ impl WebviewActor {
                         let location = msg.split(' ').nth(1).unwrap();
                         let id = u64::from_str_radix(location, 16).unwrap();
                         if let Some(span) = span_id_from_u64(id) {
-                            let Ok(_) = self.doc_action_sender.send(TypstActorRequest::DocToSrcJumpResolve(span)) else {
+                            let span_and_offset = span.into();
+                            let Ok(_) = self.doc_action_sender.send(TypstActorRequest::DocToSrcJumpResolve((span_and_offset, span_and_offset))) else {
                                 info!("WebviewActor: failed to send DocToSrcJumpResolve message to TypstActor");
                                 break;
                             };
