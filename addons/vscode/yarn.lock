@@ -2045,8 +2045,9 @@ typescript@^5.0.2:
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.1.3.tgz#8d84219244a6b40b6fb2b33cc1c062f715b9e826"
   integrity sha512-XH627E9vkeqhlZFQuL+UsyAXEnibT0kWR2FWONlr4sTjvxyJYnyefgrkyECLzM5NenmKzRAy2rR/OlYLA1HkZw==
 
-"typst-dom@file:../typst-dom":
+"typst-dom@link:../typst-dom":
   version "0.0.0"
+  uid ""
 
 "typst-preview-frontend@file:../frontend":
   version "0.0.0"
@@ -2054,7 +2055,7 @@ typescript@^5.0.2:
     "@myriaddreamin/typst-ts-renderer" "0.4.2-rc5"
     "@myriaddreamin/typst.ts" "0.4.2-rc5"
     rxjs "^7.8.1"
-    typst-dom "file:../../../../../AppData/Local/Yarn/Cache/v6/npm-typst-preview-frontend-0.0.0-28c3591a-9ced-44c4-b534-5269086d4b05-1705158597754/node_modules/typst-dom"
+    typst-dom "link:../../../../../AppData/Local/Yarn/Cache/v6/npm-typst-preview-frontend-0.0.0-b6b2e3f5-e169-4baa-9cd7-dec625f6a13f-1704984837710/node_modules/typst-dom"
 
 uc.micro@^1.0.1, uc.micro@^1.0.5:
   version "1.0.6"

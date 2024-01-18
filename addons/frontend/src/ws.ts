@@ -10,6 +10,7 @@ import renderModule from "@myriaddreamin/typst-ts-renderer/pkg/typst_ts_renderer
 import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 import { WebSocketSubject, webSocket } from 'rxjs/webSocket';
 import { Subject, Subscription, buffer, debounceTime, fromEvent, tap } from "rxjs";
+export { PreviewMode } from 'typst-dom/typst-doc.mjs';
 
 // for debug propose
 // queryObjects((window as any).TypstRenderSession);
