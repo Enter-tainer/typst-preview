@@ -1,6 +1,5 @@
 mod actor;
 mod args;
-mod debug_loc;
 mod outline;
 
 use std::{collections::HashMap, path::PathBuf, sync::Arc};

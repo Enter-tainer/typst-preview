@@ -1,11 +1,10 @@
 use std::num::NonZeroUsize;
 
-use crate::debug_loc::DocumentPosition;
-
 use serde::Serialize;
 use typst::foundations::{Content, NativeElement, Smart};
 use typst::introspection::Introspector;
 use typst::model::HeadingElem;
+use typst_ts_core::debug_loc::DocumentPosition;
 use typst_ts_core::vector::span_id_to_u64;
 use typst_ts_core::TypstDocument;
 

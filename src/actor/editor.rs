@@ -4,13 +4,14 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tokio::{net::TcpStream, sync::broadcast};
 use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
+use typst_ts_core::debug_loc::DocumentPosition;
 use typst_ts_core::vector::span_id_from_u64;
 
+use crate::outline::Outline;
 use crate::{
     actor::typst::TypstActorRequest, ChangeCursorPositionRequest, DocToSrcJumpInfo, MemoryFiles,
     MemoryFilesShort, SrcToDocJumpRequest,
 };
-use crate::{debug_loc::DocumentPosition, outline::Outline};
 
 use super::webview::WebviewActorRequest;
 #[derive(Debug, Deserialize)]

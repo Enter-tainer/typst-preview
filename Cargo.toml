@@ -60,9 +60,8 @@ typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts", re
 typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "98e3d3a42877b195f87223060882d55fd5aaa04a", package = "typst-ts-core" }
 typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "98e3d3a42877b195f87223060882d55fd5aaa04a", package = "typst-ts-compiler" }
 
-# typst = { path = "../../rust/typst/crates/typst" }
-# typst-library = { path = "../../rust/typst/crates/typst-library" }
-# typst-syntax = { path = "../../rust/typst/crates/typst-syntax" }
+# typst = { path = "../../../typst/crates/typst" }
+# typst-syntax = { path = "../../../typst/crates/typst-syntax" }
 # hayagriva = { path = "../../rust/hayagriva" }
 # typst-ts-svg-exporter = { path = "../../exporter/svg" }
 # typst-ts-compiler = { path = "../../compiler" }
