@@ -69,10 +69,11 @@ export function provideSvgDoc<
             continue;
           }
           console.log('svg post check cursorPaths leaf', leaf);
+
+          // Finds glyphs in the text element
           let useIdx = 0;
           let foundUse: SVGUseElement | undefined = undefined;
           let foundUseNext: SVGUseElement | undefined = undefined;
-          // let foundUseNext = undefined;
           for (const use of leaf[0].children) {
             if (use.tagName === 'use') {
               useIdx++;
@@ -87,52 +88,40 @@ export function provideSvgDoc<
           }
 
           if (foundUse !== undefined) {
-            // put them inside of svg instead
-            // const rect = foundUse.getBoundingClientRect();
-            // get rect inside of the group
             const g = leaf[0] as SVGGraphicsElement;
             // const textBase = g.getBBox();
             const rectBase = foundUse.getBBox();
             const rectNextBase = foundUseNext?.getBBox();
-            // const rectX = Number.parseFloat(foundUse.getAttribute('x')!);
             const rect = {
-              // right: rectX + rectBase.x + rectBase.width,
+              // Some char does not have position so they are resolved to 0
               right: (rectBase.width !== 0) ? (rectBase.x + rectBase.width) : (rectNextBase?.x || 0),
               // todo: have bug
               // top: textBase.height / 2,
             }
-            const t = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
-            t.classList.add('typst-svg-cursor');
-            t.setAttribute('cx', `${rect.right}`);
-            // t.setAttribute('cy', `${rect.top}`);
-            // t.setAttribute('r', '5');
-            // get transform matrix
-            // const mat = g.transform.baseVal.consolidate()?.matrix;
+            // Gets transform matrix
             const mat = g.getScreenCTM();
-            // set correct radius
+            // Calculates correct 5px radius
             let rx = 5;
             let ry = 5;
-            // console.log('svg post check cursorPaths mat', textBase, rectBase, rectNextBase, mat);
             const matInv = mat?.inverse();
             if (matInv) {
-              // console.log('svg post check cursorPaths matInv', matInv);
-              // r = r * matInv.a;
-              // consider scale and skew
               const sx = matInv.a;
               const ky = matInv.b;
               const kx = matInv.c;
               const sy = matInv.d;
-              // x' = x * sx + y * kx + tx
-              // y' = x * ky + y * sy + ty
 
               const rrx = rx * sx + ry * kx;
               const rry = ry * sy + rx * ky;
               rx = rrx;
               ry = rry;
             }
-
             rx = Math.abs(rx);
             ry = Math.abs(ry);
+
+            const t = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
+            t.classList.add('typst-svg-cursor');
+            t.setAttribute('cx', `${rect.right}`);
+            // t.setAttribute('cy', `${rect.top}`);
             t.setAttribute('rx', `${rx}`);
             t.setAttribute('ry', `${ry}`);
             t.setAttribute('fill', '#86C16688');
