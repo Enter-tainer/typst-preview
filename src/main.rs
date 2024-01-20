@@ -147,6 +147,7 @@ async fn main() {
     let _ = tokio::join!(previewer.join(), static_server_handle);
 }
 
+#[cfg(feature = "embed-fonts")]
 pub static EMBEDDED_FONT: &[Cow<'_, [u8]>] = &[
     // Embed default fonts.
     Cow::Borrowed(include_bytes!("../assets/fonts/LinLibertine_R.ttf").as_slice()),

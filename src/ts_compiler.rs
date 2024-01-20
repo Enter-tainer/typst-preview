@@ -10,17 +10,16 @@ use typst::model::Document;
 use typst::syntax::Span;
 
 use typst_ts_compiler::service::{
-    CompileActor, CompileClient as TsCompileClient, CompileExporter, Compiler, DocToSrcJumpInfo,
-    WorldExporter,
+    CompileActor, CompileClient as TsCompileClient, CompileExporter, Compiler, WorldExporter,
 };
 use typst_ts_compiler::service::{CompileDriver, CompileMiddleware};
 use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
 use typst_ts_core::debug_loc::SourceSpanOffset;
 use typst_ts_core::error::prelude::ZResult;
 
-use typst_preview::Location;
 use typst_preview::{CompilationHandle, CompileStatus};
 use typst_preview::{CompileHost, EditorServer, MemoryFiles, MemoryFilesShort, SourceFileServer};
+use typst_preview::{DocToSrcJumpInfo, Location};
 
 pub type CompileService<H> = CompileActor<Reporter<CompileExporter<CompileDriver>, H>>;
 pub type CompileClient<H> = TsCompileClient<CompileService<H>>;
@@ -143,7 +142,12 @@ impl<H: CompilationHandle> SourceFileServer for TypstClient<H> {
                 error!("TypstActor: failed to resolve doc to src jump: {:#}", err);
             })
             .ok()
-            .flatten())
+            .flatten()
+            .map(|e| DocToSrcJumpInfo {
+                filepath: e.filepath,
+                start: e.start,
+                end: e.end,
+            }))
     }
 }
 

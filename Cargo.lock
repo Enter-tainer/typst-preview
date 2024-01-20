@@ -3507,13 +3507,10 @@ version = "0.10.7"
 dependencies = [
  "anyhow",
  "await-tree",
- "chrono",
  "clap",
  "clap_complete",
  "clap_mangen",
- "codespan-reporting",
  "comemo",
- "dirs",
  "elsa",
  "env_logger",
  "futures",
@@ -3524,10 +3521,8 @@ dependencies = [
  "notify",
  "once_cell",
  "open",
- "same-file",
  "serde",
  "serde_json",
- "siphasher 1.0.0",
  "tiny-skia",
  "tokio",
  "tokio-tungstenite",
@@ -3536,7 +3531,6 @@ dependencies = [
  "typst-ts-core",
  "typst-ts-svg-exporter",
  "vergen",
- "walkdir",
 ]
 
 [[package]]

@@ -3,7 +3,6 @@ use await_tree::InstrumentAwait;
 use log::{debug, error, info};
 use tokio::sync::{broadcast, mpsc};
 use typst::syntax::Span;
-use typst_ts_compiler::service::DocToSrcJumpInfo;
 use typst_ts_core::debug_loc::{CharPosition, SourceLocation, SourceSpanOffset};
 
 use crate::await_tree::REGISTRY;
@@ -14,6 +13,7 @@ use crate::{
 
 use super::render::RenderActorRequest;
 use super::{editor::EditorActorRequest, webview::WebviewActorRequest};
+use crate::DocToSrcJumpInfo;
 
 #[derive(Debug)]
 pub enum TypstActorRequest {
