@@ -1,9 +1,11 @@
 mod actor;
 mod args;
+mod debug_loc;
 mod outline;
 
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
+use debug_loc::SpanInterner;
 use futures::SinkExt;
 use log::info;
 use serde::Deserialize;
@@ -130,11 +132,15 @@ pub async fn preview(arguments: PreviewArgs, compiler_driver: CompileDriver) -> 
         webview_tx.clone(),
     );
 
+    // Shared resource
+    let span_interner = SpanInterner::new();
+
     tokio::spawn(typst_actor.run());
 
     let (data_plane_port_tx, data_plane_port_rx) = tokio::sync::oneshot::channel();
     let data_plane_addr = arguments.data_plane_host;
     let data_plane_handle = {
+        let span_interner = span_interner.clone();
         let typst_tx = typst_mailbox.0.clone();
         let webview_tx = webview_tx.clone();
         let doc_watch_rx = doc_watch.1.clone();
@@ -149,6 +155,7 @@ pub async fn preview(arguments: PreviewArgs, compiler_driver: CompileDriver) -> 
             );
             let _ = data_plane_port_tx.send(listener.local_addr().unwrap().port());
             while let Ok((stream, _)) = listener.accept().await {
+                let span_interner = span_interner.clone();
                 let webview_tx = webview_tx.clone();
                 let webview_rx = webview_tx.subscribe();
                 let typst_tx = typst_tx.clone();
@@ -166,7 +173,7 @@ pub async fn preview(arguments: PreviewArgs, compiler_driver: CompileDriver) -> 
                     svg.1,
                     webview_tx.clone(),
                     webview_rx,
-                    typst_tx.clone(),
+                    editor_conn.0.clone(),
                     renderer_tx.clone(),
                 );
                 tokio::spawn(webview_actor.run());
@@ -182,6 +189,7 @@ pub async fn preview(arguments: PreviewArgs, compiler_driver: CompileDriver) -> 
                     renderer_tx.subscribe(),
                     doc_watch_rx,
                     editor_conn.0.clone(),
+                    span_interner,
                 );
                 outline_render_actor.spawn();
             }
@@ -190,6 +198,7 @@ pub async fn preview(arguments: PreviewArgs, compiler_driver: CompileDriver) -> 
 
     let control_plane_addr = arguments.control_plane_host;
     let control_plane_handle = {
+        let span_interner = span_interner.clone();
         let typst_tx = typst_mailbox.0.clone();
         let editor_rx = editor_conn.1;
         tokio::spawn(async move {
@@ -201,7 +210,8 @@ pub async fn preview(arguments: PreviewArgs, compiler_driver: CompileDriver) -> 
             );
             let (stream, _) = listener.accept().await.unwrap();
             let conn = accept_connection(stream).await;
-            let editor_actor = EditorActor::new(editor_rx, conn, typst_tx, webview_tx);
+            let editor_actor =
+                EditorActor::new(editor_rx, conn, typst_tx, webview_tx, span_interner);
             editor_actor.run().await;
         })
     };

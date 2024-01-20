@@ -5,10 +5,11 @@ use tokio::{
     sync::{broadcast, mpsc},
 };
 use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
-use typst_ts_core::{debug_loc::ElementPoint, vector::span_id_from_u64};
+use typst_ts_core::debug_loc::{DocumentPosition, ElementPoint};
 
-use super::{render::RenderActorRequest, typst::TypstActorRequest};
-use crate::{actor::render::ResolveSpanRequest, debug_loc::DocumentPosition};
+use crate::actor::{editor::DocToSrcJumpResolveRequest, render::ResolveSpanRequest};
+
+use super::{editor::EditorActorRequest, render::RenderActorRequest};
 
 // pub type CursorPosition = DocumentPosition;
 pub type SrcToDocJumpInfo = DocumentPosition;
@@ -34,7 +35,7 @@ pub struct WebviewActor {
     mailbox: broadcast::Receiver<WebviewActorRequest>,
 
     broadcast_sender: broadcast::Sender<WebviewActorRequest>,
-    doc_action_sender: mpsc::UnboundedSender<TypstActorRequest>,
+    editor_sender: mpsc::UnboundedSender<EditorActorRequest>,
     render_sender: broadcast::Sender<RenderActorRequest>,
 }
 
@@ -56,7 +57,7 @@ impl WebviewActor {
         svg_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
         broadcast_sender: broadcast::Sender<WebviewActorRequest>,
         mailbox: broadcast::Receiver<WebviewActorRequest>,
-        doc_action_sender: mpsc::UnboundedSender<TypstActorRequest>,
+        editor_sender: mpsc::UnboundedSender<EditorActorRequest>,
         render_sender: broadcast::Sender<RenderActorRequest>,
     ) -> Self {
         Self {
@@ -64,7 +65,7 @@ impl WebviewActor {
             svg_receiver,
             mailbox,
             broadcast_sender,
-            doc_action_sender,
+            editor_sender,
             render_sender,
         }
     }
@@ -113,14 +114,11 @@ impl WebviewActor {
                         self.render_sender.send(RenderActorRequest::RenderFullLatest).unwrap();
                     } else if msg.starts_with("srclocation") {
                         let location = msg.split(' ').nth(1).unwrap();
-                        let id = u64::from_str_radix(location, 16).unwrap();
-                        if let Some(span) = span_id_from_u64(id) {
-                            let span_and_offset = span.into();
-                            let Ok(_) = self.doc_action_sender.send(TypstActorRequest::DocToSrcJumpResolve((span_and_offset, span_and_offset))) else {
-                                info!("WebviewActor: failed to send DocToSrcJumpResolve message to TypstActor");
-                                break;
-                            };
-                        };
+                        self.editor_sender.send(EditorActorRequest::DocToSrcJumpResolve(
+                            DocToSrcJumpResolveRequest {
+                                span: location.trim().to_owned(),
+                            },
+                        )).unwrap();
                     } else if msg.starts_with("outline-sync") {
                         let location = msg.split(',').nth(1).unwrap();
                         let location = location.split(' ').collect::<Vec::<&str>>();
