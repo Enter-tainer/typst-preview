@@ -247,8 +247,8 @@ function getCharIndex(elem: Element, mouseX: number, mouseY: number) {
   return foundIndex;
 }
 
-export function installEditorJumpToHandler(svgDoc: any, docRoot: HTMLElement) {
-  const findSourceLocation = async (event: MouseEvent, elem: Element) => {
+export function installEditorJumpToHandler(docRoot: HTMLElement) {
+  const collectElementPath = async (event: MouseEvent, elem: Element) => {
     const visitChain: [SourceMappingType, Element, string][] = [];
     while (elem) {
       let srcElem = castToSourceMappingElement(elem);
@@ -277,7 +277,7 @@ export function installEditorJumpToHandler(svgDoc: any, docRoot: HTMLElement) {
       return undefined;
     }
 
-    console.log('visitChain', visitChain);
+    // console.log('visitChain', visitChain);
 
     let startIdx = 1;
     if (visitChain.length >= 1 && visitChain[0][0] === SourceMappingType.CharIndex) {
@@ -311,19 +311,7 @@ export function installEditorJumpToHandler(svgDoc: any, docRoot: HTMLElement) {
     (visitChain[0][1] as any) = childIdx;
 
     const sourceNodePath = visitChain;
-
-    // The page always shadowed by group, so we remove it.
-    // todo: where should I remove group under page? Putting here is a bit magical.
-    // sourceNodePath.splice(2, 2);
-
-    console.log("source location", sourceNodePath);
-
-    void (svgDoc);
-    // svgDoc.get_source_loc(sourceNodePath);
-    window.typstWebsocket.send(`srcpath ${JSON.stringify(sourceNodePath)}`);
-    // todo: response from server;
-
-    return undefined;
+    return sourceNodePath;
   };
 
   removeSourceMappingHandler(docRoot);
@@ -332,11 +320,11 @@ export function installEditorJumpToHandler(svgDoc: any, docRoot: HTMLElement) {
   ) => {
     let elem = event.target! as Element;
 
-    const sourceLoc = await findSourceLocation(event, elem);
-    if (!sourceLoc) {
+    const elementPath = await collectElementPath(event, elem);
+    if (!elementPath) {
       return;
     }
-    console.log("source location", sourceLoc);
+    console.log("element path", elementPath);
 
     const triggerWindow = document.body || document.firstElementChild;
     const basePos = triggerWindow.getBoundingClientRect();
@@ -353,7 +341,7 @@ export function installEditorJumpToHandler(svgDoc: any, docRoot: HTMLElement) {
       "typst-debug-react-ripple-effect .4s linear"
     );
 
-    window.typstWebsocket.send(`srclocation ${sourceLoc}`);
+    window.typstWebsocket.send(`srcpath ${JSON.stringify(elementPath)}`);
     return;
   });
 
@@ -370,7 +358,7 @@ export function provideDebugJumpDoc<
     constructor(...args: any[]) {
       super(...args);
       if (this.opts.sourceMapping !== false) {
-        installEditorJumpToHandler(this.kModule, this.hookedElem);
+        installEditorJumpToHandler(this.hookedElem);
         this.disposeList.push(() => {
           if (this.hookedElem) {
             removeSourceMappingHandler(this.hookedElem);
