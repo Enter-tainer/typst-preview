@@ -5,8 +5,9 @@ use typst::foundations::{Content, NativeElement, Smart};
 use typst::introspection::Introspector;
 use typst::model::HeadingElem;
 use typst_ts_core::debug_loc::DocumentPosition;
-use typst_ts_core::vector::span_id_to_u64;
 use typst_ts_core::TypstDocument;
+
+use crate::debug_loc::SpanInternerImpl;
 
 /// A heading in the outline panel.
 #[derive(Debug, Clone)]
@@ -129,24 +130,24 @@ struct OutlineItem {
     children: Vec<OutlineItem>,
 }
 
-pub fn outline(document: &TypstDocument) -> Outline {
+pub fn outline(interner: &mut SpanInternerImpl, document: &TypstDocument) -> Outline {
     let outline = get_outline(&document.introspector);
     let mut items = Vec::with_capacity(outline.as_ref().map_or(0, Vec::len));
 
     for heading in outline.iter().flatten() {
-        outline_item(heading, &mut items);
+        outline_item(interner, heading, &mut items);
     }
 
     Outline { items }
 }
 
-fn outline_item(src: &HeadingNode, res: &mut Vec<OutlineItem>) {
+fn outline_item(interner: &mut SpanInternerImpl, src: &HeadingNode, res: &mut Vec<OutlineItem>) {
     let body = src.element.expect_field_by_name::<Content>("body");
     let title = body.plain_text().trim().to_owned();
 
     let mut children = Vec::with_capacity(src.children.len());
     for child in src.children.iter() {
-        outline_item(child, &mut children);
+        outline_item(interner, child, &mut children);
     }
 
     // use body's span first, otherwise use the element's span.
@@ -157,9 +158,11 @@ fn outline_item(src: &HeadingNode, res: &mut Vec<OutlineItem>) {
         span
     };
 
+    let span = interner.intern(span);
+
     res.push(OutlineItem {
         title,
-        span: Some(format!("{:x}", span_id_to_u64(&span))),
+        span: Some(span.to_hex()),
         position: Some(src.position),
         children,
     });

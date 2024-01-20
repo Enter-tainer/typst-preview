@@ -5,8 +5,8 @@ use tokio::sync::mpsc;
 use tokio::{net::TcpStream, sync::broadcast};
 use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
 use typst_ts_core::debug_loc::DocumentPosition;
-use typst_ts_core::vector::span_id_from_u64;
 
+use crate::debug_loc::{InternQuery, SpanInterner};
 use crate::outline::Outline;
 use crate::{
     actor::typst::TypstActorRequest, ChangeCursorPositionRequest, DocToSrcJumpInfo, MemoryFiles,
@@ -17,7 +17,7 @@ use super::webview::WebviewActorRequest;
 #[derive(Debug, Deserialize)]
 pub struct DocToSrcJumpResolveRequest {
     /// Span id in hex-format.
-    span: String,
+    pub span: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -35,6 +35,7 @@ pub enum CompileStatus {
 
 #[derive(Debug)]
 pub enum EditorActorRequest {
+    DocToSrcJumpResolve(DocToSrcJumpResolveRequest),
     DocToSrcJump(DocToSrcJumpInfo),
     Outline(Outline),
     CompileStatus(CompileStatus),
@@ -46,6 +47,8 @@ pub struct EditorActor {
 
     world_sender: mpsc::UnboundedSender<TypstActorRequest>,
     webview_sender: broadcast::Sender<WebviewActorRequest>,
+
+    span_interner: SpanInterner,
 }
 
 #[derive(Debug, Deserialize)]
@@ -86,12 +89,15 @@ impl EditorActor {
         editor_websocket_conn: WebSocketStream<TcpStream>,
         world_sender: mpsc::UnboundedSender<TypstActorRequest>,
         webview_sender: broadcast::Sender<WebviewActorRequest>,
+        span_interner: SpanInterner,
     ) -> Self {
         Self {
             mailbox,
             editor_websocket_conn,
             world_sender,
             webview_sender,
+
+            span_interner,
         }
     }
 
@@ -114,6 +120,9 @@ impl EditorActor {
                                 warn!("EditorActor: failed to send DocToSrcJump message to editor");
                                 break;
                             };
+                        },
+                        EditorActorRequest::DocToSrcJumpResolve(req) => {
+                            self.source_scroll_by_span(req.span).await;
                         },
                         EditorActorRequest::CompileStatus(status) => {
                             let Ok(_) = self.editor_websocket_conn.send(Message::Text(
@@ -153,11 +162,8 @@ impl EditorActor {
                         }
                         ControlPlaneMessage::DocToSrcJumpResolve(jump_info) => {
                             debug!("EditorActor: received message from editor: {:?}", jump_info);
-                            let jump_info = u64::from_str_radix(&jump_info.span, 16).unwrap();
-                            if let Some(span) = span_id_from_u64(jump_info) {
-                                let span_and_offset = span.into();
-                                self.world_sender.send(TypstActorRequest::DocToSrcJumpResolve((span_and_offset, span_and_offset))).unwrap();
-                            };
+
+                            self.source_scroll_by_span(jump_info.span).await;
                         }
                         ControlPlaneMessage::SyncMemoryFiles(memory_files) => {
                             debug!("EditorActor: received message from editor: SyncMemoryFiles {:?}", memory_files.files.keys().collect::<Vec<_>>());
@@ -177,5 +183,26 @@ impl EditorActor {
         }
         info!("EditorActor: ws disconnected, shutting down whole program");
         std::process::exit(0);
+    }
+
+    async fn source_scroll_by_span(&mut self, span: String) {
+        let jump_info = {
+            match self.span_interner.span_by_str(&span).await {
+                InternQuery::Ok(s) => s,
+                InternQuery::UseAfterFree => {
+                    warn!("EditorActor: out of date span id: {}", span);
+                    return;
+                }
+            }
+        };
+        if let Some(span) = jump_info {
+            let span_and_offset = span.into();
+            self.world_sender
+                .send(TypstActorRequest::DocToSrcJumpResolve((
+                    span_and_offset,
+                    span_and_offset,
+                )))
+                .unwrap();
+        };
     }
 }

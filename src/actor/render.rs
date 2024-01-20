@@ -4,7 +4,10 @@ use log::{debug, info, trace};
 use tokio::sync::{broadcast, mpsc, watch};
 use typst::model::Document;
 use typst_ts_core::debug_loc::{ElementPoint, SourceSpanOffset};
+use typst_ts_core::TypstDocument;
 use typst_ts_svg_exporter::IncrSvgDocServer;
+
+use crate::{debug_loc::SpanInterner, outline::Outline};
 
 use super::{editor::EditorActorRequest, typst::TypstActorRequest, webview::WebviewActorRequest};
 
@@ -164,6 +167,8 @@ pub struct OutlineRenderActor {
     signal: broadcast::Receiver<RenderActorRequest>,
     document: watch::Receiver<Option<Arc<Document>>>,
     editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
+
+    span_interner: SpanInterner,
 }
 
 impl OutlineRenderActor {
@@ -171,11 +176,13 @@ impl OutlineRenderActor {
         signal: broadcast::Receiver<RenderActorRequest>,
         document: watch::Receiver<Option<Arc<Document>>>,
         editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
+        span_interner: SpanInterner,
     ) -> Self {
         Self {
             signal,
             document,
             editor_tx,
+            span_interner,
         }
     }
 
@@ -210,7 +217,7 @@ impl OutlineRenderActor {
                 info!("OutlineRenderActor: document is not ready");
                 continue;
             };
-            let data = crate::outline::outline(&document);
+            let data = self.outline(&document).await;
             comemo::evict(30);
             debug!("OutlineRenderActor: sending outline");
             let Ok(_) = self.editor_tx.send(EditorActorRequest::Outline(data)) else {
@@ -219,5 +226,14 @@ impl OutlineRenderActor {
             };
         }
         info!("OutlineRenderActor: exiting")
+    }
+
+    async fn outline(&self, document: &TypstDocument) -> Outline {
+        self.span_interner
+            .with_writer(|interner| {
+                interner.reset();
+                crate::outline::outline(interner, document)
+            })
+            .await
     }
 }
