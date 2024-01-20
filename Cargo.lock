@@ -1737,7 +1737,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c168f8615b12bc01f9c17e2eb0cc07dcae1940121185446edc3744920e8ef45"
 dependencies = [
  "autocfg",
- "owning_ref",
  "scopeguard",
 ]
 
@@ -1993,15 +1992,6 @@ name = "option-ext"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
-
-[[package]]
-name = "owning_ref"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ff55baddef9e4ad00f88b6c743a2a8062d4c6ade126c2a528644b8e444d52ce"
-dependencies = [
- "stable_deref_trait",
-]
 
 [[package]]
 name = "palette"
@@ -3411,8 +3401,8 @@ dependencies = [
 
 [[package]]
 name = "typst-ts-compiler"
-version = "0.4.2-rc5"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=8e92ca47e324b0834e4537b3229d51b9e9200528#8e92ca47e324b0834e4537b3229d51b9e9200528"
+version = "0.4.2-rc6"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=c5c75842792e6e82c88833e61a3ae843fcfd41ed#c5c75842792e6e82c88833e61a3ae843fcfd41ed"
 dependencies = [
  "append-only-vec",
  "base64",
@@ -3449,8 +3439,8 @@ dependencies = [
 
 [[package]]
 name = "typst-ts-core"
-version = "0.4.2-rc5"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=8e92ca47e324b0834e4537b3229d51b9e9200528#8e92ca47e324b0834e4537b3229d51b9e9200528"
+version = "0.4.2-rc6"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=c5c75842792e6e82c88833e61a3ae843fcfd41ed#c5c75842792e6e82c88833e61a3ae843fcfd41ed"
 dependencies = [
  "base64",
  "base64-serde",
@@ -3466,7 +3456,6 @@ dependencies = [
  "hex",
  "log",
  "once_cell",
- "owning_ref",
  "parking_lot",
  "path-clean",
  "rayon",
@@ -3478,7 +3467,6 @@ dependencies = [
  "serde_with",
  "sha2",
  "siphasher 1.0.0",
- "svgtypes",
  "tiny-skia",
  "tiny-skia-path",
  "ttf-parser",
@@ -3488,8 +3476,8 @@ dependencies = [
 
 [[package]]
 name = "typst-ts-svg-exporter"
-version = "0.4.2-rc5"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=8e92ca47e324b0834e4537b3229d51b9e9200528#8e92ca47e324b0834e4537b3229d51b9e9200528"
+version = "0.4.2-rc6"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=c5c75842792e6e82c88833e61a3ae843fcfd41ed#c5c75842792e6e82c88833e61a3ae843fcfd41ed"
 dependencies = [
  "base64",
  "comemo",
