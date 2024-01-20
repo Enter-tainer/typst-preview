@@ -4,9 +4,10 @@ use log::{debug, info, trace};
 use serde::Deserialize;
 use tokio::sync::{broadcast, mpsc, watch};
 use typst::model::Document;
+use typst_ts_core::debug_loc::SourceSpanOffset;
 use typst_ts_svg_exporter::IncrSvgDocServer;
 
-use super::{editor::EditorActorRequest, typst::TypstActorRequest};
+use super::{editor::EditorActorRequest, typst::TypstActorRequest, webview::WebviewActorRequest};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ResolveSpanRequest(Vec<(u32, u32, String)>);
@@ -16,6 +17,7 @@ pub enum RenderActorRequest {
     RenderFullLatest,
     RenderIncremental,
     ResolveSpan(ResolveSpanRequest),
+    ChangeCursorPosition(SourceSpanOffset),
 }
 
 impl RenderActorRequest {
@@ -24,6 +26,7 @@ impl RenderActorRequest {
             Self::RenderFullLatest => true,
             Self::RenderIncremental => false,
             Self::ResolveSpan(_) => false,
+            Self::ChangeCursorPosition(_) => false,
         }
     }
 }
@@ -34,6 +37,7 @@ pub struct RenderActor {
     renderer: IncrSvgDocServer,
     resolve_sender: mpsc::UnboundedSender<TypstActorRequest>,
     svg_sender: mpsc::UnboundedSender<Vec<u8>>,
+    webview_sender: broadcast::Sender<WebviewActorRequest>,
 }
 
 impl RenderActor {
@@ -42,6 +46,7 @@ impl RenderActor {
         document: watch::Receiver<Option<Arc<Document>>>,
         resolve_sender: mpsc::UnboundedSender<TypstActorRequest>,
         svg_sender: mpsc::UnboundedSender<Vec<u8>>,
+        webview_sender: broadcast::Sender<WebviewActorRequest>,
     ) -> Self {
         let mut res = Self {
             mailbox,
@@ -49,6 +54,7 @@ impl RenderActor {
             renderer: IncrSvgDocServer::default(),
             resolve_sender,
             svg_sender,
+            webview_sender,
         };
         res.renderer.set_should_attach_debug_info(true);
         res
@@ -66,27 +72,42 @@ impl RenderActor {
 
         let res = msg.is_full_render();
 
-        if let RenderActorRequest::ResolveSpan(ResolveSpanRequest(spans)) = msg {
-            info!("RenderActor: resolving span: {:?}", spans);
-            let spans = match self.renderer.source_span(&spans) {
-                Ok(spans) => spans,
-                Err(e) => {
-                    info!("RenderActor: failed to resolve span: {}", e);
-                    return false;
-                }
-            };
-
-            info!("RenderActor: resolved span: {:?}", spans);
-            // end position is used
-            if let Some(spans) = spans {
-                let Ok(_) = self
-                    .resolve_sender
-                    .send(TypstActorRequest::DocToSrcJumpResolve(spans))
-                else {
-                    info!("RenderActor: resolve_sender is dropped");
-                    return false;
+        match msg {
+            RenderActorRequest::ResolveSpan(ResolveSpanRequest(element_path)) => {
+                info!("RenderActor: resolving span: {:?}", element_path);
+                let spans = match self.renderer.resolve_span_by_element_path(&element_path) {
+                    Ok(spans) => spans,
+                    Err(e) => {
+                        info!("RenderActor: failed to resolve span: {}", e);
+                        return false;
+                    }
                 };
+
+                info!("RenderActor: resolved span: {:?}", spans);
+                // end position is used
+                if let Some(spans) = spans {
+                    let Ok(_) = self
+                        .resolve_sender
+                        .send(TypstActorRequest::DocToSrcJumpResolve(spans))
+                    else {
+                        info!("RenderActor: resolve_sender is dropped");
+                        return false;
+                    };
+                }
             }
+            RenderActorRequest::ChangeCursorPosition(span_offset) => {
+                info!("RenderActor: changing cursor position: {:?}", span_offset);
+
+                let res = self.renderer.resolve_element_paths_by_span(span_offset);
+
+                info!("RenderActor: resolved element paths: {:?}", res);
+                if let Ok(info) = res {
+                    let _ = self
+                        .webview_sender
+                        .send(WebviewActorRequest::CursorPaths(info));
+                }
+            }
+            RenderActorRequest::RenderFullLatest | RenderActorRequest::RenderIncremental => {}
         }
 
         res

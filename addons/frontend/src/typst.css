@@ -137,3 +137,13 @@ path.outline_glyph {
     margin: -1.5vw;
   }
 }
+
+.typst-svg-cursor {
+  animation: 1s blink step-start infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}

@@ -80,6 +80,30 @@ function findIndexOfChild(elem: Element, child: Element) {
   return children.findIndex((x) => x[1] === child);
 }
 
+export function resolveSourceLeaf(elem: Element, path: [number, number, string][]): [Element, number] | undefined {
+  const page = elem.getElementsByClassName('typst-page')[0];
+  let curElem = page;
+
+  for (const idx of path.slice(1)) {
+    if (idx[0] === SourceMappingType.CharIndex) {
+      // console.log('done char');
+      return [curElem, idx[1]];
+    }
+    const children = castChildrenToSourceMappingElement(curElem);
+    console.log(idx, children);
+    if (idx[1] >= children.length) {
+      return undefined;
+    }
+    if (idx[0] != children[idx[1]][0]) {
+      return undefined;
+    }
+    curElem = children[idx[1]][1];
+  }
+
+  // console.log('done');
+  return [curElem, 0];
+}
+
 // const rotateColors = [
 //   "green",
 //   "blue",
@@ -330,7 +354,8 @@ export function installEditorJumpToHandler(svgDoc: any, docRoot: HTMLElement) {
   docRoot.addEventListener("click", sourceMappingHandler);
 }
 
-export interface TypstDebugJumpDocument { }
+export interface TypstDebugJumpDocument {
+}
 
 export function provideDebugJumpDoc<
   TBase extends GConstructor<TypstDocumentContext>

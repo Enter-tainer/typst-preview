@@ -4,8 +4,11 @@ import { TypstPatchAttrs, isDummyPatchElem } from "./typst-patch.mjs";
 import type { GConstructor, TypstDocumentContext } from "./typst-doc.mjs";
 import type { CanvasPage, TypstCanvasDocument } from "./typst-doc.canvas.mjs";
 import { patchSvgToContainer } from "./typst-patch.svg.mjs";
+import { resolveSourceLeaf } from "./typst-debug-info.mjs";
 
-export interface TypstSvgDocument {}
+export interface TypstSvgDocument {
+  setCursorPaths(paths: [number, number, string][][]): void;
+}
 
 export function provideSvgDoc<
   TBase extends GConstructor<
@@ -20,6 +23,13 @@ export function provideSvgDoc<
 
     shouldMixinCanvas(): this is TypstCanvasDocument {
       return !!this.feat$canvas;
+    }
+
+    /// cursor position in form of [page, x, y]
+    cursorPaths?: [number, number, string][][] = undefined;
+    setCursorPaths(paths: [number, number, string][][]) {
+      this.cursorPaths = paths;
+      this.addViewportChange();
     }
 
     postRender$svg() {
@@ -46,6 +56,90 @@ export function provideSvgDoc<
         this.decorateSvgElement(elem, mode)
       );
       const t3 = performance.now();
+
+      if (this.cursorPaths) {
+        for (const c of document.querySelectorAll('.typst-svg-cursor')) {
+          c.remove();
+        }
+        console.log('svg post check cursorPaths', this.cursorPaths);
+        for (const p of this.cursorPaths) {
+          const leaf = resolveSourceLeaf(this.hookedElem, p);
+          if (!leaf) {
+            console.log('svg post check cursorPaths leaf not found', p);
+            continue;
+          }
+          console.log('svg post check cursorPaths leaf', leaf);
+          let useIdx = 0;
+          let foundUse: SVGUseElement | undefined = undefined;
+          let foundUseNext: SVGUseElement | undefined = undefined;
+          // let foundUseNext = undefined;
+          for (const use of leaf[0].children) {
+            if (use.tagName === 'use') {
+              useIdx++;
+              if (useIdx == leaf[1]) {
+                foundUse = use as SVGUseElement;
+              }
+              if (useIdx == leaf[1] + 1) {
+                foundUseNext = use as SVGUseElement;
+                break;
+              }
+            }
+          }
+
+          if (foundUse !== undefined) {
+            // put them inside of svg instead
+            // const rect = foundUse.getBoundingClientRect();
+            // get rect inside of the group
+            const g = leaf[0] as SVGGraphicsElement;
+            // const textBase = g.getBBox();
+            const rectBase = foundUse.getBBox();
+            const rectNextBase = foundUseNext?.getBBox();
+            // const rectX = Number.parseFloat(foundUse.getAttribute('x')!);
+            const rect = {
+              // right: rectX + rectBase.x + rectBase.width,
+              right: (rectBase.width !== 0) ? (rectBase.x + rectBase.width) : (rectNextBase?.x || 0),
+              // todo: have bug
+              // top: textBase.height / 2,
+            }
+            const t = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
+            t.classList.add('typst-svg-cursor');
+            t.setAttribute('cx', `${rect.right}`);
+            // t.setAttribute('cy', `${rect.top}`);
+            // t.setAttribute('r', '5');
+            // get transform matrix
+            // const mat = g.transform.baseVal.consolidate()?.matrix;
+            const mat = g.getScreenCTM();
+            // set correct radius
+            let rx = 5;
+            let ry = 5;
+            // console.log('svg post check cursorPaths mat', textBase, rectBase, rectNextBase, mat);
+            const matInv = mat?.inverse();
+            if (matInv) {
+              // console.log('svg post check cursorPaths matInv', matInv);
+              // r = r * matInv.a;
+              // consider scale and skew
+              const sx = matInv.a;
+              const ky = matInv.b;
+              const kx = matInv.c;
+              const sy = matInv.d;
+              // x' = x * sx + y * kx + tx
+              // y' = x * ky + y * sy + ty
+
+              const rrx = rx * sx + ry * kx;
+              const rry = ry * sy + rx * ky;
+              rx = rrx;
+              ry = rry;
+            }
+
+            rx = Math.abs(rx);
+            ry = Math.abs(ry);
+            t.setAttribute('rx', `${rx}`);
+            t.setAttribute('ry', `${ry}`);
+            t.setAttribute('fill', '#86C16688');
+            leaf[0].appendChild(t);
+          }
+        }
+      }
 
       return [t2, t3];
     }

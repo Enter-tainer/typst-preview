@@ -22,7 +22,7 @@ use actor::editor::EditorActor;
 use actor::typst::TypstActor;
 pub use args::*;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ChangeCursorPositionRequest {
     filepath: PathBuf,
     line: usize,
@@ -139,6 +139,7 @@ pub async fn preview(arguments: PreviewArgs, compiler_driver: CompileDriver) -> 
         let typst_tx = typst_mailbox.0.clone();
         let webview_tx = webview_tx.clone();
         let doc_watch_rx = doc_watch.1.clone();
+        let renderer_tx = renderer_mailbox.0.clone();
         tokio::spawn(async move {
             // Create the event loop and TCP listener we'll accept connections on.
             let try_socket = TcpListener::bind(&data_plane_addr).await;
@@ -164,21 +165,22 @@ pub async fn preview(arguments: PreviewArgs, compiler_driver: CompileDriver) -> 
                 let webview_actor = actor::webview::WebviewActor::new(
                     conn,
                     svg.1,
-                    webview_tx,
+                    webview_tx.clone(),
                     webview_rx,
                     typst_tx.clone(),
-                    renderer_mailbox.0.clone(),
+                    renderer_tx.clone(),
                 );
                 tokio::spawn(webview_actor.run());
                 let render_actor = actor::render::RenderActor::new(
-                    renderer_mailbox.0.subscribe(),
+                    renderer_tx.subscribe(),
                     doc_watch_rx.clone(),
                     typst_tx,
                     svg.0,
+                    webview_tx,
                 );
                 render_actor.spawn();
                 let outline_render_actor = actor::render::OutlineRenderActor::new(
-                    renderer_mailbox.0.subscribe(),
+                    renderer_tx.subscribe(),
                     doc_watch_rx,
                     editor_conn.0.clone(),
                 );

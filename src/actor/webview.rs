@@ -10,14 +10,15 @@ use typst_ts_core::vector::span_id_from_u64;
 use super::{render::RenderActorRequest, typst::TypstActorRequest};
 use crate::debug_loc::DocumentPosition;
 
-pub type CursorPosition = DocumentPosition;
+// pub type CursorPosition = DocumentPosition;
 pub type SrcToDocJumpInfo = DocumentPosition;
 
 #[derive(Debug, Clone)]
 pub enum WebviewActorRequest {
     ViewportPosition(DocumentPosition),
     SrcToDocJump(SrcToDocJumpInfo),
-    CursorPosition(CursorPosition),
+    // CursorPosition(CursorPosition),
+    CursorPaths(Vec<Vec<(u32, u32, String)>>),
 }
 
 fn position_req(
@@ -82,8 +83,13 @@ impl WebviewActor {
                             let msg = position_req("viewport", jump_info);
                             self.webview_websocket_conn.send(Message::Binary(msg.into_bytes())).await.unwrap();
                         }
-                        WebviewActorRequest::CursorPosition(jump_info) => {
-                            let msg = position_req("cursor", jump_info);
+                        // WebviewActorRequest::CursorPosition(jump_info) => {
+                        //     let msg = position_req("cursor", jump_info);
+                        //     self.webview_websocket_conn.send(Message::Binary(msg.into_bytes())).await.unwrap();
+                        // }
+                        WebviewActorRequest::CursorPaths(jump_info) => {
+                            let json = serde_json::to_string(&jump_info).unwrap();
+                            let msg = format!("cursor-paths,{json}");
                             self.webview_websocket_conn.send(Message::Binary(msg.into_bytes())).await.unwrap();
                         }
                     }
