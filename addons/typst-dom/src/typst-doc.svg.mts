@@ -62,6 +62,8 @@ export function provideSvgDoc<
           c.remove();
         }
         console.log('svg post check cursorPaths', this.cursorPaths);
+
+        // Draw cursors by element paths
         for (const p of this.cursorPaths) {
           const leaf = resolveSourceLeaf(this.hookedElem, p);
           if (!leaf) {
@@ -87,6 +89,8 @@ export function provideSvgDoc<
             }
           }
 
+          // Draws cursor at text position
+          // todo: draw cursor for image and shape elements
           if (foundUse !== undefined) {
             const g = leaf[0] as SVGGraphicsElement;
             // const textBase = g.getBBox();
@@ -98,8 +102,10 @@ export function provideSvgDoc<
               // todo: have bug
               // top: textBase.height / 2,
             }
+
             // Gets transform matrix
             const mat = g.getScreenCTM();
+
             // Calculates correct 5px radius
             let rx = 5;
             let ry = 5;
@@ -118,6 +124,7 @@ export function provideSvgDoc<
             rx = Math.abs(rx);
             ry = Math.abs(ry);
 
+            // Creates a circle with 5px radius (but regard vertical and horizontal scale)
             const t = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
             t.classList.add('typst-svg-cursor');
             t.setAttribute('cx', `${rect.right}`);
