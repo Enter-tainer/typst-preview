@@ -137,3 +137,15 @@ path.outline_glyph {
     margin: -1.5vw;
   }
 }
+
+.typst-svg-cursor {
+  /* https://www.elevenforum.com/t/change-text-cursor-blink-rate-in-windows-11.12409/ */
+  /* 1.2 seconds per blink is the default value on gtk and the slowest value on windows */
+  animation: 1.2s blink step-start infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}

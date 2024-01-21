@@ -10,6 +10,12 @@ const enum SourceMappingType {
   CharIndex = 5,
 }
 
+export interface ElementPoint {
+  kind: number;
+  index: number;
+  fingerprint: string;
+}
+
 // one-of following classes must be present:
 // - typst-page
 // - typst-group
@@ -78,6 +84,30 @@ function findIndexOfChild(elem: Element, child: Element) {
   const children = castChildrenToSourceMappingElement(elem);
   // console.log(elem, "::", children, "=>", child);
   return children.findIndex((x) => x[1] === child);
+}
+
+export function resolveSourceLeaf(elem: Element, path: ElementPoint[]): [Element, number] | undefined {
+  const page = elem.getElementsByClassName('typst-page')[0];
+  let curElem = page;
+
+  for (const point of path.slice(1)) {
+    if (point.kind === SourceMappingType.CharIndex) {
+      // console.log('done char');
+      return [curElem, point.index];
+    }
+    const children = castChildrenToSourceMappingElement(curElem);
+    console.log(point, children);
+    if (point.index >= children.length) {
+      return undefined;
+    }
+    if (point.kind != children[point.index][0]) {
+      return undefined;
+    }
+    curElem = children[point.index][1];
+  }
+
+  // console.log('done');
+  return [curElem, 0];
 }
 
 // const rotateColors = [
@@ -330,7 +360,8 @@ export function installEditorJumpToHandler(svgDoc: any, docRoot: HTMLElement) {
   docRoot.addEventListener("click", sourceMappingHandler);
 }
 
-export interface TypstDebugJumpDocument { }
+export interface TypstDebugJumpDocument {
+}
 
 export function provideDebugJumpDoc<
   TBase extends GConstructor<TypstDocumentContext>

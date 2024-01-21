@@ -345,6 +345,13 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
                 svgDoc.setCursor(page, x, y);
                 svgDoc.addViewportChange(); // todo: synthesizing cursor event
                 return;
+            } else if (message[0] === "cursor-paths") {
+                // todo: aware height padding
+                const paths = JSON.parse(dec
+                    .decode((message[1] as any).buffer));
+                console.log("cursor-paths", paths);
+                svgDoc.impl.setCursorPaths(paths);
+                return;
             } else if (message[0] === "partial-rendering") {
                 console.log("Experimental feature: partial rendering enabled");
                 svgDoc.setPartialRendering(true);

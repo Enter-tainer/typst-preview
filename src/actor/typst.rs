@@ -12,7 +12,7 @@ use typst_ts_compiler::service::{
 };
 use typst_ts_compiler::service::{CompileDriver, CompileMiddleware};
 use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
-use typst_ts_core::debug_loc::SourceSpanOffset;
+use typst_ts_core::debug_loc::{CharPosition, SourceLocation, SourceSpanOffset};
 
 use super::editor::CompileStatus;
 use super::render::RenderActorRequest;
@@ -120,10 +120,11 @@ impl TypstActor {
     ) -> Self {
         // CompileExporter + DynamicLayoutCompiler + WatchDriver
         let root = compiler_driver.world.root.clone();
+        let r = renderer_sender.clone();
         let driver = CompileExporter::new(compiler_driver).with_exporter(
             move |_world: &dyn World, doc: Arc<Document>| {
                 let _ = doc_sender.send(Some(doc)); // it is ok to ignore the error here
-                let _ = renderer_sender.send(RenderActorRequest::RenderIncremental);
+                let _ = r.send(RenderActorRequest::RenderIncremental);
                 Ok(())
             },
         );
@@ -140,6 +141,7 @@ impl TypstActor {
                 mailbox,
                 editor_conn_sender,
                 webview_conn_sender,
+                renderer_sender,
             },
         }
     }
@@ -169,6 +171,7 @@ struct TypstClient {
 
     editor_conn_sender: mpsc::UnboundedSender<EditorActorRequest>,
     webview_conn_sender: broadcast::Sender<WebviewActorRequest>,
+    renderer_sender: broadcast::Sender<RenderActorRequest>,
 }
 
 impl TypstClient {
@@ -191,10 +194,15 @@ impl TypstClient {
             TypstActorRequest::ChangeCursorPosition(req) => {
                 debug!("TypstActor: processing src2doc: {:?}", req);
 
-                // todo: change name to resolve resolve src position
                 let res = self
                     .inner()
-                    .resolve_src_to_doc_jump(req.filepath, req.line, req.character)
+                    .resolve_src_location(SourceLocation {
+                        filepath: req.filepath.to_string_lossy().to_string(),
+                        pos: CharPosition {
+                            line: req.line,
+                            column: req.character,
+                        },
+                    })
                     .await
                     .map_err(|err| {
                         error!("TypstActor: failed to resolve cursor position: {:#}", err);
@@ -204,13 +212,14 @@ impl TypstClient {
 
                 if let Some(info) = res {
                     let _ = self
-                        .webview_conn_sender
-                        .send(WebviewActorRequest::CursorPosition(info.into()));
+                        .renderer_sender
+                        .send(RenderActorRequest::ChangeCursorPosition(info));
                 }
             }
             TypstActorRequest::SrcToDocJumpResolve(req) => {
                 debug!("TypstActor: processing src2doc: {:?}", req);
 
+                // todo: change name to resolve resolve src position
                 let res = self
                     .inner()
                     .resolve_src_to_doc_jump(req.filepath, req.line, req.character)

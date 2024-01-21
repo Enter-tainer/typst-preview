@@ -4,8 +4,11 @@ import { TypstPatchAttrs, isDummyPatchElem } from "./typst-patch.mjs";
 import type { GConstructor, TypstDocumentContext } from "./typst-doc.mjs";
 import type { CanvasPage, TypstCanvasDocument } from "./typst-doc.canvas.mjs";
 import { patchSvgToContainer } from "./typst-patch.svg.mjs";
+import { ElementPoint, resolveSourceLeaf } from "./typst-debug-info.mjs";
 
-export interface TypstSvgDocument {}
+export interface TypstSvgDocument {
+  setCursorPaths(paths: ElementPoint[][]): void;
+}
 
 export function provideSvgDoc<
   TBase extends GConstructor<
@@ -20,6 +23,13 @@ export function provideSvgDoc<
 
     shouldMixinCanvas(): this is TypstCanvasDocument {
       return !!this.feat$canvas;
+    }
+
+    /// cursor path is a list of element point from root to leaf
+    cursorPaths?: ElementPoint[][] = undefined;
+    setCursorPaths(paths: ElementPoint[][]) {
+      this.cursorPaths = paths;
+      this.addViewportChange();
     }
 
     postRender$svg() {
@@ -46,6 +56,86 @@ export function provideSvgDoc<
         this.decorateSvgElement(elem, mode)
       );
       const t3 = performance.now();
+
+      if (this.cursorPaths) {
+        for (const c of document.querySelectorAll('.typst-svg-cursor')) {
+          c.remove();
+        }
+        console.log('svg post check cursorPaths', this.cursorPaths);
+
+        // Draw cursors by element paths
+        for (const p of this.cursorPaths) {
+          const leaf = resolveSourceLeaf(this.hookedElem, p);
+          if (!leaf) {
+            console.log('svg post check cursorPaths leaf not found', p);
+            continue;
+          }
+          console.log('svg post check cursorPaths leaf', leaf);
+
+          // Finds glyphs in the text element
+          let useIdx = 0;
+          let foundUse: SVGUseElement | undefined = undefined;
+          let foundUseNext: SVGUseElement | undefined = undefined;
+          for (const use of leaf[0].children) {
+            if (use.tagName === 'use') {
+              useIdx++;
+              if (useIdx == leaf[1]) {
+                foundUse = use as SVGUseElement;
+              }
+              if (useIdx == leaf[1] + 1) {
+                foundUseNext = use as SVGUseElement;
+                break;
+              }
+            }
+          }
+
+          // Draws cursor at text position
+          // todo: draw cursor for image and shape elements
+          if (foundUse !== undefined) {
+            const g = leaf[0] as SVGGraphicsElement;
+            // const textBase = g.getBBox();
+            const rectBase = foundUse.getBBox();
+            const rectNextBase = foundUseNext?.getBBox();
+            const rect = {
+              // Some char does not have position so they are resolved to 0
+              right: (rectBase.width !== 0) ? (rectBase.x + rectBase.width) : (rectNextBase?.x || 0),
+              // todo: have bug
+              // top: textBase.height / 2,
+            }
+
+            // Gets transform matrix
+            const mat = g.getScreenCTM();
+
+            // Calculates correct 5px radius
+            let rx = 5;
+            let ry = 5;
+            const matInv = mat?.inverse();
+            if (matInv) {
+              const sx = matInv.a;
+              const ky = matInv.b;
+              const kx = matInv.c;
+              const sy = matInv.d;
+
+              const rrx = rx * sx + ry * kx;
+              const rry = ry * sy + rx * ky;
+              rx = rrx;
+              ry = rry;
+            }
+            rx = Math.abs(rx);
+            ry = Math.abs(ry);
+
+            // Creates a circle with 5px radius (but regard vertical and horizontal scale)
+            const t = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
+            t.classList.add('typst-svg-cursor');
+            t.setAttribute('cx', `${rect.right}`);
+            // t.setAttribute('cy', `${rect.top}`);
+            t.setAttribute('rx', `${rx}`);
+            t.setAttribute('ry', `${ry}`);
+            t.setAttribute('fill', '#86C16688');
+            leaf[0].appendChild(t);
+          }
+        }
+      }
 
       return [t2, t3];
     }

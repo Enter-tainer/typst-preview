@@ -176,6 +176,12 @@ const sendDocRequest = async (bindDocument: vscode.TextDocument | undefined, scr
 };
 
 const reportPosition = async (bindDocument: vscode.TextDocument, activeEditor: vscode.TextEditor, event: string) => {
+	// extension-output
+	if (bindDocument.uri.fsPath.includes('extension-output')) {
+		console.log('skip extension-output file', bindDocument.uri.fsPath);
+		return;
+	}
+
 	const scrollRequest: ScrollRequest = {
 		event,
 		'filepath': bindDocument.uri.fsPath,
