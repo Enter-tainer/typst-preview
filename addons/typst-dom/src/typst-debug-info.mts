@@ -10,6 +10,12 @@ const enum SourceMappingType {
   CharIndex = 5,
 }
 
+export interface ElementPoint {
+  kind: number;
+  index: number;
+  fingerprint: string;
+}
+
 // one-of following classes must be present:
 // - typst-page
 // - typst-group
@@ -80,24 +86,24 @@ function findIndexOfChild(elem: Element, child: Element) {
   return children.findIndex((x) => x[1] === child);
 }
 
-export function resolveSourceLeaf(elem: Element, path: [number, number, string][]): [Element, number] | undefined {
+export function resolveSourceLeaf(elem: Element, path: ElementPoint[]): [Element, number] | undefined {
   const page = elem.getElementsByClassName('typst-page')[0];
   let curElem = page;
 
-  for (const idx of path.slice(1)) {
-    if (idx[0] === SourceMappingType.CharIndex) {
+  for (const point of path.slice(1)) {
+    if (point.kind === SourceMappingType.CharIndex) {
       // console.log('done char');
-      return [curElem, idx[1]];
+      return [curElem, point.index];
     }
     const children = castChildrenToSourceMappingElement(curElem);
-    console.log(idx, children);
-    if (idx[1] >= children.length) {
+    console.log(point, children);
+    if (point.index >= children.length) {
       return undefined;
     }
-    if (idx[0] != children[idx[1]][0]) {
+    if (point.kind != children[point.index][0]) {
       return undefined;
     }
-    curElem = children[idx[1]][1];
+    curElem = children[point.index][1];
   }
 
   // console.log('done');

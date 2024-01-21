@@ -1,16 +1,15 @@
 use std::sync::Arc;
 
 use log::{debug, info, trace};
-use serde::Deserialize;
 use tokio::sync::{broadcast, mpsc, watch};
 use typst::model::Document;
-use typst_ts_core::debug_loc::SourceSpanOffset;
+use typst_ts_core::debug_loc::{ElementPoint, SourceSpanOffset};
 use typst_ts_svg_exporter::IncrSvgDocServer;
 
 use super::{editor::EditorActorRequest, typst::TypstActorRequest, webview::WebviewActorRequest};
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct ResolveSpanRequest(Vec<(u32, u32, String)>);
+#[derive(Debug, Clone)]
+pub struct ResolveSpanRequest(pub Vec<ElementPoint>);
 
 #[derive(Debug, Clone)]
 pub enum RenderActorRequest {

@@ -5,10 +5,10 @@ use tokio::{
     sync::{broadcast, mpsc},
 };
 use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
-use typst_ts_core::vector::span_id_from_u64;
+use typst_ts_core::{debug_loc::ElementPoint, vector::span_id_from_u64};
 
 use super::{render::RenderActorRequest, typst::TypstActorRequest};
-use crate::debug_loc::DocumentPosition;
+use crate::{actor::render::ResolveSpanRequest, debug_loc::DocumentPosition};
 
 // pub type CursorPosition = DocumentPosition;
 pub type SrcToDocJumpInfo = DocumentPosition;
@@ -18,7 +18,7 @@ pub enum WebviewActorRequest {
     ViewportPosition(DocumentPosition),
     SrcToDocJump(SrcToDocJumpInfo),
     // CursorPosition(CursorPosition),
-    CursorPaths(Vec<Vec<(u32, u32, String)>>),
+    CursorPaths(Vec<Vec<ElementPoint>>),
 }
 
 fn position_req(
@@ -132,11 +132,11 @@ impl WebviewActor {
                         self.broadcast_sender.send(WebviewActorRequest::ViewportPosition(pos)).unwrap();
                     } else if msg.starts_with("srcpath") {
                         let path = msg.split(' ').nth(1).unwrap();
-                        let path = serde_json::from_str(
-                            path
-                        );
+                        let path = serde_json::from_str(path);
                         if let Ok(path) = path {
-                            self.render_sender.send(RenderActorRequest::ResolveSpan(path)).unwrap();
+                            let path: Vec<(u32, u32, String)> = path;
+                            let path = path.into_iter().map(ElementPoint::from).collect::<Vec<_>>();
+                            self.render_sender.send(RenderActorRequest::ResolveSpan(ResolveSpanRequest(path))).unwrap();
                         };
                     } else {
                         info!("WebviewActor: received unknown message from websocket: {}", msg);

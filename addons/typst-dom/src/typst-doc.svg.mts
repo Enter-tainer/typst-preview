@@ -4,10 +4,10 @@ import { TypstPatchAttrs, isDummyPatchElem } from "./typst-patch.mjs";
 import type { GConstructor, TypstDocumentContext } from "./typst-doc.mjs";
 import type { CanvasPage, TypstCanvasDocument } from "./typst-doc.canvas.mjs";
 import { patchSvgToContainer } from "./typst-patch.svg.mjs";
-import { resolveSourceLeaf } from "./typst-debug-info.mjs";
+import { ElementPoint, resolveSourceLeaf } from "./typst-debug-info.mjs";
 
 export interface TypstSvgDocument {
-  setCursorPaths(paths: [number, number, string][][]): void;
+  setCursorPaths(paths: ElementPoint[][]): void;
 }
 
 export function provideSvgDoc<
@@ -25,9 +25,9 @@ export function provideSvgDoc<
       return !!this.feat$canvas;
     }
 
-    /// cursor position in form of [page, x, y]
-    cursorPaths?: [number, number, string][][] = undefined;
-    setCursorPaths(paths: [number, number, string][][]) {
+    /// cursor path is a list of element point from root to leaf
+    cursorPaths?: ElementPoint[][] = undefined;
+    setCursorPaths(paths: ElementPoint[][]) {
       this.cursorPaths = paths;
       this.addViewportChange();
     }
