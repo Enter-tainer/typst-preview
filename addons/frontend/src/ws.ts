@@ -356,6 +356,11 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
                 console.log("Experimental feature: partial rendering enabled");
                 svgDoc.setPartialRendering(true);
                 return;
+            } else if (message[0] === "invert-colors") {
+                const strategy = dec.decode((message[1] as any).buffer);
+                console.log("Experimental feature: invert colors strategy taken:", strategy);
+                ensureInvertColors(document.getElementById("typst-app"), strategy);
+                return;
             } else if (message[0] === "outline") {
                 console.log("Experimental feature: outline rendering");
                 return;
@@ -387,3 +392,55 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
             })
         }));
 };
+
+function ensureInvertColors(root: HTMLElement | null, strategy: string) {
+    if (!root) {
+        return;
+    }
+
+    let needInvertColor = false;
+    switch (strategy) {
+        case "never":
+        default:
+            break;
+        case "auto":
+            needInvertColor = determineInvertColor();
+            break;
+        case "always":
+            needInvertColor = true;
+            break;
+    }
+
+    if (needInvertColor) {
+        root.classList.add("invert-colors");
+    } else {
+        root.classList.remove("invert-colors");
+    }
+
+    function determineInvertColor() {
+        const vscodeAPI = typeof acquireVsCodeApi !== "undefined";
+
+        if (vscodeAPI) {
+            // vscode-dark, high-contrast, vscode-light
+            const cls = document.body.classList;
+            const themeIsDark = (cls.contains("vscode-dark") || cls.contains("vscode-high-contrast")) &&
+                !cls.contains("vscode-light");
+
+
+            if (themeIsDark) {
+                console.log("invert-colors because detected by --typst-preview-vscode-preferred-theme");
+                return true;
+            }
+        } else {
+            // prefer dark mode
+            if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                console.log("invert-colors because detected by (prefers-color-scheme: dark)");
+                return true;
+            }
+        }
+
+        console.log("doesn't invert-colors because none of dark mode detected");
+        return false;
+    }
+}
+
