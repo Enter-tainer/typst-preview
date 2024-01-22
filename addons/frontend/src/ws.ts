@@ -428,7 +428,7 @@ function ensureInvertColors(root: HTMLElement | null, strategy: string) {
 
 
             if (themeIsDark) {
-                console.log("invert-colors because detected by --typst-preview-vscode-preferred-theme");
+                console.log("invert-colors because detected by vscode theme", document.body.className);
                 return true;
             }
         } else {
