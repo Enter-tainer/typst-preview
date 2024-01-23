@@ -21,11 +21,11 @@ let outlineProvider = new Promise<OutlineProvider>(resolve => {
 
 enum ScrollSyncModeEnum {
 	never,
+	onSelectionChangeByMouse,
 	onSelectionChange,
-	onAnyChange,
 }
 
-type ScrollSyncMode = "never" | "onSelectionChange" | "onAnyChange";
+type ScrollSyncMode = "never" | "onSelectionChangeByMouse" | "onSelectionChange";
 
 async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: string) {
 	const filePath = path.resolve(context.extensionPath, relativePath);
@@ -391,7 +391,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 				// scroll by mouse
 				(scrollSyncMode !== ScrollSyncModeEnum.never && kind === vscode.TextEditorSelectionChangeKind.Mouse)
 				// scroll by keyboard typing
-				|| (scrollSyncMode === ScrollSyncModeEnum.onAnyChange && kind === vscode.TextEditorSelectionChangeKind.Keyboard));
+				|| (scrollSyncMode === ScrollSyncModeEnum.onSelectionChange && kind === vscode.TextEditorSelectionChangeKind.Keyboard));
 			if (shouldScrollPanel) {
 				console.log(`selection changed, sending src2doc jump request`);
 				reportPosition(doc, editor, 'panelScrollTo');

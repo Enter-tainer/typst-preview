@@ -162,10 +162,10 @@
           "type": "string",
           "enum": [
             "never",
-            "onSelectionChange",
-            "onAnyChange"
+            "onSelectionChangeByMouse",
+            "onSelectionChange"
           ],
-          "default": "onSelectionChange",
+          "default": "onSelectionChangeByMouse",
           "enumDescriptions": [
             "Disable automatic scroll sync",
             "Scroll preview to current cursor position when selection changes by mouse",
