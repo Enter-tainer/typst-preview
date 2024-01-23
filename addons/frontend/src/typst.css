@@ -39,7 +39,7 @@ body {
 }
 
 #typst-app.invert-colors {
-  filter: invert(0.95) hue-rotate(180deg);
+  filter: invert(0.933333) hue-rotate(180deg);
 }
 
 #typst-app.invert-colors .typst-image {
