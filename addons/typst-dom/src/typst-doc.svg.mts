@@ -497,6 +497,27 @@ export function provideSvgDoc<
           firstRect = innerRect;
         }
 
+        const clipPath = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "clipPath"
+        );
+
+        const clipRect = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "rect"
+        );
+
+        clipRect.setAttribute("x", "0");
+        clipRect.setAttribute("y", "0");
+        clipRect.setAttribute("width", `${pageWidth}`);
+        clipRect.setAttribute("height", `${pageHeight}`);
+        const clipId = `typst-page-clip-${nextPage.index}`;
+        clipPath.appendChild(clipRect);
+        svg.insertBefore(clipPath, firstPage.elem);
+
+        clipPath.setAttribute("id", clipId);
+        pageElem.setAttribute("clip-path", `url(#${clipId})`);
+
         let pageHeightEnd =
           pageHeight + (i + 1 === nextPages.length ? 0 : heightMargin);
 
