@@ -504,6 +504,8 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		const projectRoot = getProjectRoot(filePath);
 		const rootArgs = ["--root", projectRoot];
 		const partialRenderingArgs = vscode.workspace.getConfiguration().get<boolean>('typst-preview.partialRendering') ? ["--partial-rendering"] : [];
+		const ivArgs = vscode.workspace.getConfiguration().get<string>('typst-preview.invertColors');
+		const invertColorsArgs = ivArgs ? ["--invert-colors", ivArgs] : [];
 		const previewInSlideModeArgs = task.mode === 'slide' ? ["--preview-mode=slide"] : [];
 		const { dataPlanePort, controlPlanePort, staticFilePort, serverProcess } = await runServer(serverPath, [
 			"--data-plane-host", "127.0.0.1:0",
@@ -512,6 +514,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 			"--no-open",
 			...rootArgs,
 			...partialRenderingArgs,
+			...invertColorsArgs,
 			...previewInSlideModeArgs,
 			...codeGetCliFontArgs(),
 			filePath,

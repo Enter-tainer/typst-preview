@@ -114,6 +114,7 @@ pub trait CompileHost {
 // todo: replace CompileDriver by CompileHost
 pub async fn preview(arguments: PreviewArgs, compiler_driver: CompileDriver) -> Previewer {
     let enable_partial_rendering = arguments.enable_partial_rendering;
+    let invert_colors = arguments.invert_colors;
 
     // Create the world that serves sources, fonts and files.
     let actor::typst::Channels {
@@ -165,6 +166,13 @@ pub async fn preview(arguments: PreviewArgs, compiler_driver: CompileDriver) -> 
                     conn.send(Message::Binary("partial-rendering,true".into()))
                         .await
                         .unwrap();
+                }
+                if !invert_colors.is_empty() {
+                    conn.send(Message::Binary(
+                        format!("invert-colors,{}", invert_colors).into(),
+                    ))
+                    .await
+                    .unwrap();
                 }
                 let actor::webview::Channels { svg } =
                     actor::webview::WebviewActor::set_up_channels();

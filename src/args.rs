@@ -37,9 +37,16 @@ pub struct PreviewArgs {
     )]
     pub control_plane_host: String,
 
-    /// Only render visible part of the document. This can improve performance but still being experimental.
+    /// Only render visible part of the document. This can improve performance
+    /// but still being experimental.
     #[clap(long = "partial-rendering")]
     pub enable_partial_rendering: bool,
+
+    /// Invert colors of the preview (useful for dark themes without cost).
+    /// Please note you could see the origin colors when you hover elements in
+    /// the preview.
+    #[clap(long, default_value = "never")]
+    pub invert_colors: String,
 }
 
 #[derive(Debug, Clone, Parser)]

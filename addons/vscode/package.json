@@ -175,6 +175,21 @@
           "type": "boolean",
           "default": true
         },
+        "typst-preview.invertColors": {
+          "description": "Invert colors of the preview (useful for dark themes without cost). Please note you could see the origin colors when you hover elements in the preview.",
+          "type": "string",
+          "enum": [
+            "never",
+            "auto",
+            "always"
+          ],
+          "default": "never",
+          "enumDescriptions": [
+            "Disable color inversion of the preview",
+            "Invert colors smartly by detecting dark/light themes in browser environment or by `typst query` your document",
+            "Always invert colors of the preview"
+          ]
+        },
         "typst-preview.cursorIndicator": {
           "description": "(Experimental) Show typst cursor indicator in preview.",
           "type": "boolean",

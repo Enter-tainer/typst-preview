@@ -38,6 +38,18 @@ body {
   background-color: #fff;
 }
 
+#typst-app.invert-colors {
+  filter: invert(0.933333) hue-rotate(180deg);
+}
+
+#typst-app.invert-colors .typst-image {
+  filter: invert(0) hue-rotate(0deg);
+  transition: filter 0.1s ease-in-out;
+}
+
+#typst-app.invert-colors .typst-image:hover {
+  filter: invert(1) hue-rotate(180deg);
+}
 .hide-scrollbar-x {
   overflow-x: hidden;
 }
