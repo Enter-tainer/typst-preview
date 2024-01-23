@@ -48,7 +48,7 @@ body {
 }
 
 #typst-app.invert-colors .typst-image:hover {
-  filter: invert(0.95) hue-rotate(180deg);
+  filter: invert(1) hue-rotate(180deg);
 }
 .hide-scrollbar-x {
   overflow-x: hidden;
