@@ -162,12 +162,14 @@
           "type": "string",
           "enum": [
             "never",
-            "onSelectionChange"
+            "onSelectionChange",
+            "onAnyChange"
           ],
           "default": "onSelectionChange",
           "enumDescriptions": [
             "Disable automatic scroll sync",
-            "Scroll preview to current cursor position when selection changes"
+            "Scroll preview to current cursor position when selection changes by mouse",
+            "Scroll preview to current cursor position when selection changes by mouse or keyboard (any source)"
           ]
         },
         "typst-preview.partialRendering": {
