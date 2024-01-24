@@ -19,7 +19,13 @@ let outlineProvider = new Promise<OutlineProvider>(resolve => {
 	resolveOutlineProvider = resolve;
 });
 
-type ScrollSyncMode = "never" | "onSelectionChange";
+enum ScrollSyncModeEnum {
+	never,
+	onSelectionChangeByMouse,
+	onSelectionChange,
+}
+
+type ScrollSyncMode = "never" | "onSelectionChangeByMouse" | "onSelectionChange";
 
 async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: string) {
 	const filePath = path.resolve(context.extensionPath, relativePath);
@@ -333,7 +339,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 	const filePath = bindDocument.uri.fsPath;
 
 	const refreshStyle = vscode.workspace.getConfiguration().get<string>('typst-preview.refresh') || "onSave";
-	const scrollSyncMode = vscode.workspace.getConfiguration().get<ScrollSyncMode>('typst-preview.scrollSync') || "never";
+	const scrollSyncMode = ScrollSyncModeEnum[vscode.workspace.getConfiguration().get<ScrollSyncMode>('typst-preview.scrollSync') || "never"];
 	const enableCursor = vscode.workspace.getConfiguration().get<boolean>('typst-preview.cursorIndicator') || false;
 	const fontendPath = path.resolve(context.extensionPath, "out/frontend");
 	await watchEditorFiles();
@@ -381,7 +387,12 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 
 			const kind = e.kind;
 			console.log(`selection changed, kind: ${kind && vscode.TextEditorSelectionChangeKind[kind]}`);
-			if (kind === vscode.TextEditorSelectionChangeKind.Mouse) {
+			const shouldScrollPanel = (
+				// scroll by mouse
+				(scrollSyncMode !== ScrollSyncModeEnum.never && kind === vscode.TextEditorSelectionChangeKind.Mouse)
+				// scroll by keyboard typing
+				|| (scrollSyncMode === ScrollSyncModeEnum.onSelectionChange && kind === vscode.TextEditorSelectionChangeKind.Keyboard));
+			if (shouldScrollPanel) {
 				console.log(`selection changed, sending src2doc jump request`);
 				reportPosition(doc, editor, 'panelScrollTo');
 			}
@@ -392,7 +403,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		}
 	};
 	const src2docHandlerDispose =
-		scrollSyncMode === "onSelectionChange"
+		scrollSyncMode !== ScrollSyncModeEnum.never
 			? vscode.window.onDidChangeTextEditorSelection(src2docHandler, 500)
 			: undefined;
 
