@@ -38,7 +38,16 @@ This project is not affiliated with, created by, or endorsed by Typst the brand.
 
 ## Release Notes
 
-## v0.10.6 - [2024-01-17]
+### v0.10.7 - [2024-01-25]
+
+- Features:
+  - Jump to source is more accurate now.
+  - Add a config to invert color in preview panel. See `typst-preview.invertColors`.
+  - Allow config scroll sync mode. See `typst-preview.scrollSync`
+  - (Experimental) Improve cursor indicator.
+
+
+### v0.10.6 - [2024-01-17]
 
 - Bug fixes:
   - fix a bug which cause the preview panel no longer updates as you type

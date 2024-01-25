@@ -4,6 +4,14 @@ All notable changes to the "typst-preview" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.10.7 - [2024-01-25]
+
+- Features:
+  - Jump to source is more accurate now.
+  - Add a config to invert color in preview panel. See `typst-preview.invertColors`.
+  - Allow config scroll sync mode. See `typst-preview.scrollSync`
+  - (Experimental) Improve cursor indicator.
+
 ## v0.10.6 - [2024-01-17]
 
 - Bug fixes:
