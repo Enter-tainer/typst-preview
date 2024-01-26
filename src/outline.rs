@@ -5,7 +5,7 @@ use typst::foundations::{Content, NativeElement, Smart};
 use typst::introspection::Introspector;
 use typst::model::HeadingElem;
 use typst_ts_core::debug_loc::DocumentPosition;
-use typst_ts_core::TypstDocument;
+use typst_ts_core::{IntoTypst, TypstDocument};
 
 use crate::debug_loc::SpanInternerImpl;
 
@@ -97,7 +97,7 @@ impl HeadingNode {
     fn leaf(introspector: &Introspector, element: Content) -> Self {
         let position = {
             let loc = element.location().unwrap();
-            introspector.position(loc).into()
+            introspector.position(loc).into_typst()
         };
 
         HeadingNode {

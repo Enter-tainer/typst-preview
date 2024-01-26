@@ -233,7 +233,7 @@ impl TypstClient {
                 if let Some(info) = res {
                     let _ = self
                         .webview_conn_sender
-                        .send(WebviewActorRequest::SrcToDocJump(info.into()));
+                        .send(WebviewActorRequest::SrcToDocJump(info));
                 }
             }
             TypstActorRequest::SyncMemoryFiles(m) => {
