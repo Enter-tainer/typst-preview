@@ -16,7 +16,7 @@
     "Other"
   ],
   "activationEvents": [],
-  "main": "./out/extension.js",
+  "main": "./out/src/extension.js",
   "contributes": {
     "icons": {
       "typst-guy": {
