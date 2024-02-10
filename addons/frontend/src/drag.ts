@@ -28,7 +28,7 @@ export function setupDrag() {
             y: e.clientY,
         };
         if (!containerElement) return;
-        const elementUnderMouse = document.elementFromPoint(e.clientX, e.clientY);
+        const elementUnderMouse = e.target as HTMLElement | null;
         if (elementUnderMouse !== null && elementUnderMouse.classList.contains('tsel')) {
             return;
         }
