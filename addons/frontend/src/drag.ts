@@ -28,6 +28,10 @@ export function setupDrag() {
             y: e.clientY,
         };
         if (!containerElement) return;
+        const elementUnderMouse = document.elementFromPoint(e.clientX, e.clientY);
+        if (elementUnderMouse !== null && elementUnderMouse.classList.contains('tsel')) {
+            return;
+        }
         containerElement.style.cursor = 'grabbing';
         containerElement.style.userSelect = 'none';
 

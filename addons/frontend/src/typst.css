@@ -60,6 +60,7 @@ body {
 
 .typst-text {
   pointer-events: bounding-box;
+  cursor: text;
 }
 
 .tsel span,
