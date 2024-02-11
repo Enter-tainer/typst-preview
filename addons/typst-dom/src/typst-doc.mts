@@ -193,6 +193,7 @@ export class TypstDocumentContext<O = any> {
       2.1, 2.4, 2.7, 3, 3.3, 3.7, 4.1, 4.6, 5.1, 5.7, 6.3, 7, 7.7, 8.5, 9.4, 10,
     ];
     const deltaDistanceThreshold = 20;
+    const pixelPerLine = 20;
     let deltaDistance = 0;
     const wheelEventHandler = (event: WheelEvent) => {
       if (event.ctrlKey) {
@@ -206,7 +207,9 @@ export class TypstDocumentContext<O = any> {
           window.onresize = null;
         }
         const prevScaleRatio = this.currentScaleRatio;
-        deltaDistance += event.deltaY;
+        // accumulate delta distance
+        const pixels = event.deltaMode === 0 ? event.deltaY : event.deltaY * pixelPerLine;
+        deltaDistance += pixels;
         if (Math.abs(deltaDistance) < deltaDistanceThreshold) {
           return;
         }
