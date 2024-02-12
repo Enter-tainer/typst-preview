@@ -8,6 +8,7 @@ import "./styles/help-panel.css";
 import "./styles/outline.css";
 
 import { wsMain, PreviewMode } from './ws';
+import { setupDrag } from './drag';
 
 /// Main entry point of the frontend program.
 main();
@@ -17,6 +18,7 @@ function main() {
     const { nextWs } = buildWs();
     window.onload = () => nextWs(wsArgs);
     setupVscodeChannel(nextWs);
+    setupDrag();
 }
 
 /// Placeholders for typst-preview program initializing frontend
