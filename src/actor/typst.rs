@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
+use crate::await_tree::REGISTRY;
 use crate::{ChangeCursorPositionRequest, MemoryFiles, MemoryFilesShort, SrcToDocJumpRequest};
+use await_tree::InstrumentAwait;
 use log::{debug, error, info};
 use tokio::sync::{broadcast, mpsc, watch};
 use typst::diag::SourceResult;
@@ -147,8 +149,16 @@ impl TypstActor {
     }
 
     pub async fn run(self) {
+        let root = REGISTRY
+            .lock()
+            .await
+            .register("typst actor".into(), "typst actor");
+        root.instrument(self.run_instrumented()).await;
+    }
+
+    async fn run_instrumented(self) {
         let (server, client) = self.inner.split();
-        server.spawn().await;
+        server.spawn().instrument_await("spawn typst server").await;
 
         if self.client.inner.set(client).is_err() {
             panic!("TypstActor: failed to set client");
@@ -157,8 +167,16 @@ impl TypstActor {
         let mut client = self.client;
 
         debug!("TypstActor: waiting for message");
-        while let Some(mail) = client.mailbox.recv().await {
-            client.process_mail(mail).await;
+        while let Some(mail) = client
+            .mailbox
+            .recv()
+            .instrument_await("waiting for message")
+            .await
+        {
+            client
+                .process_mail(mail)
+                .instrument_await("processing mail")
+                .await;
         }
         info!("TypstActor: exiting");
     }
@@ -183,7 +201,10 @@ impl TypstClient {
         match mail {
             TypstActorRequest::DocToSrcJumpResolve(span_range) => {
                 debug!("TypstActor: processing doc2src: {:?}", span_range);
-                let res = self.resolve_span_range(span_range).await;
+                let res = self
+                    .resolve_span_range(span_range)
+                    .instrument_await("resolve span range")
+                    .await;
 
                 if let Some(info) = res {
                     let _ = self
@@ -203,6 +224,7 @@ impl TypstClient {
                             column: req.character,
                         },
                     })
+                    .instrument_await("resolve source position")
                     .await
                     .map_err(|err| {
                         error!("TypstActor: failed to resolve cursor position: {:#}", err);
@@ -223,6 +245,7 @@ impl TypstClient {
                 let res = self
                     .inner()
                     .resolve_src_to_doc_jump(req.filepath, req.line, req.character)
+                    .instrument_await("resolve src to doc jump")
                     .await
                     .map_err(|err| {
                         error!("TypstActor: failed to resolve src to doc jump: {:#}", err);
@@ -260,6 +283,7 @@ impl TypstClient {
     async fn resolve_span(&mut self, s: Span, offset: Option<usize>) -> Option<DocToSrcJumpInfo> {
         self.inner()
             .resolve_span_and_offset(s, offset)
+            .instrument_await("resolve span and offset")
             .await
             .map_err(|err| {
                 error!("TypstActor: failed to resolve doc to src jump: {:#}", err);
@@ -269,7 +293,9 @@ impl TypstClient {
     }
 
     async fn resolve_span_offset(&mut self, s: SourceSpanOffset) -> Option<DocToSrcJumpInfo> {
-        self.resolve_span(s.span, Some(s.offset)).await
+        self.resolve_span(s.span, Some(s.offset))
+            .instrument_await("resolve span offset")
+            .await
     }
 
     async fn resolve_span_range(
@@ -279,7 +305,10 @@ impl TypstClient {
         // Resolves FileLoC of start, end, and the element wide
         let st_res = self.resolve_span_offset(span_range.0).await;
         let ed_res = self.resolve_span_offset(span_range.1).await;
-        let elem_res = self.resolve_span(span_range.1.span, None).await;
+        let elem_res = self
+            .resolve_span(span_range.1.span, None)
+            .instrument_await("resolve span")
+            .await;
 
         // Combines the result of start and end
         let range_res = match (st_res, ed_res) {

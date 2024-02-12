@@ -52,6 +52,7 @@ indexmap = "2"
 # <= 1.0.171 due to serde-rs/serde#2538
 serde = "1.0.188"
 hyper = { version = "0.14", features = ["full"] }
+await-tree = "0.1.2"
 
 
 [patch.crates-io]
