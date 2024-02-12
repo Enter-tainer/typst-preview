@@ -119,7 +119,7 @@ impl RenderActor {
 
     #[tokio::main(flavor = "current_thread")]
     async fn run(self, peer_addr: &str) {
-        let span = format!("render actor[{}]", peer_addr);
+        let span = format!("render actor<{}>", peer_addr);
         let root = REGISTRY.lock().await.register(span.clone().into(), span);
         root.instrument(self.run_instrumented()).await;
     }
@@ -214,7 +214,7 @@ impl OutlineRenderActor {
 
     #[tokio::main(flavor = "current_thread")]
     async fn run(self, peer_addr: &str) {
-        let span = format!("outline render actor[{}]", peer_addr);
+        let span = format!("outline render actor<{}>", peer_addr);
         let root = REGISTRY.lock().await.register(span.clone().into(), span);
         root.instrument(self.run_instrumented()).await;
     }

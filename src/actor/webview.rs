@@ -75,7 +75,7 @@ impl WebviewActor {
     }
 
     pub async fn run(self, peer_addr: String) {
-        let span = format!("webview actor[{}]", peer_addr);
+        let span = format!("webview actor<{}>", peer_addr);
         let root = REGISTRY.lock().await.register(span.clone().into(), span);
         root.instrument(self.run_instrumented()).await;
     }

@@ -11,7 +11,10 @@ use hyper::{
     Error,
 };
 
-use typst_preview::{await_tree::REGISTRY, preview, CliArguments, PreviewMode, Previewer};
+use typst_preview::{
+    await_tree::{get_await_tree_async, REGISTRY},
+    preview, CliArguments, PreviewMode, Previewer,
+};
 
 pub fn make_static_host(
     previewer: &Previewer,
@@ -29,6 +32,10 @@ pub fn make_static_host(
                     if req.uri().path() == "/" {
                         log::info!("Serve frontend: {:?}", mode);
                         Ok::<_, Error>(hyper::Response::new(hyper::Body::from(html)))
+                    } else if req.uri().path() == "/await_tree" {
+                        Ok::<_, Error>(hyper::Response::new(hyper::Body::from(
+                            get_await_tree_async().await,
+                        )))
                     } else {
                         // jump to /
                         let mut res = hyper::Response::new(hyper::Body::empty());
@@ -109,18 +116,6 @@ async fn main() {
         let _ = tokio::signal::ctrl_c().await;
         info!("Ctrl-C received, exiting");
         std::process::exit(0);
-    });
-
-    // TODO: remove this
-    tokio::spawn(async {
-        loop {
-            let mut res = String::new();
-            for (_key, tree) in REGISTRY.lock().await.iter() {
-                res += &tree.to_string();
-            }
-            info!("{}", res);
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-        }
     });
 
     let previewer = async_root
