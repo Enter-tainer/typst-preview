@@ -216,7 +216,7 @@ export class TypstDocumentContext<O = any> {
         const scrollDirection = deltaDistance > 0 ? 1 : -1;
         deltaDistance = 0;
         // Get wheel scroll direction and calculate new scale
-        if (scrollDirection === 1) {
+        if (scrollDirection === -1) {
           // enlarge
           if (this.currentScaleRatio >= factors.at(-1)!) {
             // already large than max factor
@@ -226,7 +226,7 @@ export class TypstDocumentContext<O = any> {
               .filter((x) => x > this.currentScaleRatio)
               .at(0)!;
           }
-        } else if (scrollDirection === -1) {
+        } else if (scrollDirection === 1) {
           // reduce
           if (this.currentScaleRatio <= factors.at(0)!) {
             return;
