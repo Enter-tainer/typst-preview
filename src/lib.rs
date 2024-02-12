@@ -1,10 +1,12 @@
 mod actor;
 mod args;
+pub mod await_tree;
 mod debug_loc;
 mod outline;
 
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
+use ::await_tree::InstrumentAwait;
 use debug_loc::SpanInterner;
 use futures::SinkExt;
 use log::info;
@@ -148,22 +150,34 @@ pub async fn preview(arguments: PreviewArgs, compiler_driver: CompileDriver) -> 
         let renderer_tx = renderer_mailbox.0.clone();
         tokio::spawn(async move {
             // Create the event loop and TCP listener we'll accept connections on.
-            let try_socket = TcpListener::bind(&data_plane_addr).await;
+            let try_socket = TcpListener::bind(&data_plane_addr)
+                .instrument_await("bind data plane server")
+                .await;
             let listener = try_socket.expect("Failed to bind");
             info!(
                 "Data plane server listening on: {}",
                 listener.local_addr().unwrap()
             );
             let _ = data_plane_port_tx.send(listener.local_addr().unwrap().port());
-            while let Ok((stream, _)) = listener.accept().await {
+            while let Ok((stream, _)) = listener
+                .accept()
+                .instrument_await("accept data plane connection")
+                .await
+            {
                 let span_interner = span_interner.clone();
                 let webview_tx = webview_tx.clone();
                 let webview_rx = webview_tx.subscribe();
                 let typst_tx = typst_tx.clone();
                 let doc_watch_rx = doc_watch_rx.clone();
-                let mut conn = accept_connection(stream).await;
+                let peer_addr = stream
+                    .peer_addr()
+                    .map_or("unknown".to_string(), |addr| addr.to_string());
+                let mut conn = accept_connection(stream)
+                    .instrument_await("accept data plane websocket connection")
+                    .await;
                 if enable_partial_rendering {
                     conn.send(Message::Binary("partial-rendering,true".into()))
+                        .instrument_await("send partial-rendering message to webview")
                         .await
                         .unwrap();
                 }
@@ -171,6 +185,7 @@ pub async fn preview(arguments: PreviewArgs, compiler_driver: CompileDriver) -> 
                     conn.send(Message::Binary(
                         format!("invert-colors,{}", invert_colors).into(),
                     ))
+                    .instrument_await("send invert-colors message to webview")
                     .await
                     .unwrap();
                 }
@@ -184,7 +199,7 @@ pub async fn preview(arguments: PreviewArgs, compiler_driver: CompileDriver) -> 
                     editor_conn.0.clone(),
                     renderer_tx.clone(),
                 );
-                tokio::spawn(webview_actor.run());
+                tokio::spawn(webview_actor.run(peer_addr.clone()));
                 let render_actor = actor::render::RenderActor::new(
                     renderer_tx.subscribe(),
                     doc_watch_rx.clone(),
@@ -192,14 +207,14 @@ pub async fn preview(arguments: PreviewArgs, compiler_driver: CompileDriver) -> 
                     svg.0,
                     webview_tx,
                 );
-                render_actor.spawn();
+                render_actor.spawn(peer_addr.clone());
                 let outline_render_actor = actor::render::OutlineRenderActor::new(
                     renderer_tx.subscribe(),
                     doc_watch_rx,
                     editor_conn.0.clone(),
                     span_interner,
                 );
-                outline_render_actor.spawn();
+                outline_render_actor.spawn(peer_addr);
             }
         })
     };
@@ -210,17 +225,28 @@ pub async fn preview(arguments: PreviewArgs, compiler_driver: CompileDriver) -> 
         let typst_tx = typst_mailbox.0.clone();
         let editor_rx = editor_conn.1;
         tokio::spawn(async move {
-            let try_socket = TcpListener::bind(&control_plane_addr).await;
+            let try_socket = TcpListener::bind(&control_plane_addr)
+                .instrument_await("bind control plane server")
+                .await;
             let listener = try_socket.expect("Failed to bind");
             info!(
                 "Control plane server listening on: {}",
                 listener.local_addr().unwrap()
             );
-            let (stream, _) = listener.accept().await.unwrap();
-            let conn = accept_connection(stream).await;
+            let (stream, _) = listener
+                .accept()
+                .instrument_await("accept control plane connection")
+                .await
+                .unwrap();
+            let conn = accept_connection(stream)
+                .instrument_await("accept control plane websocket connection")
+                .await;
             let editor_actor =
                 EditorActor::new(editor_rx, conn, typst_tx, webview_tx, span_interner);
-            editor_actor.run().await;
+            editor_actor
+                .run()
+                .instrument_await("run editor actor")
+                .await;
         })
     };
     let data_plane_port = data_plane_port_rx.await.unwrap();
@@ -255,6 +281,7 @@ async fn accept_connection(stream: TcpStream) -> WebSocketStream<TcpStream> {
     info!("Peer address: {}", addr);
 
     let ws_stream = tokio_tungstenite::accept_async(stream)
+        .instrument_await("accept websocket connection")
         .await
         .expect("Error during the websocket handshake occurred");
 

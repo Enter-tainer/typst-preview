@@ -1,3 +1,4 @@
+use await_tree::InstrumentAwait;
 use clap::Parser;
 use log::{error, info};
 
@@ -10,7 +11,10 @@ use hyper::{
     Error,
 };
 
-use typst_preview::{preview, CliArguments, PreviewMode, Previewer};
+use typst_preview::{
+    await_tree::{get_await_tree_async, REGISTRY},
+    preview, CliArguments, PreviewMode, Previewer,
+};
 
 pub fn make_static_host(
     previewer: &Previewer,
@@ -28,6 +32,10 @@ pub fn make_static_host(
                     if req.uri().path() == "/" {
                         log::info!("Serve frontend: {:?}", mode);
                         Ok::<_, Error>(hyper::Response::new(hyper::Body::from(html)))
+                    } else if req.uri().path() == "/await_tree" {
+                        Ok::<_, Error>(hyper::Response::new(hyper::Body::from(
+                            get_await_tree_async().await,
+                        )))
                     } else {
                         // jump to /
                         let mut res = hyper::Response::new(hyper::Body::empty());
@@ -67,6 +75,10 @@ async fn main() {
         )
         .filter_module("typst_ts_compiler::service::watch", log::LevelFilter::Debug)
         .try_init();
+    let async_root = REGISTRY
+        .lock()
+        .await
+        .register("root".into(), "typst-preview");
     let arguments = CliArguments::parse();
     info!("Arguments: {:#?}", arguments);
     let entry = if arguments.input.is_absolute() {
@@ -106,7 +118,10 @@ async fn main() {
         std::process::exit(0);
     });
 
-    let previewer = preview(arguments.preview, compiler_driver).await;
+    let previewer = async_root
+        .instrument(preview(arguments.preview, compiler_driver))
+        .instrument_await("preview")
+        .await;
 
     let static_file_addr = arguments.static_file_host;
     let mode = arguments.preview_mode;

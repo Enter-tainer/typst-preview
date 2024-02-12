@@ -1,3 +1,4 @@
+use await_tree::InstrumentAwait;
 use futures::{SinkExt, StreamExt};
 use log::{debug, info, trace, warn};
 use serde::{Deserialize, Serialize};
@@ -6,6 +7,7 @@ use tokio::{net::TcpStream, sync::broadcast};
 use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
 use typst_ts_core::debug_loc::DocumentPosition;
 
+use crate::await_tree::REGISTRY;
 use crate::debug_loc::{InternQuery, SpanInterner};
 use crate::outline::Outline;
 use crate::{
@@ -101,33 +103,48 @@ impl EditorActor {
         }
     }
 
-    pub async fn run(mut self) {
+    pub async fn run(self) {
+        let root = REGISTRY
+            .lock()
+            .await
+            .register("editor actor".into(), "editor actor");
+        root.instrument(self.run_instrumented()).await;
+    }
+
+    async fn run_instrumented(mut self) {
         self.editor_websocket_conn
             .send(Message::Text(
                 serde_json::to_string(&ControlPlaneResponse::SyncEditorChanges(())).unwrap(),
             ))
+            .instrument_await("sync editor changes")
             .await
             .unwrap();
         loop {
             tokio::select! {
-                Some(msg) = self.mailbox.recv() => {
+                Some(msg) = self.mailbox.recv().instrument_await("waiting for mailbox") => {
                     trace!("EditorActor: received message from mailbox: {:?}", msg);
                     match msg {
                         EditorActorRequest::DocToSrcJump(jump_info) => {
                             let Ok(_) = self.editor_websocket_conn.send(Message::Text(
                                 serde_json::to_string(&ControlPlaneResponse::EditorScrollTo(jump_info)).unwrap(),
-                            )).await else {
+                            ))
+                            .instrument_await("send DocToSrcJump message to editor")
+                            .await else {
                                 warn!("EditorActor: failed to send DocToSrcJump message to editor");
                                 break;
                             };
                         },
                         EditorActorRequest::DocToSrcJumpResolve(req) => {
-                            self.source_scroll_by_span(req.span).await;
+                            self.source_scroll_by_span(req.span)
+                                .instrument_await("source scroll by span")
+                                .await;
                         },
                         EditorActorRequest::CompileStatus(status) => {
                             let Ok(_) = self.editor_websocket_conn.send(Message::Text(
                                 serde_json::to_string(&ControlPlaneResponse::CompileStatus(status)).unwrap(),
-                            )).await else {
+                            ))
+                                .instrument_await("send CompileStatus message to editor")
+                                .await else {
                                 warn!("EditorActor: failed to send CompileStatus message to editor");
                                 break;
                             };
@@ -135,14 +152,16 @@ impl EditorActor {
                         EditorActorRequest::Outline(outline) => {
                             let Ok(_) = self.editor_websocket_conn.send(Message::Text(
                                 serde_json::to_string(&ControlPlaneResponse::Outline(outline)).unwrap(),
-                            )).await else {
+                            ))
+                                .instrument_await("send Outline message to editor")
+                                .await else {
                                 warn!("EditorActor: failed to send Outline message to editor");
                                 break;
                             };
                         }
                     }
                 }
-                Some(Ok(Message::Text(msg))) = self.editor_websocket_conn.next() => {
+                Some(Ok(Message::Text(msg))) = self.editor_websocket_conn.next().instrument_await("waiting for websocket") => {
                     let Ok(msg) = serde_json::from_str::<ControlPlaneMessage>(&msg) else {
                         warn!("failed to parse jump request: {:?}", msg);
                         continue;
@@ -163,7 +182,9 @@ impl EditorActor {
                         ControlPlaneMessage::DocToSrcJumpResolve(jump_info) => {
                             debug!("EditorActor: received message from editor: {:?}", jump_info);
 
-                            self.source_scroll_by_span(jump_info.span).await;
+                            self.source_scroll_by_span(jump_info.span)
+                                .instrument_await("source scroll by span")
+                                .await;
                         }
                         ControlPlaneMessage::SyncMemoryFiles(memory_files) => {
                             debug!("EditorActor: received message from editor: SyncMemoryFiles {:?}", memory_files.files.keys().collect::<Vec<_>>());
@@ -187,7 +208,12 @@ impl EditorActor {
 
     async fn source_scroll_by_span(&mut self, span: String) {
         let jump_info = {
-            match self.span_interner.span_by_str(&span).await {
+            match self
+                .span_interner
+                .span_by_str(&span)
+                .instrument_await("get span by str")
+                .await
+            {
                 InternQuery::Ok(s) => s,
                 InternQuery::UseAfterFree => {
                     warn!("EditorActor: out of date span id: {}", span);
