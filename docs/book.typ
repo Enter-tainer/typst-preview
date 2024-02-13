@@ -5,7 +5,7 @@
 
 #book-meta(
   title: "Typst Preview Book",
-  description: "Docuement for typst preview ",
+  description: "Document for typst preview ",
   authors: ("Enter-tainer", "Myriad-Dreamin"),
   language: "en",
   repository: "https://github.com/Enter-tainer/typst-preview",
