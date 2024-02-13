@@ -104,7 +104,7 @@ A dedicated thread for the first two actor is necessary because typst use #link(
 
 === Renderer
 
-To achieve incremental and high performance rendering, we use #link("https://github.com/Myriad-Dreamin/typst.ts")[typst.ts] to render docuement. To be specific, we use the `IncrementalSvgExporter`. The `IncrementalSvgExporter` will only output the changed part of the document. The result is serialized to using #link("https://github.com/rkyv/rkyv")[rkyv]. The serialized result is then sent to the client.
+To achieve incremental and high performance rendering, we use #link("https://github.com/Myriad-Dreamin/typst.ts")[typst.ts] to render document. To be specific, we use the `IncrementalSvgExporter`. The `IncrementalSvgExporter` will only output the changed part of the document. The result is serialized to using #link("https://github.com/rkyv/rkyv")[rkyv]. The serialized result is then sent to the client.
 
 == Client Part of Typst Preview
 
