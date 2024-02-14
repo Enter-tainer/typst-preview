@@ -54,12 +54,12 @@ jobs:
     env:
       target: ${{ matrix.platform }}-${{ matrix.arch }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.3
-      - uses: actions/setup-node@v3
+        uses: mozilla-actions/sccache-action@v0.0.4
+      - uses: actions/setup-node@v4
         with:
           node-version: 16
       - run: |
@@ -94,11 +94,11 @@ jobs:
       - shell: pwsh
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
         working-directory: ./addons/vscode
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: typst-preview-${{ env.target }}.vsix
           path: addons/vscode/typst-preview-${{ env.target }}.vsix
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: typst-preview-${{ env.target }}
           path: typst-preview-${{ env.target }}${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
@@ -118,11 +118,11 @@ jobs:
       - name: Install dependencies
         run: apk add --no-cache git clang lld musl-dev nodejs npm yarn
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.3
+        uses: mozilla-actions/sccache-action@v0.0.4
       - run: |
           yarn
           yarn build
@@ -142,11 +142,11 @@ jobs:
       - name: package extension
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
         working-directory: ./addons/vscode
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: typst-preview-${{ env.target }}.vsix
           path: addons/vscode/typst-preview-${{ env.target }}.vsix
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: typst-preview-${{ env.target }}
           path: typst-preview-${{ env.target }}
@@ -158,10 +158,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4
         with:
           path: artifacts
       - name: Display structure of downloaded files
@@ -181,7 +181,7 @@ jobs:
     needs: [build]
     if: success() && startsWith(github.ref, 'refs/tags/')
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4
 
       - name: Deploy to VS Code Marketplace
         run: npx vsce publish --packagePath $(find . -type f -iname '*.vsix')
