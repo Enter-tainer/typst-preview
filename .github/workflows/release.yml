@@ -123,12 +123,7 @@ jobs:
         with:
           name: typst-preview-${{ env.target }}.vsix
           path: addons/vscode/typst-preview-${{ env.target }}.vsix
-      - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: typst-preview-${{ env.target }}
-          path: typst-preview-${{ env.target }}${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
-      # window: .pdb, linux: .dwp, mac: .dSYM
+      # window: .pdb, linux: .debug, mac: .dSYM
       - name: Upload split debug symbols for windows
         if: matrix.platform == 'win32'
         uses: actions/upload-artifact@v4
@@ -160,6 +155,12 @@ jobs:
           name: typst-preview-${{ env.target }}.dSYM.tar.gz
           path: target/${{ matrix.rust-target }}/release/typst-preview.dSYM.tar.gz
           compression-level: 0
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: typst-preview-${{ env.target }}
+          path: typst-preview-${{ env.target }}${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
+  
 
   build_alpine:
     name: build (x86_64-unknown-linux-musl)
@@ -208,15 +209,15 @@ jobs:
         with:
           name: typst-preview-${{ env.target }}.vsix
           path: addons/vscode/typst-preview-${{ env.target }}.vsix
+      - name: Split debug symbols
+        run: |
+          objcopy --compress-debug-sections --only-keep-debug "target/${{ env.RUST_TARGET }}/release/typst-preview" "target/${{ env.RUST_TARGET }}/release/typst-preview.debug"
+          objcopy --strip-debug --add-gnu-debuglink="typst-preview.debug" "target/${{ env.RUST_TARGET }}/release/typst-preview"
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
           name: typst-preview-${{ env.target }}
           path: typst-preview-${{ env.target }}
-      - name: Split debug symbols
-        run: |
-          objcopy --compress-debug-sections --only-keep-debug "target/${{ env.RUST_TARGET }}/release/typst-preview" "target/${{ env.RUST_TARGET }}/release/typst-preview.debug"
-          objcopy --strip-debug --add-gnu-debuglink="typst-preview.debug" "target/${{ env.RUST_TARGET }}/release/typst-preview"
       - name: Upload split debug symbols
         uses: actions/upload-artifact@v4
         with:
