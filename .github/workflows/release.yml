@@ -77,16 +77,20 @@ jobs:
           submodules: recursive
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.4
-      - uses: actions/setup-node@v4
+      - name: Install Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 16
-      - run: |
+      - name: Build typst-dom
+        run: |
           yarn
           yarn build
         working-directory: ./addons/typst-dom
-      - run: yarn
+      - name: Build frontend
+        run: yarn
         working-directory: ./addons/frontend
-      - run: |
+      - name: Build vscode extension
+        run: |
           yarn
           yarn run compile
         working-directory: ./addons/vscode
@@ -104,12 +108,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install gcc-arm-linux-gnueabihf
-      - shell: pwsh
+      - name: Build typst-preview binary
+        shell: pwsh
         run: |
           cargo build --release -p typst-preview --target ${{ matrix.rust-target }}
           cp "target/${{ matrix.rust-target }}/release/typst-preview$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "addons/vscode/out/"
           cp "target/${{ matrix.rust-target }}/release/typst-preview$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "typst-preview-${{ env.target }}$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )"
-      - shell: pwsh
+      - name: Package extension
+        shell: pwsh
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
         working-directory: ./addons/vscode
       - name: Upload VSIX artifact
@@ -162,30 +168,35 @@ jobs:
           submodules: recursive
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.4
-      - run: |
+      - name: Build typst-dom
+        run: |
           yarn
           yarn build
         working-directory: ./addons/typst-dom
-      - run: yarn
+      - name: Build frontend
+        run: yarn
         working-directory: ./addons/frontend
-      - run: |
+      - name: Build vscode extension
+        run: |
           yarn
           yarn run compile
         working-directory: ./addons/vscode
-      - name: build server binary
+      - name: Build typst-preview binary
         run: |
           cargo build --release -p typst-preview --target $RUST_TARGET
           mkdir -p addons/vscode/out
           cp "target/$RUST_TARGET/release/typst-preview" "addons/vscode/out/"
           cp "target/$RUST_TARGET/release/typst-preview" "typst-preview-alpine-x64"
-      - name: package extension
+      - name: Package extension
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
         working-directory: ./addons/vscode
-      - uses: actions/upload-artifact@v4
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
         with:
           name: typst-preview-${{ env.target }}.vsix
           path: addons/vscode/typst-preview-${{ env.target }}.vsix
-      - uses: actions/upload-artifact@v4
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
         with:
           name: typst-preview-${{ env.target }}
           path: typst-preview-${{ env.target }}
