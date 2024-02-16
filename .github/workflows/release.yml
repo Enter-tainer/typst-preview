@@ -12,6 +12,19 @@ env:
   RUSTC_WRAPPER: "sccache"
 
 jobs:
+  pre_build:
+    permissions:
+      actions: write
+      contents: read
+    name: Duplicate Actions Detection
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@v5
+        with:
+          cancel_others: 'true'
   build:
     strategy:
       matrix:
