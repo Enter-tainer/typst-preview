@@ -142,8 +142,11 @@ jobs:
           name: typst-preview-${{ env.target }}.dwp
           path: target/${{ matrix.rust-target }}/release/typst-preview.dwp
       - name: Package split debug symbols for mac
+      # note that debug symbols on mac is a symlink to the actual dSYM directory
         if: matrix.platform == 'darwin'
-        run: tar -czf target/${{ matrix.rust-target }}/release/typst-preview.dSYM.tar.gz target/${{ matrix.rust-target }}/release/typst-preview.dSYM
+        run: |
+          cp -LR "target/${{ matrix.rust-target }}/release/typst-preview.dSYM" "typst-preview.dSYM"
+          tar -czf "target/${{ matrix.rust-target }}/release/typst-preview.dSYM.tar.gz" "typst-preview.dSYM"
       - name: Upload split debug symbols for mac
         if: matrix.platform == 'darwin'
         uses: actions/upload-artifact@v4
