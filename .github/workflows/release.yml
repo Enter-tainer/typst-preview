@@ -117,8 +117,6 @@ jobs:
         shell: pwsh
         run: |
           cargo build --release -p typst-preview --target ${{ matrix.rust-target }}
-          cp "target/${{ matrix.rust-target }}/release/typst-preview$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "addons/vscode/out/"
-          cp "target/${{ matrix.rust-target }}/release/typst-preview$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "typst-preview-${{ env.target }}$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )"
       # window: .pdb, linux: .debug, mac: .dSYM
       - name: Upload split debug symbols for windows
         if: matrix.platform == 'win32'
@@ -131,7 +129,7 @@ jobs:
         run: |
           cd target/${{ matrix.rust-target }}/release
           llvm-objcopy --compress-debug-sections --only-keep-debug "typst-preview" "typst-preview.debug"
-          llvm-objcopy --strip-debug --add-gnu-debuglink="typst-preview.debug" "typst-preview"
+          llvm-objcopy --strip-debug --add-gnu-debuglink="typst-preview.debug" --strip-all "typst-preview"
       - name: Upload split debug symbols for linux
         if: matrix.platform == 'linux'
         uses: actions/upload-artifact@v4
@@ -152,11 +150,15 @@ jobs:
           name: typst-preview-${{ env.target }}.dSYM.tar.gz
           path: target/${{ matrix.rust-target }}/release/typst-preview.dSYM.tar.gz
           compression-level: 0
+      - name: Copy binary to output directory
+        run: |
+          cp "target/${{ matrix.rust-target }}/release/typst-preview$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "addons/vscode/out/"
+          cp "target/${{ matrix.rust-target }}/release/typst-preview$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "typst-preview-${{ env.target }}$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )"
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
           name: typst-preview-${{ env.target }}
-          path: typst-preview-${{ env.target }}${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
+          path: typst-preview-${{ env.target }}$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )
       - name: Package extension
         shell: pwsh
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
@@ -206,22 +208,24 @@ jobs:
         run: |
           cargo build --release -p typst-preview --target $RUST_TARGET
           mkdir -p addons/vscode/out
-          cp "target/$RUST_TARGET/release/typst-preview" "addons/vscode/out/"
-          cp "target/$RUST_TARGET/release/typst-preview" "typst-preview-alpine-x64"
       - name: Split debug symbols
         run: |
           objcopy --compress-debug-sections --only-keep-debug "target/${{ env.RUST_TARGET }}/release/typst-preview" "target/${{ env.RUST_TARGET }}/release/typst-preview.debug"
           objcopy --strip-debug --add-gnu-debuglink="typst-preview.debug" "target/${{ env.RUST_TARGET }}/release/typst-preview"
-      - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: typst-preview-${{ env.target }}
-          path: typst-preview-${{ env.target }}
       - name: Upload split debug symbols
         uses: actions/upload-artifact@v4
         with:
           name: typst-preview-${{ env.target }}.debug
           path: target/{{ env.RUST_TARGET }}/release/typst-preview.debug
+      - name: Copy binary to output directory
+        run: |
+          cp "target/${{ env.RUST_TARGET }}/release/typst-preview" "addons/vscode/out/"
+          cp "target/${{ env.RUST_TARGET }}/release/typst-preview" "typst-preview-${{ env.target }}"
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: typst-preview-${{ env.target }}
+          path: typst-preview-${{ env.target }}
       - name: Package extension
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
         working-directory: ./addons/vscode
