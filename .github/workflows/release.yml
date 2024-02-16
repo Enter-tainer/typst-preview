@@ -129,7 +129,7 @@ jobs:
         run: |
           cd target/${{ matrix.rust-target }}/release
           llvm-objcopy --compress-debug-sections --only-keep-debug "typst-preview" "typst-preview.debug"
-          llvm-objcopy --strip-debug --add-gnu-debuglink="typst-preview.debug" --strip-all "typst-preview"
+          llvm-objcopy --strip-debug --add-gnu-debuglink="typst-preview.debug" "typst-preview"
       - name: Upload split debug symbols for linux
         if: matrix.platform == 'linux'
         uses: actions/upload-artifact@v4
@@ -159,7 +159,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: typst-preview-${{ env.target }}
-          path: typst-preview-${{ env.target }}$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )
+          path: typst-preview-${{ env.target }}${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
       - name: Package extension
         shell: pwsh
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
@@ -211,8 +211,9 @@ jobs:
           mkdir -p addons/vscode/out
       - name: Split debug symbols
         run: |
-          objcopy --compress-debug-sections --only-keep-debug "target/${{ env.RUST_TARGET }}/release/typst-preview" "target/${{ env.RUST_TARGET }}/release/typst-preview.debug"
-          objcopy --strip-debug --add-gnu-debuglink="typst-preview.debug" "target/${{ env.RUST_TARGET }}/release/typst-preview"
+          cd target/$RUST_TARGET/release
+          objcopy --compress-debug-sections --only-keep-debug "typst-preview" "typst-preview.debug"
+          objcopy --strip-debug --add-gnu-debuglink="typst-preview.debug" "typst-preview"
       - name: Upload split debug symbols
         uses: actions/upload-artifact@v4
         with:
