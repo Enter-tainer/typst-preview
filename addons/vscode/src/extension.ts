@@ -7,7 +7,7 @@ import { readFile } from 'fs/promises';
 import * as path from 'path';
 import { WebSocket } from 'ws';
 import { version, name } from '../package.json';
-import { error } from 'console';
+import fetch from 'node-fetch';
 
 const vscodeVariables = require('vscode-variables');
 
@@ -206,6 +206,8 @@ interface TaskControlBlock {
 	panel?: vscode.WebviewPanel;
 	/// channel to communicate with typst-preview
 	addonΠserver: WebSocket;
+	/// static file server port
+	staticFilePort?: string;
 }
 
 interface JumpInfo {
@@ -249,7 +251,7 @@ interface LaunchCliResult {
 	serverProcess: ChildProcessWithoutNullStreams,
 	controlPlanePort: string,
 	dataPlanePort: string,
-	staticFilePort?: string,
+	staticFilePort: string,
 }
 
 function runServer(command: string, args: string[], outputChannel: vscode.OutputChannel, openInBrowser: boolean): Promise<LaunchCliResult> {
@@ -300,14 +302,8 @@ function runServer(command: string, args: string[], outputChannel: vscode.Output
 				if (staticPort !== undefined) {
 					staticFilePort = staticPort;
 				}
-				if (dataPlanePort !== undefined && controlPlanePort !== undefined) {
-					if (openInBrowser) {
-						if (staticFilePort !== undefined) {
-							resolve({ dataPlanePort, controlPlanePort, staticFilePort, serverProcess });
-						}
-					} else {
-						resolve({ dataPlanePort, controlPlanePort, serverProcess });
-					}
+				if (dataPlanePort !== undefined && controlPlanePort !== undefined && staticFilePort !== undefined) {
+					resolve({ dataPlanePort, controlPlanePort, staticFilePort, serverProcess });
 				}
 			}
 		});
@@ -346,7 +342,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 	const enableCursor = vscode.workspace.getConfiguration().get<boolean>('typst-preview.cursorIndicator') || false;
 	const fontendPath = path.resolve(context.extensionPath, "out/frontend");
 	await watchEditorFiles();
-	const { serverProcess, controlPlanePort, dataPlanePort } = await launchCli(task.kind === 'browser');
+	const { serverProcess, controlPlanePort, dataPlanePort, staticFilePort } = await launchCli(task.kind === 'browser');
 
 	const addonΠserver = new WebSocket(`ws://127.0.0.1:${controlPlanePort}`);
 	addonΠserver.addEventListener("message", async (message) => {
@@ -436,6 +432,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		// todo: may override the same file
 		activeTask.set(bindDocument, {
 			addonΠserver,
+			staticFilePort
 		});
 	}
 
@@ -481,6 +478,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		activeTask.set(bindDocument, {
 			panel,
 			addonΠserver,
+			staticFilePort
 		});
 	};
 
@@ -533,13 +531,13 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 			...codeGetCliFontArgs(),
 			filePath,
 		], outputChannel, openInBrowser);
-		console.log(`Launched server, data plane port:${dataPlanePort}, control plane port:${controlPlanePort}`);
+		console.log(`Launched server, data plane port:${dataPlanePort}, control plane port:${controlPlanePort}, static file port:${staticFilePort}`);
 		if (openInBrowser) {
 			vscode.env.openExternal(vscode.Uri.parse(`http://127.0.0.1:${staticFilePort}`));
 		}
 		// window.typstWebsocket.send("current");
 		return {
-			serverProcess, dataPlanePort, controlPlanePort
+			serverProcess, dataPlanePort, controlPlanePort, staticFilePort
 		};
 	};
 };
@@ -769,7 +767,32 @@ export function activate(context: vscode.ExtensionContext) {
 		context.subscriptions.push(
 			vscode.window.registerTreeDataProvider('typst-preview.outline', outlineProvider));
 	}
-
+	let awaitTreeDisposable = vscode.commands.registerCommand('typst-preview.showAwaitTree', async () => {
+		if (activeTask.size === 0) {
+			vscode.window.showWarningMessage('No active preview');
+			return;
+		}
+		const showAwaitTree = async (tcb: TaskControlBlock) => {
+			const url = `http://127.0.0.1:${tcb.staticFilePort}/await_tree`;
+			// fetch await tree
+			const awaitTree = await (await fetch(`${url}`)).text();
+			console.log(awaitTree);
+			const input = await vscode.window.showInformationMessage("Click to copy the await tree to clipboard", "Copy");
+			if (input === "Copy") {
+				vscode.env.clipboard.writeText(awaitTree);
+			}
+		};
+		if (activeTask.size === 1) {
+			await showAwaitTree(Array.from(activeTask.values())[0]);
+		}
+		const activeDocument = vscode.window.activeTextEditor?.document;
+		if (activeDocument) {
+			const task = activeTask.get(activeDocument);
+			if (task) {
+				await showAwaitTree(task);
+			}
+		}
+	});
 	let webviewDisposable = vscode.commands.registerCommand('typst-preview.preview', launchPrologue('webview', 'doc'));
 	let browserDisposable = vscode.commands.registerCommand('typst-preview.browser', launchPrologue('browser', 'doc'));
 	let webviewSlideDisposable = vscode.commands.registerCommand('typst-preview.preview-slide', launchPrologue('webview', 'slide'));
@@ -803,7 +826,7 @@ export function activate(context: vscode.ExtensionContext) {
 		outputChannel.show();
 	});
 
-	context.subscriptions.push(webviewDisposable, browserDisposable, webviewSlideDisposable, browserSlideDisposable, syncDisposable, showLogDisposable, statusBarItem, revealDocumentDisposable);
+	context.subscriptions.push(webviewDisposable, browserDisposable, webviewSlideDisposable, browserSlideDisposable, syncDisposable, showLogDisposable, statusBarItem, revealDocumentDisposable, awaitTreeDisposable);
 	process.on('SIGINT', () => {
 		for (const serverProcess of serverProcesses) {
 			serverProcess.kill();
