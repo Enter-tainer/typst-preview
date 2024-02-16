@@ -204,7 +204,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: typst-preview-${{ env.target }}.dwp
-          path: target/$RUST_TARGET/release/typst-preview.dwp
+          path: target/{{ env.RUST_TARGET }}/release/typst-preview.dwp
 
   release:
     runs-on: ubuntu-latest
