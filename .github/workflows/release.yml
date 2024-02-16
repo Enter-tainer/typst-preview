@@ -133,8 +133,9 @@ jobs:
       - name: Split debug symbols for linux
         if: matrix.platform == 'linux'
         run: |
-          objcopy --compress-debug-sections --only-keep-debug "target/${{ matrix.rust-target }}/release/typst-preview" "target/${{ matrix.rust-target }}/release/typst-preview.debug"
-          objcopy --strip-debug --add-gnu-debuglink="typst-preview.debug" "target/${{ matrix.rust-target }}/release/typst-preview"
+          cd target/${{ matrix.rust-target }}/release
+          objcopy --compress-debug-sections --only-keep-debug "typst-preview" "typst-preview.debug"
+          objcopy --strip-debug --add-gnu-debuglink="typst-preview.debug" "typst-preview"
       - name: Upload split debug symbols for linux
         if: matrix.platform == 'linux'
         uses: actions/upload-artifact@v4
