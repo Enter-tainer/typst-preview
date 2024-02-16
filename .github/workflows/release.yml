@@ -133,20 +133,24 @@ jobs:
         if: matrix.platform == 'win32'
         uses: actions/upload-artifact@v4
         with:
-          name: typst-preview-${{ env.target }}.pdb
-          path: target/${{ matrix.rust-target }}/release/typst-preview.pdb
+          name: typst_preview-${{ env.target }}.pdb
+          path: target/${{ matrix.rust-target }}/release/typst_preview.pdb
       - name: Upload split debug symbols for linux
         if: matrix.platform == 'linux'
         uses: actions/upload-artifact@v4
         with:
           name: typst-preview-${{ env.target }}.dwp
           path: target/${{ matrix.rust-target }}/release/typst-preview.dwp
+      - name: Package split debug symbols for mac
+        if: matrix.platform == 'darwin'
+        run: tar -czf target/${{ matrix.rust-target }}/release/typst-preview.dSYM.tar.gz target/${{ matrix.rust-target }}/release/typst-preview.dSYM
       - name: Upload split debug symbols for mac
         if: matrix.platform == 'darwin'
         uses: actions/upload-artifact@v4
         with:
           name: typst-preview-${{ env.target }}.dSYM.tar.gz
           path: target/${{ matrix.rust-target }}/release/typst-preview.dSYM.tar.gz
+          compression-level: 0
 
   build_alpine:
     name: build (x86_64-unknown-linux-musl)
