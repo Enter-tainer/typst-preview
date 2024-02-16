@@ -98,6 +98,11 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.rust-target }}
+      - name: Install llvm
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install llvm
       - name: Install AArch64 target toolchain
         if: matrix.rust-target == 'aarch64-unknown-linux-gnu'
         run: |
@@ -134,8 +139,8 @@ jobs:
         if: matrix.platform == 'linux'
         run: |
           cd target/${{ matrix.rust-target }}/release
-          objcopy --compress-debug-sections --only-keep-debug "typst-preview" "typst-preview.debug"
-          objcopy --strip-debug --add-gnu-debuglink="typst-preview.debug" "typst-preview"
+          llvm-objcopy --compress-debug-sections --only-keep-debug "typst-preview" "typst-preview.debug"
+          llvm-objcopy --strip-debug --add-gnu-debuglink="typst-preview.debug" "typst-preview"
       - name: Upload split debug symbols for linux
         if: matrix.platform == 'linux'
         uses: actions/upload-artifact@v4
