@@ -135,12 +135,18 @@ jobs:
         with:
           name: typst_preview-${{ env.target }}.pdb
           path: target/${{ matrix.rust-target }}/release/typst_preview.pdb
+      - name: Split debug symbols for linux
+        if: matrix.platform == 'linux'
+        run: |
+          objcopy --compress-debug-sections --only-keep-debug "target/${{ matrix.rust-target }}/release/typst-preview" "target/${{ matrix.rust-target }}/release/typst-preview.debug"
+          objcopy --strip-debug --add-gnu-debuglink="typst-preview.debug" "target/${{ matrix.rust-target }}/release/typst-preview"
       - name: Upload split debug symbols for linux
         if: matrix.platform == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          name: typst-preview-${{ env.target }}.dwp
-          path: target/${{ matrix.rust-target }}/release/typst-preview.dwp
+          name: typst-preview-${{ env.target }}.debug
+          path: target/${{ matrix.rust-target }}/release/typst-preview.debug
+          compression-level: 0
       - name: Package split debug symbols for mac
       # note that debug symbols on mac is a symlink to the actual dSYM directory
         if: matrix.platform == 'darwin'
@@ -168,7 +174,7 @@ jobs:
       RUSTFLAGS: "-C link-arg=-fuse-ld=lld -C target-feature=-crt-static"
     steps:
       - name: Install dependencies
-        run: apk add --no-cache git clang lld musl-dev nodejs npm yarn
+        run: apk add --no-cache git clang lld musl-dev nodejs npm yarn binutils
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -207,11 +213,15 @@ jobs:
         with:
           name: typst-preview-${{ env.target }}
           path: typst-preview-${{ env.target }}
+      - name: Split debug symbols
+        run: |
+          objcopy --compress-debug-sections --only-keep-debug "target/${{ env.RUST_TARGET }}/release/typst-preview" "target/${{ env.RUST_TARGET }}/release/typst-preview.debug"
+          objcopy --strip-debug --add-gnu-debuglink="typst-preview.debug" "target/${{ env.RUST_TARGET }}/release/typst-preview"
       - name: Upload split debug symbols
         uses: actions/upload-artifact@v4
         with:
-          name: typst-preview-${{ env.target }}.dwp
-          path: target/{{ env.RUST_TARGET }}/release/typst-preview.dwp
+          name: typst-preview-${{ env.target }}.debug
+          path: target/{{ env.RUST_TARGET }}/release/typst-preview.debug
 
   release:
     runs-on: ubuntu-latest

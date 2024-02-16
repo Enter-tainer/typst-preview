@@ -94,4 +94,3 @@ embed-fonts = []
 
 [profile.release]
 debug = true
-split-debuginfo = "packed"
