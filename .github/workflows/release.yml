@@ -119,15 +119,6 @@ jobs:
           cargo build --release -p typst-preview --target ${{ matrix.rust-target }}
           cp "target/${{ matrix.rust-target }}/release/typst-preview$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "addons/vscode/out/"
           cp "target/${{ matrix.rust-target }}/release/typst-preview$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "typst-preview-${{ env.target }}$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )"
-      - name: Package extension
-        shell: pwsh
-        run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
-        working-directory: ./addons/vscode
-      - name: Upload VSIX artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: typst-preview-${{ env.target }}.vsix
-          path: addons/vscode/typst-preview-${{ env.target }}.vsix
       # window: .pdb, linux: .debug, mac: .dSYM
       - name: Upload split debug symbols for windows
         if: matrix.platform == 'win32'
@@ -166,6 +157,16 @@ jobs:
         with:
           name: typst-preview-${{ env.target }}
           path: typst-preview-${{ env.target }}${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
+      - name: Package extension
+        shell: pwsh
+        run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
+        working-directory: ./addons/vscode
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: typst-preview-${{ env.target }}.vsix
+          path: addons/vscode/typst-preview-${{ env.target }}.vsix
+  
   
 
   build_alpine:
@@ -207,14 +208,6 @@ jobs:
           mkdir -p addons/vscode/out
           cp "target/$RUST_TARGET/release/typst-preview" "addons/vscode/out/"
           cp "target/$RUST_TARGET/release/typst-preview" "typst-preview-alpine-x64"
-      - name: Package extension
-        run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
-        working-directory: ./addons/vscode
-      - name: Upload VSIX artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: typst-preview-${{ env.target }}.vsix
-          path: addons/vscode/typst-preview-${{ env.target }}.vsix
       - name: Split debug symbols
         run: |
           objcopy --compress-debug-sections --only-keep-debug "target/${{ env.RUST_TARGET }}/release/typst-preview" "target/${{ env.RUST_TARGET }}/release/typst-preview.debug"
@@ -229,6 +222,15 @@ jobs:
         with:
           name: typst-preview-${{ env.target }}.debug
           path: target/{{ env.RUST_TARGET }}/release/typst-preview.debug
+      - name: Package extension
+        run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
+        working-directory: ./addons/vscode
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: typst-preview-${{ env.target }}.vsix
+          path: addons/vscode/typst-preview-${{ env.target }}.vsix
+  
 
   release:
     runs-on: ubuntu-latest
