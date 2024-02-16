@@ -151,6 +151,7 @@ jobs:
           path: target/${{ matrix.rust-target }}/release/typst-preview.dSYM.tar.gz
           compression-level: 0
       - name: Copy binary to output directory
+        shell: pwsh
         run: |
           cp "target/${{ matrix.rust-target }}/release/typst-preview$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "addons/vscode/out/"
           cp "target/${{ matrix.rust-target }}/release/typst-preview$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "typst-preview-${{ env.target }}$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )"
