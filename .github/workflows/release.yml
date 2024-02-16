@@ -94,14 +94,35 @@ jobs:
       - shell: pwsh
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
         working-directory: ./addons/vscode
-      - uses: actions/upload-artifact@v4
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
         with:
           name: typst-preview-${{ env.target }}.vsix
           path: addons/vscode/typst-preview-${{ env.target }}.vsix
-      - uses: actions/upload-artifact@v4
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
         with:
           name: typst-preview-${{ env.target }}
           path: typst-preview-${{ env.target }}${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
+      # window: .pdb, linux: .dwp, mac: .dSYM
+      - name: Upload split debug symbols for windows
+        if: matrix.platform == 'win32'
+        uses: actions/upload-artifact@v4
+        with:
+          name: typst-preview-${{ env.target }}.pdb
+          path: target/${{ matrix.rust-target }}/release/typst-preview.pdb
+      - name: Upload split debug symbols for linux
+        if: matrix.platform == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: typst-preview-${{ env.target }}.dwp
+          path: target/${{ matrix.rust-target }}/release/typst-preview.dwp
+      - name: Upload split debug symbols for mac
+        if: matrix.platform == 'darwin'
+        uses: actions/upload-artifact@v4
+        with:
+          name: typst-preview-${{ env.target }}.dSYM
+          path: target/${{ matrix.rust-target }}/release/typst-preview.dSYM
 
   build_alpine:
     name: build (x86_64-unknown-linux-musl)
@@ -150,6 +171,11 @@ jobs:
         with:
           name: typst-preview-${{ env.target }}
           path: typst-preview-${{ env.target }}
+      - name: Upload split debug symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: typst-preview-${{ env.target }}.dwp
+          path: target/$RUST_TARGET/release/typst-preview.dwp
 
   release:
     runs-on: ubuntu-latest
