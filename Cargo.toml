@@ -92,7 +92,6 @@ default = ["embed-fonts"]
 # into the binary.
 embed-fonts = []
 
-[profile.rel_dev]
-inherits = "release"
+[profile.release]
 debug = true
-opt-level = 3
+split-debuginfo = "packed"
