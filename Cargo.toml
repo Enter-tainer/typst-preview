@@ -94,3 +94,7 @@ embed-fonts = []
 
 [profile.release]
 debug = true
+# on macos, use split debuginfo
+[target.'cfg(target_os = "macos")'.profile.release]
+debug = true
+split-debuginfo = "packed"
