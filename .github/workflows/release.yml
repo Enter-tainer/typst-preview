@@ -136,11 +136,10 @@ jobs:
           name: typst-preview-${{ env.target }}.debug
           path: target/${{ matrix.rust-target }}/release/typst-preview.debug
           compression-level: 0
-      - name: Split debug symbols for mac
+      - name: Collect debug symbols for mac
         if: matrix.platform == 'darwin'
         run: |
           dsymutil -f "target/${{ matrix.rust-target }}/release/typst-preview"
-          strip -d "target/${{ matrix.rust-target }}/release/typst-preview"
       - name: Upload split debug symbols for mac
         if: matrix.platform == 'darwin'
         uses: actions/upload-artifact@v4
