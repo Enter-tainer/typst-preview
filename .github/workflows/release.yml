@@ -98,6 +98,11 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.rust-target }}
+      - name: Install llvm
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install llvm
       - name: Install AArch64 target toolchain
         if: matrix.rust-target == 'aarch64-unknown-linux-gnu'
         run: |
@@ -112,8 +117,45 @@ jobs:
         shell: pwsh
         run: |
           cargo build --release -p typst-preview --target ${{ matrix.rust-target }}
+      - name: Upload split debug symbols for windows
+        if: matrix.platform == 'win32'
+        uses: actions/upload-artifact@v4
+        with:
+          name: typst_preview-${{ env.target }}.pdb
+          path: target/${{ matrix.rust-target }}/release/typst_preview.pdb
+      - name: Split debug symbols for linux
+        if: matrix.platform == 'linux'
+        run: |
+          cd target/${{ matrix.rust-target }}/release
+          llvm-objcopy --compress-debug-sections --only-keep-debug "typst-preview" "typst-preview.debug"
+          llvm-objcopy --strip-debug --add-gnu-debuglink="typst-preview.debug" "typst-preview"
+      - name: Upload split debug symbols for linux
+        if: matrix.platform == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: typst-preview-${{ env.target }}.debug
+          path: target/${{ matrix.rust-target }}/release/typst-preview.debug
+          compression-level: 0
+      - name: Collect debug symbols for mac
+        if: matrix.platform == 'darwin'
+        run: |
+          dsymutil -f "target/${{ matrix.rust-target }}/release/typst-preview"
+      - name: Upload split debug symbols for mac
+        if: matrix.platform == 'darwin'
+        uses: actions/upload-artifact@v4
+        with:
+          name: typst-preview-${{ env.target }}.dwarf
+          path: target/${{ matrix.rust-target }}/release/typst-preview.dwarf
+      - name: Copy binary to output directory
+        shell: pwsh
+        run: |
           cp "target/${{ matrix.rust-target }}/release/typst-preview$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "addons/vscode/out/"
           cp "target/${{ matrix.rust-target }}/release/typst-preview$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "typst-preview-${{ env.target }}$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )"
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: typst-preview-${{ env.target }}
+          path: typst-preview-${{ env.target }}${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
       - name: Package extension
         shell: pwsh
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
@@ -123,37 +165,8 @@ jobs:
         with:
           name: typst-preview-${{ env.target }}.vsix
           path: addons/vscode/typst-preview-${{ env.target }}.vsix
-      - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: typst-preview-${{ env.target }}
-          path: typst-preview-${{ env.target }}${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
-      # window: .pdb, linux: .dwp, mac: .dSYM
-      - name: Upload split debug symbols for windows
-        if: matrix.platform == 'win32'
-        uses: actions/upload-artifact@v4
-        with:
-          name: typst_preview-${{ env.target }}.pdb
-          path: target/${{ matrix.rust-target }}/release/typst_preview.pdb
-      - name: Upload split debug symbols for linux
-        if: matrix.platform == 'linux'
-        uses: actions/upload-artifact@v4
-        with:
-          name: typst-preview-${{ env.target }}.dwp
-          path: target/${{ matrix.rust-target }}/release/typst-preview.dwp
-      - name: Package split debug symbols for mac
-      # note that debug symbols on mac is a symlink to the actual dSYM directory
-        if: matrix.platform == 'darwin'
-        run: |
-          cp -LR "target/${{ matrix.rust-target }}/release/typst-preview.dSYM" "typst-preview.dSYM"
-          tar -czf "target/${{ matrix.rust-target }}/release/typst-preview.dSYM.tar.gz" "typst-preview.dSYM"
-      - name: Upload split debug symbols for mac
-        if: matrix.platform == 'darwin'
-        uses: actions/upload-artifact@v4
-        with:
-          name: typst-preview-${{ env.target }}.dSYM.tar.gz
-          path: target/${{ matrix.rust-target }}/release/typst-preview.dSYM.tar.gz
-          compression-level: 0
+  
+  
 
   build_alpine:
     name: build (x86_64-unknown-linux-musl)
@@ -168,7 +181,7 @@ jobs:
       RUSTFLAGS: "-C link-arg=-fuse-ld=lld -C target-feature=-crt-static"
     steps:
       - name: Install dependencies
-        run: apk add --no-cache git clang lld musl-dev nodejs npm yarn
+        run: apk add --no-cache git clang lld musl-dev nodejs npm yarn binutils
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -192,8 +205,25 @@ jobs:
         run: |
           cargo build --release -p typst-preview --target $RUST_TARGET
           mkdir -p addons/vscode/out
-          cp "target/$RUST_TARGET/release/typst-preview" "addons/vscode/out/"
-          cp "target/$RUST_TARGET/release/typst-preview" "typst-preview-alpine-x64"
+      - name: Split debug symbols
+        run: |
+          cd target/$RUST_TARGET/release
+          objcopy --compress-debug-sections --only-keep-debug "typst-preview" "typst-preview.debug"
+          objcopy --strip-debug --add-gnu-debuglink="typst-preview.debug" "typst-preview"
+      - name: Upload split debug symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: typst-preview-${{ env.target }}.debug
+          path: target/${{ env.RUST_TARGET }}/release/typst-preview.debug
+      - name: Copy binary to output directory
+        run: |
+          cp "target/${{ env.RUST_TARGET }}/release/typst-preview" "addons/vscode/out/"
+          cp "target/${{ env.RUST_TARGET }}/release/typst-preview" "typst-preview-${{ env.target }}"
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: typst-preview-${{ env.target }}
+          path: typst-preview-${{ env.target }}
       - name: Package extension
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
         working-directory: ./addons/vscode
@@ -202,16 +232,7 @@ jobs:
         with:
           name: typst-preview-${{ env.target }}.vsix
           path: addons/vscode/typst-preview-${{ env.target }}.vsix
-      - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: typst-preview-${{ env.target }}
-          path: typst-preview-${{ env.target }}
-      - name: Upload split debug symbols
-        uses: actions/upload-artifact@v4
-        with:
-          name: typst-preview-${{ env.target }}.dwp
-          path: target/{{ env.RUST_TARGET }}/release/typst-preview.dwp
+  
 
   release:
     runs-on: ubuntu-latest
