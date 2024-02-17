@@ -13,7 +13,7 @@ use ::await_tree::InstrumentAwait;
 use debug_loc::SpanInterner;
 use futures::SinkExt;
 use log::info;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
@@ -21,13 +21,7 @@ use typst::{layout::Position, syntax::Span};
 use typst_ts_core::debug_loc::SourceSpanOffset;
 use typst_ts_core::{error::prelude::ZResult, ImmutStr, TypstDocument as Document};
 
-// todo: move to typst_ts_core
-#[derive(Debug, Serialize)]
-pub struct DocToSrcJumpInfo {
-    pub filepath: String,
-    pub start: Option<(usize, usize)>, // row, column
-    pub end: Option<(usize, usize)>,
-}
+pub use typst_ts_compiler::service::DocToSrcJumpInfo;
 
 use actor::editor::EditorActor;
 use actor::typst::TypstActor;
@@ -98,10 +92,9 @@ impl CompilationHandle for CompilationHandleImpl {
     fn notify_compile(&self, res: Result<Arc<Document>, CompileStatus>) {
         match res {
             Ok(doc) => {
-                self.doc_sender.send(Some(doc)).unwrap();
-                self.render_tx
-                    .send(RenderActorRequest::RenderIncremental)
-                    .unwrap();
+                let _ = self.doc_sender.send(Some(doc)); // it is ok to ignore the error here
+                                                         // todo: is it right that ignore zero broadcast receiver?
+                let _ = self.render_tx.send(RenderActorRequest::RenderIncremental);
                 self.editor_tx
                     .send(EditorActorRequest::CompileStatus(
                         CompileStatus::CompileSuccess,
