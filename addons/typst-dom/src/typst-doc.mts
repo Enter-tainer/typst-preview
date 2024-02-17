@@ -192,6 +192,9 @@ export class TypstDocumentContext<O = any> {
       0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.3, 1.5, 1.7, 1.9,
       2.1, 2.4, 2.7, 3, 3.3, 3.7, 4.1, 4.6, 5.1, 5.7, 6.3, 7, 7.7, 8.5, 9.4, 10,
     ];
+    const deltaDistanceThreshold = 20;
+    const pixelPerLine = 20;
+    let deltaDistance = 0;
     const wheelEventHandler = (event: WheelEvent) => {
       if (event.ctrlKey) {
         event.preventDefault();
@@ -204,8 +207,16 @@ export class TypstDocumentContext<O = any> {
           window.onresize = null;
         }
         const prevScaleRatio = this.currentScaleRatio;
+        // accumulate delta distance
+        const pixels = event.deltaMode === 0 ? event.deltaY : event.deltaY * pixelPerLine;
+        deltaDistance += pixels;
+        if (Math.abs(deltaDistance) < deltaDistanceThreshold) {
+          return;
+        }
+        const scrollDirection = deltaDistance > 0 ? 1 : -1;
+        deltaDistance = 0;
         // Get wheel scroll direction and calculate new scale
-        if (event.deltaY < 0) {
+        if (scrollDirection === -1) {
           // enlarge
           if (this.currentScaleRatio >= factors.at(-1)!) {
             // already large than max factor
@@ -215,7 +226,7 @@ export class TypstDocumentContext<O = any> {
               .filter((x) => x > this.currentScaleRatio)
               .at(0)!;
           }
-        } else if (event.deltaY > 0) {
+        } else if (scrollDirection === 1) {
           // reduce
           if (this.currentScaleRatio <= factors.at(0)!) {
             return;
