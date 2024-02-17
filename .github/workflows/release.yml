@@ -117,7 +117,6 @@ jobs:
         shell: pwsh
         run: |
           cargo build --release -p typst-preview --target ${{ matrix.rust-target }}
-      # window: .pdb, linux: .debug, mac: .dSYM
       - name: Upload split debug symbols for windows
         if: matrix.platform == 'win32'
         uses: actions/upload-artifact@v4
@@ -137,19 +136,17 @@ jobs:
           name: typst-preview-${{ env.target }}.debug
           path: target/${{ matrix.rust-target }}/release/typst-preview.debug
           compression-level: 0
-      - name: Package split debug symbols for mac
-      # note that debug symbols on mac is a symlink to the actual dSYM directory
+      - name: Split debug symbols for mac
         if: matrix.platform == 'darwin'
         run: |
-          cp -LR "target/${{ matrix.rust-target }}/release/typst-preview.dSYM" "typst-preview.dSYM"
-          tar -czf "target/${{ matrix.rust-target }}/release/typst-preview.dSYM.tar.gz" "typst-preview.dSYM"
+          dsymutil -f "target/${{ matrix.rust-target }}/release/typst-preview"
+          strip -d "target/${{ matrix.rust-target }}/release/typst-preview"
       - name: Upload split debug symbols for mac
         if: matrix.platform == 'darwin'
         uses: actions/upload-artifact@v4
         with:
-          name: typst-preview-${{ env.target }}.dSYM.tar.gz
-          path: target/${{ matrix.rust-target }}/release/typst-preview.dSYM.tar.gz
-          compression-level: 0
+          name: typst-preview-${{ env.target }}.dwarf
+          path: target/${{ matrix.rust-target }}/release/typst-preview.dwarf
       - name: Copy binary to output directory
         shell: pwsh
         run: |
