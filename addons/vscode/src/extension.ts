@@ -7,7 +7,7 @@ import { readFile } from 'fs/promises';
 import * as path from 'path';
 import { WebSocket } from 'ws';
 import { version, name } from '../package.json';
-import fetch from 'node-fetch';
+import type fetchFunc from 'node-fetch';
 
 const vscodeVariables = require('vscode-variables');
 
@@ -742,6 +742,8 @@ let statusBarItem: vscode.StatusBarItem;
 // Your extension is activated the very first time the command is executed
 // todo: is global state safe?
 export function activate(context: vscode.ExtensionContext) {
+	// import fetch from 'node-fetch';
+
 	// Use the console to output diagnostic information (console.log) and errors (console.error)
 	// This line of code will only be executed once when your extension is activated
 	// The command has been defined in the package.json file
@@ -767,12 +769,15 @@ export function activate(context: vscode.ExtensionContext) {
 		context.subscriptions.push(
 			vscode.window.registerTreeDataProvider('typst-preview.outline', outlineProvider));
 	}
+	let fetch: (typeof fetchFunc) | undefined = undefined;
 	let awaitTreeDisposable = vscode.commands.registerCommand('typst-preview.showAwaitTree', async () => {
 		if (activeTask.size === 0) {
 			vscode.window.showWarningMessage('No active preview');
 			return;
 		}
 		const showAwaitTree = async (tcb: TaskControlBlock) => {
+			fetch = fetch || ((await import('node-fetch')).default);
+
 			const url = `http://127.0.0.1:${tcb.staticFilePort}/await_tree`;
 			// fetch await tree
 			const awaitTree = await (await fetch(`${url}`)).text();
