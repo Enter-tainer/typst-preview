@@ -38,6 +38,18 @@ This project is not affiliated with, created by, or endorsed by Typst the brand.
 
 ## Release Notes
 
+### v0.10.8 - [2024-02-19]
+
+- Features:
+  - Add favicon when opening the preview in browser (#239)
+  - Add drag to scroll. You can now drag the preview panel to scroll.
+- Bug fixes:
+  - fix sensitive scale on touchpad (#244)
+  - The vscode extension will check the server version before starting.
+- Misc:
+  - Add async tracing and add a new command `typst-preview.showAwaitTree` to copy the async tree to clipboard. This is useful for debugging.
+  - Add split debug symbol for the server.
+
 ### v0.10.7 - [2024-01-25]
 
 - Features:
