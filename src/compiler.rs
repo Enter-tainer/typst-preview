@@ -15,7 +15,7 @@ use typst_ts_compiler::service::{
 use typst_ts_compiler::service::{CompileDriver, CompileMiddleware};
 use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
 use typst_ts_core::debug_loc::SourceSpanOffset;
-use typst_ts_core::error::prelude::ZResult;
+use typst_ts_core::Error;
 
 use typst_preview::{CompilationHandle, CompileStatus};
 use typst_preview::{CompileHost, EditorServer, MemoryFiles, MemoryFilesShort, SourceFileServer};
@@ -91,7 +91,7 @@ impl<H: CompilationHandle> CompileServer<H> {
         }
     }
 
-    pub fn spawn(self) -> ZResult<TypstClient<H>> {
+    pub fn spawn(self) -> Result<TypstClient<H>, Error> {
         let (server, client) = self.inner.split();
         tokio::spawn(server.spawn().instrument_await("spawn typst server"));
 
@@ -112,7 +112,10 @@ impl<H: CompilationHandle> TypstClient<H> {
 }
 
 impl<H: CompilationHandle> SourceFileServer for TypstClient<H> {
-    async fn resolve_source_span(&mut self, loc: Location) -> ZResult<Option<SourceSpanOffset>> {
+    async fn resolve_source_span(
+        &mut self,
+        loc: Location,
+    ) -> Result<Option<SourceSpanOffset>, Error> {
         let Location::Src(src_loc) = loc;
         self.inner()
             .resolve_src_location(src_loc)
@@ -120,7 +123,10 @@ impl<H: CompilationHandle> SourceFileServer for TypstClient<H> {
             .await
     }
 
-    async fn resolve_document_position(&mut self, loc: Location) -> ZResult<Option<Position>> {
+    async fn resolve_document_position(
+        &mut self,
+        loc: Location,
+    ) -> Result<Option<Position>, Error> {
         let Location::Src(src_loc) = loc;
 
         let path = Path::new(&src_loc.filepath).to_owned();
@@ -137,7 +143,7 @@ impl<H: CompilationHandle> SourceFileServer for TypstClient<H> {
         &mut self,
         s: Span,
         offset: Option<usize>,
-    ) -> ZResult<Option<DocToSrcJumpInfo>> {
+    ) -> Result<Option<DocToSrcJumpInfo>, Error> {
         Ok(self
             .inner()
             .resolve_span_and_offset(s, offset)
@@ -157,7 +163,11 @@ impl<H: CompilationHandle> SourceFileServer for TypstClient<H> {
 }
 
 impl<H: CompilationHandle> EditorServer for TypstClient<H> {
-    async fn update_memory_files(&mut self, files: MemoryFiles, reset_shadow: bool) -> ZResult<()> {
+    async fn update_memory_files(
+        &mut self,
+        files: MemoryFiles,
+        reset_shadow: bool,
+    ) -> Result<(), Error> {
         // todo: is it safe to believe that the path is normalized?
         let now = std::time::SystemTime::now();
         let files = FileChangeSet::new_inserts(
@@ -180,7 +190,7 @@ impl<H: CompilationHandle> EditorServer for TypstClient<H> {
         Ok(())
     }
 
-    async fn remove_shadow_files(&mut self, files: MemoryFilesShort) -> ZResult<()> {
+    async fn remove_shadow_files(&mut self, files: MemoryFilesShort) -> Result<(), Error> {
         // todo: is it safe to believe that the path is normalized?
         let files = FileChangeSet::new_removes(files.files.into_iter().map(From::from).collect());
         self.inner().add_memory_changes(MemoryEvent::Update(files));

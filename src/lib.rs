@@ -19,7 +19,8 @@ use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 use typst::{layout::Position, syntax::Span};
 use typst_ts_core::debug_loc::SourceSpanOffset;
-use typst_ts_core::{error::prelude::ZResult, ImmutStr, TypstDocument as Document};
+use typst_ts_core::Error;
+use typst_ts_core::{ImmutStr, TypstDocument as Document};
 
 pub use typst_ts_compiler::service::DocToSrcJumpInfo;
 
@@ -142,14 +143,14 @@ pub trait SourceFileServer {
     fn resolve_source_span(
         &mut self,
         _by: Location,
-    ) -> impl Future<Output = ZResult<Option<SourceSpanOffset>>> + Send {
+    ) -> impl Future<Output = Result<Option<SourceSpanOffset>, Error>> + Send {
         async { Ok(None) }
     }
 
     fn resolve_document_position(
         &mut self,
         _by: Location,
-    ) -> impl Future<Output = ZResult<Option<Position>>> + Send {
+    ) -> impl Future<Output = Result<Option<Position>, Error>> + Send {
         async { Ok(None) }
     }
 
@@ -157,7 +158,7 @@ pub trait SourceFileServer {
         &mut self,
         _s: Span,
         _offset: Option<usize>,
-    ) -> impl Future<Output = ZResult<Option<DocToSrcJumpInfo>>> + Send {
+    ) -> impl Future<Output = Result<Option<DocToSrcJumpInfo>, Error>> + Send {
         async { Ok(None) }
     }
 }
@@ -167,14 +168,14 @@ pub trait EditorServer {
         &mut self,
         _files: MemoryFiles,
         _reset_shadow: bool,
-    ) -> impl Future<Output = ZResult<()>> + Send {
+    ) -> impl Future<Output = Result<(), Error>> + Send {
         async { Ok(()) }
     }
 
     fn remove_shadow_files(
         &mut self,
         _files: MemoryFilesShort,
-    ) -> impl Future<Output = ZResult<()>> + Send {
+    ) -> impl Future<Output = Result<(), Error>> + Send {
         async { Ok(()) }
     }
 }
