@@ -1,5 +1,4 @@
 import type { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
-import { TypstCancellationToken } from "./typst-cancel.mjs";
 
 export interface ContainerDOMState {
   /// cached `hookedElem.offsetWidth` or `hookedElem.innerWidth`
@@ -77,8 +76,6 @@ export class TypstDocumentContext<O = any> {
   patchQueue: [string, string][] = [];
   /// resources to dispose
   disposeList: (() => void)[] = [];
-  /// canvas render ctoken
-  canvasRenderCToken?: TypstCancellationToken;
 
   /// There are two scales in this class: The real scale is to adjust the size
   /// of `hookedElem` to fit the svg. The virtual scale (scale ratio) is to let
@@ -372,14 +369,6 @@ export class TypstDocumentContext<O = any> {
 
       try {
         let t0 = performance.now();
-
-        const ctoken = this.canvasRenderCToken;
-        if (ctoken) {
-          await ctoken.cancel();
-          await ctoken.wait();
-          this.canvasRenderCToken = undefined;
-          console.log("cancel canvas rendering");
-        }
 
         let needRerender = false;
         // console.log('patchQueue', JSON.stringify(this.patchQueue.map(x => x[0])));

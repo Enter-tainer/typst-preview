@@ -16,6 +16,9 @@ export function provideSvgDoc<
   >
 >(Base: TBase): TBase & GConstructor<TypstSvgDocument> {
   return class SvgDocument extends Base {
+    /// canvas render ctoken
+    canvasRenderCToken?: TypstCancellationToken;
+
     constructor(...args: any[]) {
       super(...args);
       this.registerMode("svg");
@@ -597,12 +600,23 @@ export function provideSvgDoc<
         }
 
         this.createCanvas(pagesInCanvasMode);
+
+        const ctoken = this.canvasRenderCToken;
+        let waitCancel = Promise.resolve();
+        if (ctoken) {
+          waitCancel = ctoken.cancel().then(() => ctoken.wait());
+          this.canvasRenderCToken = undefined;
+          console.log("cancel canvas rendering");
+        }
+
         console.assert(
           this.canvasRenderCToken === undefined,
           "Noo!!: canvasRenderCToken should be undefined"
         );
+
         const tok = (this.canvasRenderCToken = new TypstCancellationToken());
-        setTimeout(() => {
+        setTimeout(async () => {
+          await waitCancel;
           this.updateCanvas(pagesInCanvasMode, {
             cancel: tok,
           }).finally(() => {
