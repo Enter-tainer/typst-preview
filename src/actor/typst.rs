@@ -1,24 +1,19 @@
-use std::sync::Arc;
-
-use crate::await_tree::REGISTRY;
-use crate::{ChangeCursorPositionRequest, MemoryFiles, MemoryFilesShort, SrcToDocJumpRequest};
 use await_tree::InstrumentAwait;
+
 use log::{debug, error, info};
-use tokio::sync::{broadcast, mpsc, watch};
-use typst::diag::SourceResult;
+use tokio::sync::{broadcast, mpsc};
 use typst::syntax::Span;
-use typst::{model::Document, World};
-use typst_ts_compiler::service::{
-    CompileActor, CompileClient as TsCompileClient, CompileExporter, Compiler, DocToSrcJumpInfo,
-    WorldExporter,
-};
-use typst_ts_compiler::service::{CompileDriver, CompileMiddleware};
-use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
 use typst_ts_core::debug_loc::{CharPosition, SourceLocation, SourceSpanOffset};
 
-use super::editor::CompileStatus;
+use crate::await_tree::REGISTRY;
+use crate::{
+    ChangeCursorPositionRequest, EditorServer, MemoryFiles, MemoryFilesShort, SourceFileServer,
+    SrcToDocJumpRequest,
+};
+
 use super::render::RenderActorRequest;
 use super::{editor::EditorActorRequest, webview::WebviewActorRequest};
+use crate::DocToSrcJumpInfo;
 
 #[derive(Debug)]
 pub enum TypstActorRequest {
@@ -31,159 +26,8 @@ pub enum TypstActorRequest {
     RemoveMemoryFiles(MemoryFilesShort),
 }
 
-pub type CompileService = CompileActor<Reporter<CompileExporter<CompileDriver>>>;
-pub type CompileClient = TsCompileClient<CompileService>;
-
-pub struct TypstActor {
-    inner: CompileService,
-    client: TypstClient,
-}
-
-type MpScChannel<T> = (mpsc::UnboundedSender<T>, mpsc::UnboundedReceiver<T>);
-type WatchChannel<T> = (watch::Sender<T>, watch::Receiver<T>);
-type BroadcastChannel<T> = (broadcast::Sender<T>, broadcast::Receiver<T>);
-
-pub struct Channels {
-    pub typst_mailbox: MpScChannel<TypstActorRequest>,
-    pub doc_watch: WatchChannel<Option<Arc<Document>>>,
-    pub renderer_mailbox: BroadcastChannel<RenderActorRequest>,
-    pub editor_conn: MpScChannel<EditorActorRequest>,
-    pub webview_conn: BroadcastChannel<WebviewActorRequest>,
-}
-
-pub struct Reporter<C> {
-    inner: C,
-    sender: mpsc::UnboundedSender<EditorActorRequest>,
-}
-
-impl<C: Compiler> CompileMiddleware for Reporter<C> {
-    type Compiler = C;
-
-    fn inner(&self) -> &Self::Compiler {
-        &self.inner
-    }
-
-    fn inner_mut(&mut self) -> &mut Self::Compiler {
-        &mut self.inner
-    }
-
-    fn wrap_compile(
-        &mut self,
-        env: &mut typst_ts_compiler::service::CompileEnv,
-    ) -> SourceResult<Arc<Document>> {
-        let _ = self
-            .sender
-            .send(EditorActorRequest::CompileStatus(CompileStatus::Compiling));
-        let doc = self.inner_mut().compile(env);
-        if let Err(err) = &doc {
-            let _ = self.sender.send(EditorActorRequest::CompileStatus(
-                CompileStatus::CompileError,
-            ));
-            log::error!("TypstActor: compile error: {:?}", err);
-        } else {
-            let _ = self.sender.send(EditorActorRequest::CompileStatus(
-                CompileStatus::CompileSuccess,
-            ));
-        }
-
-        doc
-    }
-}
-
-impl<C: Compiler + WorldExporter> WorldExporter for Reporter<C> {
-    fn export(&mut self, output: Arc<typst::model::Document>) -> SourceResult<()> {
-        self.inner.export(output)
-    }
-}
-
-impl TypstActor {
-    pub fn set_up_channels() -> Channels {
-        let typst_mailbox = mpsc::unbounded_channel();
-        let doc_watch = watch::channel(None);
-        let renderer_mailbox = broadcast::channel(1024);
-        let editor_conn = mpsc::unbounded_channel();
-        let webview_conn = broadcast::channel(32);
-        Channels {
-            typst_mailbox,
-            doc_watch,
-            renderer_mailbox,
-            editor_conn,
-            webview_conn,
-        }
-    }
-
-    pub fn new(
-        compiler_driver: CompileDriver,
-        mailbox: mpsc::UnboundedReceiver<TypstActorRequest>,
-        doc_sender: watch::Sender<Option<Arc<Document>>>,
-        renderer_sender: broadcast::Sender<RenderActorRequest>,
-        editor_conn_sender: mpsc::UnboundedSender<EditorActorRequest>,
-        webview_conn_sender: broadcast::Sender<WebviewActorRequest>,
-    ) -> Self {
-        // CompileExporter + DynamicLayoutCompiler + WatchDriver
-        let root = compiler_driver.world.root.clone();
-        let r = renderer_sender.clone();
-        let driver = CompileExporter::new(compiler_driver).with_exporter(
-            move |_world: &dyn World, doc: Arc<Document>| {
-                let _ = doc_sender.send(Some(doc)); // it is ok to ignore the error here
-                let _ = r.send(RenderActorRequest::RenderIncremental);
-                Ok(())
-            },
-        );
-        let driver = Reporter {
-            inner: driver,
-            sender: editor_conn_sender.clone(),
-        };
-        let inner = CompileActor::new(driver, root.as_ref().to_owned()).with_watch(true);
-
-        Self {
-            inner,
-            client: TypstClient {
-                inner: once_cell::sync::OnceCell::new(),
-                mailbox,
-                editor_conn_sender,
-                webview_conn_sender,
-                renderer_sender,
-            },
-        }
-    }
-
-    pub async fn run(self) {
-        let root = REGISTRY
-            .lock()
-            .await
-            .register("typst actor".into(), "typst actor");
-        root.instrument(self.run_instrumented()).await;
-    }
-
-    async fn run_instrumented(self) {
-        let (server, client) = self.inner.split();
-        server.spawn().instrument_await("spawn typst server").await;
-
-        if self.client.inner.set(client).is_err() {
-            panic!("TypstActor: failed to set client");
-        }
-
-        let mut client = self.client;
-
-        debug!("TypstActor: waiting for message");
-        while let Some(mail) = client
-            .mailbox
-            .recv()
-            .instrument_await("waiting for message")
-            .await
-        {
-            client
-                .process_mail(mail)
-                .instrument_await("processing mail")
-                .await;
-        }
-        info!("TypstActor: exiting");
-    }
-}
-
-struct TypstClient {
-    inner: once_cell::sync::OnceCell<CompileClient>,
+pub struct TypstActor<T> {
+    client: T,
 
     mailbox: mpsc::UnboundedReceiver<TypstActorRequest>,
 
@@ -192,9 +36,69 @@ struct TypstClient {
     renderer_sender: broadcast::Sender<RenderActorRequest>,
 }
 
-impl TypstClient {
-    fn inner(&mut self) -> &mut CompileClient {
-        self.inner.get_mut().unwrap()
+type MpScChannel<T> = (mpsc::UnboundedSender<T>, mpsc::UnboundedReceiver<T>);
+type BroadcastChannel<T> = (broadcast::Sender<T>, broadcast::Receiver<T>);
+
+pub struct Channels {
+    pub typst_mailbox: MpScChannel<TypstActorRequest>,
+    pub renderer_mailbox: BroadcastChannel<RenderActorRequest>,
+    pub editor_conn: MpScChannel<EditorActorRequest>,
+    pub webview_conn: BroadcastChannel<WebviewActorRequest>,
+}
+
+impl<T> TypstActor<T> {
+    pub fn set_up_channels() -> Channels {
+        let typst_mailbox = mpsc::unbounded_channel();
+        let renderer_mailbox = broadcast::channel(1024);
+        let editor_conn = mpsc::unbounded_channel();
+        let webview_conn = broadcast::channel(32);
+        Channels {
+            typst_mailbox,
+            renderer_mailbox,
+            editor_conn,
+            webview_conn,
+        }
+    }
+
+    pub fn new(
+        client: T,
+        mailbox: mpsc::UnboundedReceiver<TypstActorRequest>,
+        renderer_sender: broadcast::Sender<RenderActorRequest>,
+        editor_conn_sender: mpsc::UnboundedSender<EditorActorRequest>,
+        webview_conn_sender: broadcast::Sender<WebviewActorRequest>,
+    ) -> Self {
+        Self {
+            client,
+            mailbox,
+            renderer_sender,
+            editor_conn_sender,
+            webview_conn_sender,
+        }
+    }
+}
+
+impl<T: SourceFileServer + EditorServer> TypstActor<T> {
+    pub async fn run(self) {
+        let root = REGISTRY
+            .lock()
+            .await
+            .register("typst actor".into(), "typst actor");
+        root.instrument(self.run_instrumented()).await;
+    }
+
+    pub async fn run_instrumented(mut self) {
+        debug!("TypstActor: waiting for message");
+        while let Some(mail) = self
+            .mailbox
+            .recv()
+            .instrument_await("waiting for message")
+            .await
+        {
+            self.process_mail(mail)
+                .instrument_await("processing mail")
+                .await;
+        }
+        info!("TypstActor: exiting");
     }
 
     async fn process_mail(&mut self, mail: TypstActorRequest) {
@@ -216,15 +120,15 @@ impl TypstClient {
                 debug!("TypstActor: processing src2doc: {:?}", req);
 
                 let res = self
-                    .inner()
-                    .resolve_src_location(SourceLocation {
+                    .client
+                    .resolve_source_span(crate::Location::Src(SourceLocation {
                         filepath: req.filepath.to_string_lossy().to_string(),
                         pos: CharPosition {
                             line: req.line,
                             column: req.character,
                         },
-                    })
-                    .instrument_await("resolve source position")
+                    }))
+                    .instrument_await("resolve span range")
                     .await
                     .map_err(|err| {
                         error!("TypstActor: failed to resolve cursor position: {:#}", err);
@@ -243,9 +147,15 @@ impl TypstClient {
 
                 // todo: change name to resolve resolve src position
                 let res = self
-                    .inner()
-                    .resolve_src_to_doc_jump(req.filepath, req.line, req.character)
-                    .instrument_await("resolve src to doc jump")
+                    .client
+                    .resolve_document_position(crate::Location::Src(SourceLocation {
+                        filepath: req.filepath.to_string_lossy().to_string(),
+                        pos: CharPosition {
+                            line: req.line,
+                            column: req.character,
+                        },
+                    }))
+                    .instrument_await("resolve doc position")
                     .await
                     .map_err(|err| {
                         error!("TypstActor: failed to resolve src to doc jump: {:#}", err);
@@ -264,26 +174,44 @@ impl TypstClient {
                     "TypstActor: processing SYNC memory files: {:?}",
                     m.files.keys().collect::<Vec<_>>()
                 );
-                self.update_memory_files(m, true);
+                handle_error(
+                    "SyncMemoryFiles",
+                    self.client
+                        .update_memory_files(m, true)
+                        .instrument_await("sync memory files")
+                        .await,
+                );
             }
             TypstActorRequest::UpdateMemoryFiles(m) => {
                 debug!(
                     "TypstActor: processing UPDATE memory files: {:?}",
                     m.files.keys().collect::<Vec<_>>()
                 );
-                self.update_memory_files(m, false);
+                handle_error(
+                    "UpdateMemoryFiles",
+                    self.client
+                        .update_memory_files(m, false)
+                        .instrument_await("update memory files")
+                        .await,
+                );
             }
             TypstActorRequest::RemoveMemoryFiles(m) => {
                 debug!("TypstActor: processing REMOVE memory files: {:?}", m.files);
-                self.remove_shadow_files(m);
+                handle_error(
+                    "RemoveMemoryFiles",
+                    self.client
+                        .remove_shadow_files(m)
+                        .instrument_await("remove memory files")
+                        .await,
+                );
             }
         }
     }
 
     async fn resolve_span(&mut self, s: Span, offset: Option<usize>) -> Option<DocToSrcJumpInfo> {
-        self.inner()
-            .resolve_span_and_offset(s, offset)
-            .instrument_await("resolve span and offset")
+        self.client
+            .resolve_source_location(s, offset)
+            .instrument_await("resolve span")
             .await
             .map_err(|err| {
                 error!("TypstActor: failed to resolve doc to src jump: {:#}", err);
@@ -369,31 +297,12 @@ impl TypstClient {
             (None, None) => None,
         }
     }
+}
 
-    fn update_memory_files(&mut self, files: MemoryFiles, reset_shadow: bool) {
-        // todo: is it safe to believe that the path is normalized?
-        let now = std::time::SystemTime::now();
-        let files = FileChangeSet::new_inserts(
-            files
-                .files
-                .into_iter()
-                .map(|(path, content)| {
-                    let content = content.as_bytes().into();
-                    // todo: cloning PathBuf -> Arc<Path>
-                    (path.into(), Ok((now, content)).into())
-                })
-                .collect(),
-        );
-        self.inner().add_memory_changes(if reset_shadow {
-            MemoryEvent::Sync(files)
-        } else {
-            MemoryEvent::Update(files)
-        });
+fn handle_error<T>(loc: &'static str, m: Result<T, typst_ts_core::Error>) -> Option<T> {
+    if let Err(err) = &m {
+        error!("TypstActor: failed to {loc}: {err:#}");
     }
 
-    fn remove_shadow_files(&mut self, files: MemoryFilesShort) {
-        // todo: is it safe to believe that the path is normalized?
-        let files = FileChangeSet::new_removes(files.files.into_iter().map(From::from).collect());
-        self.inner().add_memory_changes(MemoryEvent::Update(files))
-    }
+    m.ok()
 }

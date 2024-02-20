@@ -4,7 +4,10 @@ pub mod await_tree;
 mod debug_loc;
 mod outline;
 
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+pub use actor::editor::CompileStatus;
+use tokio::sync::{broadcast, mpsc, watch};
+
+use std::{collections::HashMap, future::Future, path::PathBuf, sync::Arc};
 
 use ::await_tree::InstrumentAwait;
 use debug_loc::SpanInterner;
@@ -15,15 +18,18 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 use typst::{layout::Position, syntax::Span};
-use typst_ts_compiler::service::CompileDriver;
-use typst_ts_core::{error::prelude::ZResult, ImmutStr, TypstDocument as Document};
+use typst_ts_core::debug_loc::SourceSpanOffset;
+use typst_ts_core::Error;
+use typst_ts_core::{ImmutStr, TypstDocument as Document};
 
 pub use typst_ts_compiler::service::DocToSrcJumpInfo;
 
-use actor::editor::CompileStatus;
 use actor::editor::EditorActor;
 use actor::typst::TypstActor;
 pub use args::*;
+
+use crate::actor::editor::EditorActorRequest;
+use crate::actor::render::RenderActorRequest;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChangeCursorPositionRequest {
@@ -57,13 +63,52 @@ impl SrcToDocJumpRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct MemoryFiles {
-    files: HashMap<PathBuf, String>,
+    pub files: HashMap<PathBuf, String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct MemoryFilesShort {
-    files: Vec<PathBuf>,
+    pub files: Vec<PathBuf>,
     // mtime: Option<u64>,
+}
+
+pub trait CompilationHandle: Send + 'static {
+    fn status(&self, status: CompileStatus);
+    fn notify_compile(&self, res: Result<Arc<Document>, CompileStatus>);
+}
+
+pub struct CompilationHandleImpl {
+    doc_sender: watch::Sender<Option<Arc<Document>>>,
+    editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
+    render_tx: broadcast::Sender<RenderActorRequest>,
+}
+
+impl CompilationHandle for CompilationHandleImpl {
+    fn status(&self, status: CompileStatus) {
+        self.editor_tx
+            .send(EditorActorRequest::CompileStatus(status))
+            .unwrap();
+    }
+
+    fn notify_compile(&self, res: Result<Arc<Document>, CompileStatus>) {
+        match res {
+            Ok(doc) => {
+                let _ = self.doc_sender.send(Some(doc)); // it is ok to ignore the error here
+                                                         // todo: is it right that ignore zero broadcast receiver?
+                let _ = self.render_tx.send(RenderActorRequest::RenderIncremental);
+                self.editor_tx
+                    .send(EditorActorRequest::CompileStatus(
+                        CompileStatus::CompileSuccess,
+                    ))
+                    .unwrap();
+            }
+            Err(status) => {
+                self.editor_tx
+                    .send(EditorActorRequest::CompileStatus(status))
+                    .unwrap();
+            }
+        }
+    }
 }
 
 /// If this file is not found, please refer to https://enter-tainer.github.io/typst-preview/dev.html to build the frontend.
@@ -88,57 +133,93 @@ impl Previewer {
     }
 }
 
-pub trait CompileHost {
-    fn subscribe_doc(&self) -> Option<tokio::sync::watch::Receiver<Option<Arc<Document>>>> {
-        None
-    }
+pub type SourceLocation = typst_ts_core::debug_loc::SourceLocation;
 
-    fn subscribe_status(&self) -> Option<tokio::sync::watch::Receiver<CompileStatus>> {
-        None
-    }
+pub enum Location {
+    Src(SourceLocation),
+}
 
-    // todo: sync or async
-    /// fixme: character is 0-based, UTF-16 code unit. We treat it as UTF-8 now.
-    fn resolve_src_to_doc_jump(
+pub trait SourceFileServer {
+    fn resolve_source_span(
         &mut self,
-        _filepath: PathBuf,
-        _line: usize,
-        _character: usize,
-    ) -> ZResult<Option<Position>> {
-        Ok(None)
+        _by: Location,
+    ) -> impl Future<Output = Result<Option<SourceSpanOffset>, Error>> + Send {
+        async { Ok(None) }
     }
 
-    fn resolve_span(&mut self, _span_id: Span) -> ZResult<Option<DocToSrcJumpInfo>> {
-        Ok(None)
+    fn resolve_document_position(
+        &mut self,
+        _by: Location,
+    ) -> impl Future<Output = Result<Option<Position>, Error>> + Send {
+        async { Ok(None) }
+    }
+
+    fn resolve_source_location(
+        &mut self,
+        _s: Span,
+        _offset: Option<usize>,
+    ) -> impl Future<Output = Result<Option<DocToSrcJumpInfo>, Error>> + Send {
+        async { Ok(None) }
     }
 }
 
+pub trait EditorServer {
+    fn update_memory_files(
+        &mut self,
+        _files: MemoryFiles,
+        _reset_shadow: bool,
+    ) -> impl Future<Output = Result<(), Error>> + Send {
+        async { Ok(()) }
+    }
+
+    fn remove_shadow_files(
+        &mut self,
+        _files: MemoryFilesShort,
+    ) -> impl Future<Output = Result<(), Error>> + Send {
+        async { Ok(()) }
+    }
+}
+
+pub trait CompileHost: SourceFileServer + EditorServer {}
+
 // todo: replace CompileDriver by CompileHost
-pub async fn preview(arguments: PreviewArgs, compiler_driver: CompileDriver) -> Previewer {
+pub async fn preview<T: CompileHost + Send + 'static>(
+    arguments: PreviewArgs,
+    client: impl FnOnce(CompilationHandleImpl) -> T,
+) -> Previewer {
     let enable_partial_rendering = arguments.enable_partial_rendering;
     let invert_colors = arguments.invert_colors;
 
-    // Create the world that serves sources, fonts and files.
+    // Creates the world that serves sources, fonts and files.
     let actor::typst::Channels {
         typst_mailbox,
-        doc_watch,
         renderer_mailbox,
         editor_conn,
         webview_conn: (webview_tx, _),
-    } = TypstActor::set_up_channels();
-    let typst_actor = TypstActor::new(
-        compiler_driver,
-        typst_mailbox.1,
-        doc_watch.0,
-        renderer_mailbox.0.clone(),
-        editor_conn.0.clone(),
-        webview_tx.clone(),
-    );
+    } = TypstActor::<()>::set_up_channels();
 
     // Shared resource
     let span_interner = SpanInterner::new();
 
+    // Set callback
+    let doc_watcher = watch::channel::<Option<Arc<Document>>>(None);
+    let client = client(CompilationHandleImpl {
+        doc_sender: doc_watcher.0,
+        editor_tx: editor_conn.0.clone(),
+        render_tx: renderer_mailbox.0.clone(),
+    });
+
+    // Spawns the typst actor
+    let typst_actor = TypstActor::new(
+        client,
+        typst_mailbox.1,
+        renderer_mailbox.0.clone(),
+        editor_conn.0.clone(),
+        webview_tx.clone(),
+    );
     tokio::spawn(typst_actor.run());
+
+    log::info!("Previewer: typst actor spawned");
 
     let (data_plane_port_tx, data_plane_port_rx) = tokio::sync::oneshot::channel();
     let data_plane_addr = arguments.data_plane_host;
@@ -146,7 +227,6 @@ pub async fn preview(arguments: PreviewArgs, compiler_driver: CompileDriver) -> 
         let span_interner = span_interner.clone();
         let typst_tx = typst_mailbox.0.clone();
         let webview_tx = webview_tx.clone();
-        let doc_watch_rx = doc_watch.1.clone();
         let renderer_tx = renderer_mailbox.0.clone();
         tokio::spawn(async move {
             // Create the event loop and TCP listener we'll accept connections on.
@@ -168,7 +248,6 @@ pub async fn preview(arguments: PreviewArgs, compiler_driver: CompileDriver) -> 
                 let webview_tx = webview_tx.clone();
                 let webview_rx = webview_tx.subscribe();
                 let typst_tx = typst_tx.clone();
-                let doc_watch_rx = doc_watch_rx.clone();
                 let peer_addr = stream
                     .peer_addr()
                     .map_or("unknown".to_string(), |addr| addr.to_string());
@@ -202,7 +281,7 @@ pub async fn preview(arguments: PreviewArgs, compiler_driver: CompileDriver) -> 
                 tokio::spawn(webview_actor.run(peer_addr.clone()));
                 let render_actor = actor::render::RenderActor::new(
                     renderer_tx.subscribe(),
-                    doc_watch_rx.clone(),
+                    doc_watcher.1.clone(),
                     typst_tx,
                     svg.0,
                     webview_tx,
@@ -210,7 +289,7 @@ pub async fn preview(arguments: PreviewArgs, compiler_driver: CompileDriver) -> 
                 render_actor.spawn(peer_addr.clone());
                 let outline_render_actor = actor::render::OutlineRenderActor::new(
                     renderer_tx.subscribe(),
-                    doc_watch_rx,
+                    doc_watcher.1.clone(),
                     editor_conn.0.clone(),
                     span_interner,
                 );
