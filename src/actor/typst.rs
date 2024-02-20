@@ -91,11 +91,11 @@ impl<T: SourceFileServer + EditorServer> TypstActor<T> {
         while let Some(mail) = self
             .mailbox
             .recv()
-            .instrument_await("wait for message")
+            .instrument_await("waiting for message")
             .await
         {
             self.process_mail(mail)
-                .instrument_await("process mail")
+                .instrument_await("processing mail")
                 .await;
         }
         info!("TypstActor: exiting");
@@ -176,7 +176,10 @@ impl<T: SourceFileServer + EditorServer> TypstActor<T> {
                 );
                 handle_error(
                     "SyncMemoryFiles",
-                    self.client.update_memory_files(m, true).await,
+                    self.client
+                        .update_memory_files(m, true)
+                        .instrument_await("sync memory files")
+                        .await,
                 );
             }
             TypstActorRequest::UpdateMemoryFiles(m) => {
@@ -186,14 +189,20 @@ impl<T: SourceFileServer + EditorServer> TypstActor<T> {
                 );
                 handle_error(
                     "UpdateMemoryFiles",
-                    self.client.update_memory_files(m, false).await,
+                    self.client
+                        .update_memory_files(m, false)
+                        .instrument_await("update memory files")
+                        .await,
                 );
             }
             TypstActorRequest::RemoveMemoryFiles(m) => {
                 debug!("TypstActor: processing REMOVE memory files: {:?}", m.files);
                 handle_error(
                     "RemoveMemoryFiles",
-                    self.client.remove_shadow_files(m).await,
+                    self.client
+                        .remove_shadow_files(m)
+                        .instrument_await("remove memory files")
+                        .await,
                 );
             }
         }

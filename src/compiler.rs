@@ -114,7 +114,10 @@ impl<H: CompilationHandle> TypstClient<H> {
 impl<H: CompilationHandle> SourceFileServer for TypstClient<H> {
     async fn resolve_source_span(&mut self, loc: Location) -> ZResult<Option<SourceSpanOffset>> {
         let Location::Src(src_loc) = loc;
-        self.inner().resolve_src_location(src_loc).await
+        self.inner()
+            .resolve_src_location(src_loc)
+            .instrument_await("resolve src location")
+            .await
     }
 
     async fn resolve_document_position(&mut self, loc: Location) -> ZResult<Option<Position>> {
@@ -126,6 +129,7 @@ impl<H: CompilationHandle> SourceFileServer for TypstClient<H> {
 
         self.inner()
             .resolve_src_to_doc_jump(path, line, column)
+            .instrument_await("resolve src to doc jump")
             .await
     }
 
@@ -137,6 +141,7 @@ impl<H: CompilationHandle> SourceFileServer for TypstClient<H> {
         Ok(self
             .inner()
             .resolve_span_and_offset(s, offset)
+            .instrument_await("resolve span offset")
             .await
             .map_err(|err| {
                 error!("TypstActor: failed to resolve doc to src jump: {:#}", err);

@@ -7,7 +7,7 @@ mod outline;
 pub use actor::editor::CompileStatus;
 use tokio::sync::{broadcast, mpsc, watch};
 
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, future::Future, path::PathBuf, sync::Arc};
 
 use ::await_tree::InstrumentAwait;
 use debug_loc::SpanInterner;
@@ -142,14 +142,14 @@ pub trait SourceFileServer {
     fn resolve_source_span(
         &mut self,
         _by: Location,
-    ) -> impl std::future::Future<Output = ZResult<Option<SourceSpanOffset>>> + Send {
+    ) -> impl Future<Output = ZResult<Option<SourceSpanOffset>>> + Send {
         async { Ok(None) }
     }
 
     fn resolve_document_position(
         &mut self,
         _by: Location,
-    ) -> impl std::future::Future<Output = ZResult<Option<Position>>> + Send {
+    ) -> impl Future<Output = ZResult<Option<Position>>> + Send {
         async { Ok(None) }
     }
 
@@ -157,7 +157,7 @@ pub trait SourceFileServer {
         &mut self,
         _s: Span,
         _offset: Option<usize>,
-    ) -> impl std::future::Future<Output = ZResult<Option<DocToSrcJumpInfo>>> + Send {
+    ) -> impl Future<Output = ZResult<Option<DocToSrcJumpInfo>>> + Send {
         async { Ok(None) }
     }
 }
@@ -167,14 +167,14 @@ pub trait EditorServer {
         &mut self,
         _files: MemoryFiles,
         _reset_shadow: bool,
-    ) -> impl std::future::Future<Output = ZResult<()>> + Send {
+    ) -> impl Future<Output = ZResult<()>> + Send {
         async { Ok(()) }
     }
 
     fn remove_shadow_files(
         &mut self,
         _files: MemoryFilesShort,
-    ) -> impl std::future::Future<Output = ZResult<()>> + Send {
+    ) -> impl Future<Output = ZResult<()>> + Send {
         async { Ok(()) }
     }
 }
