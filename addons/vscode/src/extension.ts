@@ -11,6 +11,9 @@ import fetch from 'node-fetch';
 
 const vscodeVariables = require('vscode-variables');
 
+/// kill the probe task after 60s
+const PROBE_TIMEOUT = 60_000;
+
 let resolveContentPreviewProvider: (value: ContentPreviewProvider) => void = () => { };
 let contentPreviewProvider = new Promise<ContentPreviewProvider>(resolve => {
 	resolveContentPreviewProvider = resolve;
@@ -83,7 +86,7 @@ export async function getCliPath(extensionPath?: string): Promise<string> {
 	state.configPath = configPath;
 
 	const checkExecutable = (path: string): string | null => {
-		const child = spawnSync(path, ['-V'], { timeout: 1000, encoding: 'utf8' });
+		const child = spawnSync(path, ['-V'], { timeout: PROBE_TIMEOUT, encoding: 'utf8' });
 		if (child.error) {
 			return child.error.message;
 		}
