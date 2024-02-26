@@ -254,13 +254,14 @@ interface LaunchCliResult {
 	staticFilePort: string,
 }
 
-function runServer(command: string, args: string[], outputChannel: vscode.OutputChannel, openInBrowser: boolean): Promise<LaunchCliResult> {
+function runServer(command: string, projectRoot: string, args: string[], outputChannel: vscode.OutputChannel, openInBrowser: boolean): Promise<LaunchCliResult> {
 	const serverProcess = spawn(command, args, {
 		env: {
 			...process.env,
 			// eslint-disable-next-line @typescript-eslint/naming-convention
 			"RUST_BACKTRACE": "1",
-		}
+		},
+		cwd: projectRoot,
 	});
 	serverProcess.on('error', (err: any) => {
 		console.error('Failed to start server process');
@@ -519,7 +520,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		const ivArgs = vscode.workspace.getConfiguration().get<string>('typst-preview.invertColors');
 		const invertColorsArgs = ivArgs ? ["--invert-colors", ivArgs] : [];
 		const previewInSlideModeArgs = task.mode === 'slide' ? ["--preview-mode=slide"] : [];
-		const { dataPlanePort, controlPlanePort, staticFilePort, serverProcess } = await runServer(serverPath, [
+		const { dataPlanePort, controlPlanePort, staticFilePort, serverProcess } = await runServer(serverPath, projectRoot, [
 			"--data-plane-host", "127.0.0.1:0",
 			"--control-plane-host", "127.0.0.1:0",
 			"--static-file-host", "127.0.0.1:0",
