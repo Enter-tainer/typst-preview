@@ -1,11 +1,11 @@
-# stolen from https://github.com/nvarner/typst-lsp/blob/master/.github/workflows/release.yml
+# stolen from https://github.com/nvarner/tinymist/blob/master/.github/workflows/release.yml
 name: CI
 on:
   push:
     branches:
       - main
     tags:
-      - '*'
+      - "*"
   pull_request:
     types: [opened, synchronize]
     branches:
@@ -31,7 +31,7 @@ jobs:
       - id: skip_check
         uses: fkirc/skip-duplicate-actions@v5
         with:
-          cancel_others: 'true'
+          cancel_others: "true"
   build:
     strategy:
       matrix:
@@ -173,8 +173,6 @@ jobs:
         with:
           name: typst-preview-${{ env.target }}.vsix
           path: addons/vscode/typst-preview-${{ env.target }}.vsix
-  
-  
 
   build_alpine:
     name: build (x86_64-unknown-linux-musl)
@@ -240,7 +238,6 @@ jobs:
         with:
           name: typst-preview-${{ env.target }}.vsix
           path: addons/vscode/typst-preview-${{ env.target }}.vsix
-  
 
   release:
     runs-on: ubuntu-latest

@@ -168,7 +168,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 - Bug fixes:
   - fix #41. It is now possible to use Typst Preview in VSCode Remote.
-  - fix #82. You can have preview button even when typst-lsp is not installed.
+  - fix #82. You can have preview button even when tinymist is not installed.
 - Misc: We downgrade the ci image for Linux to Ubuntu 20.04. This should fix the problem where the extension cannot be installed on some old Linux distros.
 
 ## v0.7.0 - [2023-08-09]
