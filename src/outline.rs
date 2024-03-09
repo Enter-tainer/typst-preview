@@ -1,9 +1,10 @@
 use std::num::NonZeroUsize;
 
 use serde::Serialize;
-use typst::foundations::{Content, NativeElement, Smart};
+use typst::foundations::{Content, NativeElement, Packed, StyleChain};
 use typst::introspection::Introspector;
 use typst::model::HeadingElem;
+use typst::syntax::Span;
 use typst_ts_core::debug_loc::DocumentPosition;
 use typst_ts_core::TypstDocument;
 
@@ -12,7 +13,8 @@ use crate::debug_loc::SpanInternerImpl;
 /// A heading in the outline panel.
 #[derive(Debug, Clone)]
 pub(crate) struct HeadingNode {
-    element: Content,
+    body: Content,
+    span: Span,
     position: DocumentPosition,
     level: NonZeroUsize,
     bookmarked: bool,
@@ -22,15 +24,16 @@ pub(crate) struct HeadingNode {
 /// Construct the outline for the document.
 pub(crate) fn get_outline(introspector: &Introspector) -> Option<Vec<HeadingNode>> {
     let mut tree: Vec<HeadingNode> = vec![];
-
     // Stores the level of the topmost skipped ancestor of the next bookmarked
     // heading. A skipped heading is a heading with 'bookmarked: false', that
     // is, it is not added to the PDF outline, and so is not in the tree.
     // Therefore, its next descendant must be added at its level, which is
     // enforced in the manner shown below.
     let mut last_skipped_level = None;
-    for heading in introspector.query(&HeadingElem::elem().select()).iter() {
-        let leaf = HeadingNode::leaf(introspector, (**heading).clone());
+    let elements = introspector.query(&HeadingElem::elem().select());
+    for elem in elements.iter() {
+        let heading = elem.to_packed::<HeadingElem>().unwrap();
+        let leaf = HeadingNode::leaf(introspector, heading);
 
         if leaf.bookmarked {
             let mut children = &mut tree;
@@ -65,7 +68,7 @@ pub(crate) fn get_outline(introspector: &Introspector) -> Option<Vec<HeadingNode
             // exists), or at most as deep as its actual nesting level in Typst
             // (not exceeding whichever is the most restrictive depth limit
             // of those two).
-            while children.last().map_or(false, |last| {
+            while children.last().is_some_and(|last| {
                 last_skipped_level.map_or(true, |l| last.level < l) && last.level < leaf.level
             }) {
                 children = &mut children.last_mut().unwrap().children;
@@ -94,20 +97,26 @@ pub(crate) fn get_outline(introspector: &Introspector) -> Option<Vec<HeadingNode
 }
 
 impl HeadingNode {
-    fn leaf(introspector: &Introspector, element: Content) -> Self {
+    fn leaf(introspector: &Introspector, element: &Packed<HeadingElem>) -> Self {
         let position = {
             let loc = element.location().unwrap();
-            introspector.position(loc).into()
+            let pos = introspector.position(loc);
+            DocumentPosition {
+                page_no: pos.page.into(),
+                x: pos.point.x.to_pt() as f32,
+                y: pos.point.y.to_pt() as f32,
+            }
         };
 
         HeadingNode {
-            level: element.expect_field_by_name::<NonZeroUsize>("level"),
+            level: element.resolve_level(StyleChain::default()),
             position,
             // 'bookmarked' set to 'auto' falls back to the value of 'outlined'.
             bookmarked: element
-                .expect_field_by_name::<Smart<bool>>("bookmarked")
-                .unwrap_or_else(|| element.expect_field_by_name::<bool>("outlined")),
-            element,
+                .bookmarked(StyleChain::default())
+                .unwrap_or_else(|| element.outlined(StyleChain::default())),
+            body: element.body.clone(),
+            span: element.span(),
             children: Vec::new(),
         }
     }
@@ -142,7 +151,7 @@ pub fn outline(interner: &mut SpanInternerImpl, document: &TypstDocument) -> Out
 }
 
 fn outline_item(interner: &mut SpanInternerImpl, src: &HeadingNode, res: &mut Vec<OutlineItem>) {
-    let body = src.element.expect_field_by_name::<Content>("body");
+    let body = src.body.clone();
     let title = body.plain_text().trim().to_owned();
 
     let mut children = Vec::with_capacity(src.children.len());
@@ -151,9 +160,9 @@ fn outline_item(interner: &mut SpanInternerImpl, src: &HeadingNode, res: &mut Ve
     }
 
     // use body's span first, otherwise use the element's span.
-    let span = body.span();
+    let span = src.span;
     let span = if span.is_detached() {
-        src.element.span()
+        src.body.span()
     } else {
         span
     };
