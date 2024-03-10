@@ -3643,7 +3643,7 @@ dependencies = [
  "ttf-parser",
  "two-face",
  "typed-arena",
- "typst-assets",
+ "typst-assets 0.10.0",
  "typst-macros",
  "typst-syntax",
  "typst-timing",
@@ -3659,6 +3659,11 @@ dependencies = [
 name = "typst-assets"
 version = "0.10.0"
 source = "git+https://github.com/typst/typst-assets?rev=4d1211a#4d1211ab5ba8a02992a7362000e6dd422d44dd68"
+
+[[package]]
+name = "typst-assets"
+version = "0.11.0-rc1"
+source = "git+https://github.com/typst/typst-assets?tag=v0.11.0-rc1#0ef66188759fc7035be57d9608ccb1ecfd3ef796"
 
 [[package]]
 name = "typst-macros"
@@ -3697,6 +3702,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "typst",
+ "typst-assets 0.11.0-rc1",
  "typst-ts-compiler",
  "typst-ts-core",
  "typst-ts-svg-exporter",

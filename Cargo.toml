@@ -17,7 +17,7 @@ doc = false
 [dependencies]
 typst = "0.10.0"
 # typst-library = "0.10.0"
-
+typst-assets = { git = "https://github.com/typst/typst-assets", tag = "v0.11.0-rc1"}
 typst-ts-svg-exporter = "0.4.2-rc7"
 typst-ts-core = { version = "0.4.2-rc7", default-features = false, features = [
   "flat-vector",
@@ -80,7 +80,7 @@ default = ["embed-fonts", "cli"]
 # - code (Deja Vu Sans Mono)
 # and additionally New Computer Modern for text
 # into the binary.
-embed-fonts = []
+embed-fonts = ["typst-assets/fonts"]
 # Disable the default content hint.
 # This requires modifying typst.
 no-content-hint = ["typst-ts-core/no-content-hint"]
