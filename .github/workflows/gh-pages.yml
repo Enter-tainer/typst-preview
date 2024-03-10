@@ -28,6 +28,7 @@ jobs:
       - name: Download font assets
         # use fonts in stable releases
         run: |
+          mkdir -p assets/fonts/
           curl -L https://github.com/Myriad-Dreamin/typst-book/releases/download/v0.1.2/font-assets.tar.gz | tar -xvz -C assets/fonts
           curl -L https://use.fontawesome.com/releases/v6.4.2/fontawesome-free-6.4.2-desktop.zip -o fontawesome-free-6.4.2-desktop.zip
           unzip fontawesome-free-6.4.2-desktop.zip
