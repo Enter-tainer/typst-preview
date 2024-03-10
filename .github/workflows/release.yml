@@ -1,4 +1,4 @@
-# stolen from https://github.com/nvarner/tinymist/blob/master/.github/workflows/release.yml
+# stolen from https://github.com/nvarner/typst-lsp/blob/master/.github/workflows/release.yml
 name: CI
 on:
   push:
