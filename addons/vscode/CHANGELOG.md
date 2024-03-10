@@ -4,7 +4,16 @@ All notable changes to the "typst-preview" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## v0.11.0-rc1 - [2024-03-10]
+## v0.10.9 - [2024-03-10]
+
+- Features:
+  - Upgrade to typst v0.11.0-rc1
+- Bug fixes:
+  - May fix a bug when typst preview cannot launch on some windows machines
+  - Fix jumping view while zooming
+  - Fix cannot use relative path in `typst-preview.fontPaths`
+
+## ~~v0.11.0-rc1 - [2024-03-10]~~
 
 - Features:
   - Upgrade to typst v0.11.0-rc1

@@ -3678,7 +3678,7 @@ dependencies = [
 
 [[package]]
 name = "typst-preview"
-version = "0.11.0-rc1"
+version = "0.10.9"
 dependencies = [
  "anyhow",
  "await-tree",
