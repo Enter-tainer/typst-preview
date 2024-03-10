@@ -27,7 +27,7 @@ pub struct PanelScrollByPositionRequest {
     position: DocumentPosition,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "data")]
 pub enum CompileStatus {
     Compiling,

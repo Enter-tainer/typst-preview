@@ -3,7 +3,7 @@ use await_tree::InstrumentAwait;
 use log::{debug, error, info};
 use tokio::sync::{broadcast, mpsc};
 use typst::syntax::Span;
-use typst_ts_core::debug_loc::{CharPosition, SourceLocation, SourceSpanOffset};
+use typst_ts_core::debug_loc::{CharPosition, DocumentPosition, SourceLocation, SourceSpanOffset};
 
 use crate::await_tree::REGISTRY;
 use crate::{
@@ -162,11 +162,24 @@ impl<T: SourceFileServer + EditorServer> TypstActor<T> {
                     })
                     .ok()
                     .flatten();
+                // impl From<TypstPosition> for DocumentPosition {
+                //     fn from(position: TypstPosition) -> Self {
+                //         Self {
+                //             page_no: position.page.into(),
+                //             x: position.point.x.to_pt() as f32,
+                //             y: position.point.y.to_pt() as f32,
+                //         }
+                //     }
+                // }
 
                 if let Some(info) = res {
                     let _ = self
                         .webview_conn_sender
-                        .send(WebviewActorRequest::SrcToDocJump(info.into()));
+                        .send(WebviewActorRequest::SrcToDocJump(DocumentPosition {
+                            page_no: info.page.into(),
+                            x: info.point.x.to_pt() as f32,
+                            y: info.point.y.to_pt() as f32,
+                        }));
                 }
             }
             TypstActorRequest::SyncMemoryFiles(m) => {

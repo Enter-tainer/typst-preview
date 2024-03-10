@@ -1,4 +1,0 @@
-[submodule "assets/fonts"]
-	path = assets/fonts
-	url = https://github.com/Myriad-Dreamin/typst
-	branch = assets-fonts

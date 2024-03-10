@@ -38,6 +38,16 @@ This project is not affiliated with, created by, or endorsed by Typst the brand.
 
 ## Release Notes
 
+
+### v0.11.0-rc1 - [2024-03-10]
+
+- Features:
+  - Upgrade to typst v0.11.0-rc1
+- Bug fixes:
+  - May fix a bug when typst preview cannot launch on some windows machines
+  - Fix jumping view while zooming
+  - Fix cannot use relative path in `typst-preview.fontPaths`
+
 ### v0.10.8 - [2024-02-19]
 
 - Features:
