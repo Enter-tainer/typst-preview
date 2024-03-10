@@ -18,6 +18,7 @@ export type RenderMode = "svg" | "canvas";
 export enum PreviewMode {
   Doc,
   Slide,
+  FontTool,
 }
 
 export interface Options {

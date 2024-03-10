@@ -521,9 +521,9 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		const invertColorsArgs = ivArgs ? ["--invert-colors", ivArgs] : [];
 		const previewInSlideModeArgs = task.mode === 'slide' ? ["--preview-mode=slide"] : [];
 		const { dataPlanePort, controlPlanePort, staticFilePort, serverProcess } = await runServer(serverPath, projectRoot, [
-			"--data-plane-host", "127.0.0.1:0",
-			"--control-plane-host", "127.0.0.1:0",
-			"--static-file-host", "127.0.0.1:0",
+			// "--data-plane-host", "127.0.0.1:0",
+			// "--control-plane-host", "127.0.0.1:0",
+			// "--static-file-host", "127.0.0.1:0",
 			"--no-open",
 			...rootArgs,
 			...partialRenderingArgs,

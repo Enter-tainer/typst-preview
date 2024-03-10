@@ -14,8 +14,9 @@
   "dependencies": {
     "@myriaddreamin/typst-ts-renderer": "0.4.2-rc6",
     "@myriaddreamin/typst.ts": "0.4.2-rc6",
+    "rxjs": "^7.8.1",
     "typst-dom": "link:../typst-dom",
-    "rxjs": "^7.8.1"
+    "vanjs-core": "^1.3.0"
   },
   "devDependencies": {
     "typescript": "^5.3.3",

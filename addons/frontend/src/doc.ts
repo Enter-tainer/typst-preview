@@ -27,7 +27,7 @@ export interface WsArgs {
     isContentPreview: boolean;
 }
 
-export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
+export async function docMain({ url, previewMode, isContentPreview }: WsArgs) {
     if (!url) {
         const hookedElem = document.getElementById("typst-app");
         if (hookedElem) {

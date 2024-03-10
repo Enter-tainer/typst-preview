@@ -6,8 +6,10 @@ import "./styles/toolbar.css";
 import "./styles/layout.css";
 import "./styles/help-panel.css";
 import "./styles/outline.css";
+import "./styles/font-tool.css";
 
-import { wsMain, PreviewMode } from './ws';
+import { docMain, PreviewMode } from './doc';
+import { fontToolMain } from './tools/font';
 import { setupDrag } from './drag';
 
 /// Main entry point of the frontend program.
@@ -30,7 +32,7 @@ function retrieveWsArgs() {
     ///   let frontend_html = frontend_html.replace(
     ///     "preview-arg:previewMode:Doc", ...);
     /// ```
-    let mode = 'preview-arg:previewMode:Doc';
+    let mode = 'preview-arg:previewMode:FontTool';
     /// Remove the placeholder prefix.
     mode = mode.replace('preview-arg:previewMode:', '');
     let previewMode = PreviewMode[mode];
@@ -56,8 +58,17 @@ function buildWs() {
             await previous.then(d => d());
             /// Reset app mode before creating a new websocket connection.
             resetAppMode(nextWsArgs);
-            /// Create a new websocket connection.
-            resolve(wsMain(nextWsArgs));
+
+            const { previewMode } = nextWsArgs;
+            switch (previewMode) {
+                case PreviewMode.FontTool:
+                    resolve(fontToolMain(nextWsArgs));
+                    return;
+                default:
+                    /// Create a new websocket connection.
+                    resolve(docMain(nextWsArgs));
+                    return;
+            }
         });
     }
 
@@ -65,6 +76,11 @@ function buildWs() {
 
     function resetAppMode({ previewMode: mode, isContentPreview }) {
         const app = document.getElementById('typst-container');
+
+        if (mode === PreviewMode.FontTool) {
+            app.innerHTML = '<div id="font-tool"></div>';
+            return;
+        }
 
         /// Set the root css selector to the content preview mode.
         app.classList.remove('content-preview');
