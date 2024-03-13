@@ -2527,8 +2527,8 @@ dependencies = [
 
 [[package]]
 name = "reflexo"
-version = "0.4.2-rc7"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=58c2c6b07831cffb8915776c45058754c505033b#58c2c6b07831cffb8915776c45058754c505033b"
+version = "0.4.2-rc8"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=c8ff53382c2afa67582465c6e7e0fd78603e4341#c8ff53382c2afa67582465c6e7e0fd78603e4341"
 dependencies = [
  "base64 0.22.0",
  "bitvec",
@@ -3597,7 +3597,7 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 [[package]]
 name = "typst"
 version = "0.10.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=typst.ts-v0.11.0#a2d097686f01b2834f4a9b313bd9c1c692210479"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=typst.ts-v0.11.0-2#48820fe69b8061bd949847afc343bf160d05c924"
 dependencies = [
  "az",
  "bitflags 2.4.2",
@@ -3668,7 +3668,7 @@ source = "git+https://github.com/typst/typst-assets?tag=v0.11.0-rc1#0ef66188759f
 [[package]]
 name = "typst-macros"
 version = "0.10.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=typst.ts-v0.11.0#a2d097686f01b2834f4a9b313bd9c1c692210479"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=typst.ts-v0.11.0-2#48820fe69b8061bd949847afc343bf160d05c924"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -3678,7 +3678,7 @@ dependencies = [
 
 [[package]]
 name = "typst-preview"
-version = "0.10.9"
+version = "0.10.10"
 dependencies = [
  "anyhow",
  "await-tree",
@@ -3712,7 +3712,7 @@ dependencies = [
 [[package]]
 name = "typst-syntax"
 version = "0.10.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=typst.ts-v0.11.0#a2d097686f01b2834f4a9b313bd9c1c692210479"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=typst.ts-v0.11.0-2#48820fe69b8061bd949847afc343bf160d05c924"
 dependencies = [
  "comemo",
  "ecow",
@@ -3728,7 +3728,7 @@ dependencies = [
 [[package]]
 name = "typst-timing"
 version = "0.10.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=typst.ts-v0.11.0#a2d097686f01b2834f4a9b313bd9c1c692210479"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=typst.ts-v0.11.0-2#48820fe69b8061bd949847afc343bf160d05c924"
 dependencies = [
  "parking_lot",
  "serde",
@@ -3738,8 +3738,8 @@ dependencies = [
 
 [[package]]
 name = "typst-ts-compiler"
-version = "0.4.2-rc7"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=58c2c6b07831cffb8915776c45058754c505033b#58c2c6b07831cffb8915776c45058754c505033b"
+version = "0.4.2-rc8"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=c8ff53382c2afa67582465c6e7e0fd78603e4341#c8ff53382c2afa67582465c6e7e0fd78603e4341"
 dependencies = [
  "append-only-vec",
  "base64 0.22.0",
@@ -3776,8 +3776,8 @@ dependencies = [
 
 [[package]]
 name = "typst-ts-core"
-version = "0.4.2-rc7"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=58c2c6b07831cffb8915776c45058754c505033b#58c2c6b07831cffb8915776c45058754c505033b"
+version = "0.4.2-rc8"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=c8ff53382c2afa67582465c6e7e0fd78603e4341#c8ff53382c2afa67582465c6e7e0fd78603e4341"
 dependencies = [
  "base64 0.22.0",
  "base64-serde",
@@ -3813,8 +3813,8 @@ dependencies = [
 
 [[package]]
 name = "typst-ts-svg-exporter"
-version = "0.4.2-rc7"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=58c2c6b07831cffb8915776c45058754c505033b#58c2c6b07831cffb8915776c45058754c505033b"
+version = "0.4.2-rc8"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=c8ff53382c2afa67582465c6e7e0fd78603e4341#c8ff53382c2afa67582465c6e7e0fd78603e4341"
 dependencies = [
  "base64 0.22.0",
  "comemo",

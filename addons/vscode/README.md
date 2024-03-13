@@ -38,7 +38,14 @@ This project is not affiliated with, created by, or endorsed by Typst the brand.
 
 ## Release Notes
 
-### v0.11.0-rc1 - [2024-03-10]
+## v0.10.10 - [2024-03-13]
+
+- Features:
+  - Upgrade to typst v0.11.0-rc1(master, 48820fe69b8061bd949847afc343bf160d05c924)
+- Bug fixes:
+  - Fix gradient color being rendered incorrectly
+
+### v0.10.9 - [2024-03-10]
 
 - Features:
   - Upgrade to typst v0.11.0-rc1
