@@ -8,7 +8,7 @@
     "type": "git",
     "url": "https://github.com/Enter-tainer/typst-preview"
   },
-  "version": "0.10.10",
+  "version": "0.11.0",
   "engines": {
     "vscode": "^1.77.0"
   },
@@ -237,7 +237,7 @@
     ]
   },
   "scripts": {
-    "build:frontend": "cd ../frontend && yarn run build && cd ../vscode && rimraf ./out/frontend/ && cpr ../frontend/dist/ ./out/frontend/",
+    "build:frontend": "cd ../frontend && yarn run build && cd ../vscode && rimraf ./out/frontend/ && cpr ../frontend/dist/ ./out/frontend/ && rimraf ../../src/index.html && cpr ./out/frontend/index.html ../../src/index.html",
     "vscode:prepublish": "yarn run compile",
     "compile": "tsc -p ./ && yarn run build:frontend",
     "build": "yarn run compile",

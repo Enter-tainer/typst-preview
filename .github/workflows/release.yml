@@ -173,6 +173,12 @@ jobs:
         with:
           name: typst-preview-${{ env.target }}.vsix
           path: addons/vscode/typst-preview-${{ env.target }}.vsix
+      - name: Upload frontend html
+        uses: actions/upload-artifact@v4
+        with:
+          name: index.html
+          path: addons/vscode/out/frontend/index.html
+          overwrite: true
 
   build_alpine:
     name: build (x86_64-unknown-linux-musl)

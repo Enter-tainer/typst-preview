@@ -112,7 +112,10 @@ impl CompilationHandle for CompilationHandleImpl {
 }
 
 /// If this file is not found, please refer to https://enter-tainer.github.io/typst-preview/dev.html to build the frontend.
-const HTML: &str = include_str!("../addons/vscode/out/frontend/index.html");
+#[cfg(feature = "embed-html")]
+const HTML: &str = include_str!("index.html");
+#[cfg(not(feature = "embed-html"))]
+const HTML: &str = "<html><body>Typst Preview needs to be built with the `embed-html` feature to work!</body></html>";
 
 pub struct Previewer {
     frontend_html_factory: Box<dyn Fn(PreviewMode) -> ImmutStr>,
@@ -186,6 +189,7 @@ pub trait CompileHost: SourceFileServer + EditorServer {}
 pub async fn preview<T: CompileHost + Send + 'static>(
     arguments: PreviewArgs,
     client: impl FnOnce(CompilationHandleImpl) -> T,
+    html: Option<&str>,
 ) -> Previewer {
     let enable_partial_rendering = arguments.enable_partial_rendering;
     let invert_colors = arguments.invert_colors;
@@ -329,7 +333,7 @@ pub async fn preview<T: CompileHost + Send + 'static>(
         })
     };
     let data_plane_port = data_plane_port_rx.await.unwrap();
-    let html = HTML.replace(
+    let html = html.unwrap_or(HTML).replace(
         "ws://127.0.0.1:23625",
         format!("ws://127.0.0.1:{data_plane_port}").as_str(),
     );

@@ -4,6 +4,12 @@ All notable changes to the "typst-preview" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.0 - [2024-03-18]
+
+- Features:
+  - Upgrade to typst v0.11.0
+  - typst-preview is available on crate.io now. You can install it by running `cargo install typst-preview`. You can also use it as a library in your project by adding `typst-preview` to your `Cargo.toml`.
+
 ## v0.10.10 - [2024-03-13]
 
 - Features:

@@ -110,7 +110,7 @@ async fn main() {
         let world = TypstSystemWorld::new(CompileOpts {
             root_dir: root.clone(),
             font_paths: arguments.font_paths.clone(),
-            with_embedded_fonts: get_embedded_fonts(),
+            with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
             ..CompileOpts::default()
         })
         .expect("incorrect options");
@@ -124,11 +124,15 @@ async fn main() {
         std::process::exit(0);
     });
 
-    let previewer = preview(arguments.preview, move |handle| {
-        let compile_server = CompileServer::new(compiler_driver, handle);
+    let previewer = preview(
+        arguments.preview,
+        move |handle| {
+            let compile_server = CompileServer::new(compiler_driver, handle);
 
-        compile_server.spawn().unwrap()
-    });
+            compile_server.spawn().unwrap()
+        },
+        None,
+    );
     let previewer = async_root
         .instrument(previewer)
         .instrument_await("preview")
@@ -145,14 +149,4 @@ async fn main() {
         };
     }
     let _ = tokio::join!(previewer.join(), static_server_handle);
-}
-
-#[cfg(feature = "embed-fonts")]
-fn get_embedded_fonts() -> Vec<Cow<'static, [u8]>> {
-    typst_assets::fonts().map(Cow::Borrowed).collect()
-}
-
-#[cfg(not(feature = "embed-fonts"))]
-fn get_embedded_fonts() -> Vec<Cow<'static, [u8]>> {
-    vec![]
 }

@@ -38,7 +38,13 @@ This project is not affiliated with, created by, or endorsed by Typst the brand.
 
 ## Release Notes
 
-## v0.10.10 - [2024-03-13]
+### v0.11.0 - [2024-03-18]
+
+- Features:
+  - Upgrade to typst v0.11.0
+  - typst-preview is available on crate.io now. You can install it by running `cargo install typst-preview`. You can also use it as a library in your project by adding `typst-preview` to your `Cargo.toml`.
+
+### v0.10.10 - [2024-03-13]
 
 - Features:
   - Upgrade to typst v0.11.0-rc1(master, 48820fe69b8061bd949847afc343bf160d05c924)
