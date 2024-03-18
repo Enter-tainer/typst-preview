@@ -237,7 +237,7 @@
     ]
   },
   "scripts": {
-    "build:frontend": "cd ../frontend && yarn run build && cd ../vscode && rimraf ./out/frontend/ && cpr ../frontend/dist/ ./out/frontend/ && cpr ./out/frontend/index.html ../../src/index.html",
+    "build:frontend": "cd ../frontend && yarn run build && cd ../vscode && rimraf ./out/frontend/ && cpr ../frontend/dist/ ./out/frontend/ && rimraf ../../src/index.html && cpr ./out/frontend/index.html ../../src/index.html",
     "vscode:prepublish": "yarn run compile",
     "compile": "tsc -p ./ && yarn run build:frontend",
     "build": "yarn run compile",
