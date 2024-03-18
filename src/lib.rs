@@ -113,7 +113,7 @@ impl CompilationHandle for CompilationHandleImpl {
 
 /// If this file is not found, please refer to https://enter-tainer.github.io/typst-preview/dev.html to build the frontend.
 #[cfg(feature = "embed-html")]
-const HTML: &str = include_str!("../addons/vscode/out/frontend/index.html");
+const HTML: &str = include_str!("index.html");
 #[cfg(not(feature = "embed-html"))]
 const HTML: &str = "HTML not embedded.";
 

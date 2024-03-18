@@ -4,7 +4,7 @@ version = "0.11.0"
 authors = ["The Typst Project Developers"]
 edition = "2021"
 build = "build.rs"
-
+include = ["src/**/*", "src/index.html", "LICENSE", "README.md", "build.rs"]
 [[bin]]
 name = "typst-preview"
 required-features = ["cli"]
