@@ -4,6 +4,11 @@ All notable changes to the "typst-preview" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.1 - [2024-03-18]
+
+- Fix:
+  - remove windows-ia32. It is not supported by vscode anymore.
+
 ## v0.11.0 - [2024-03-18]
 
 - Features:

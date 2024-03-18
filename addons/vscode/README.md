@@ -38,6 +38,11 @@ This project is not affiliated with, created by, or endorsed by Typst the brand.
 
 ## Release Notes
 
+### v0.11.1 - [2024-03-18]
+
+- Fix:
+  - remove windows-ia32. It is not supported by vscode anymore.
+
 ### v0.11.0 - [2024-03-18]
 
 - Features:
