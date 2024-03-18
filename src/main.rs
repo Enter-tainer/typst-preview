@@ -110,7 +110,7 @@ async fn main() {
         let world = TypstSystemWorld::new(CompileOpts {
             root_dir: root.clone(),
             font_paths: arguments.font_paths.clone(),
-            with_embedded_fonts: get_embedded_fonts(),
+            with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
             ..CompileOpts::default()
         })
         .expect("incorrect options");
@@ -145,14 +145,4 @@ async fn main() {
         };
     }
     let _ = tokio::join!(previewer.join(), static_server_handle);
-}
-
-#[cfg(feature = "embed-fonts")]
-fn get_embedded_fonts() -> Vec<Cow<'static, [u8]>> {
-    typst_assets::fonts().map(Cow::Borrowed).collect()
-}
-
-#[cfg(not(feature = "embed-fonts"))]
-fn get_embedded_fonts() -> Vec<Cow<'static, [u8]>> {
-    vec![]
 }
