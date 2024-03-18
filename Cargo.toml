@@ -82,7 +82,9 @@ embed-fonts = ["typst-assets/fonts"]
 # This requires modifying typst.
 no-content-hint = ["typst-ts-core/no-content-hint"]
 
-cli = ["hyper", "clap", "open", "typst-ts-compiler", "no-content-hint"]
+embed-html = []
+
+cli = ["hyper", "clap", "open", "typst-ts-compiler", "no-content-hint", "embed-html"]
 
 [profile.release]
 debug = true
