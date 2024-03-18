@@ -124,11 +124,15 @@ async fn main() {
         std::process::exit(0);
     });
 
-    let previewer = preview(arguments.preview, move |handle| {
-        let compile_server = CompileServer::new(compiler_driver, handle);
+    let previewer = preview(
+        arguments.preview,
+        move |handle| {
+            let compile_server = CompileServer::new(compiler_driver, handle);
 
-        compile_server.spawn().unwrap()
-    });
+            compile_server.spawn().unwrap()
+        },
+        None,
+    );
     let previewer = async_root
         .instrument(previewer)
         .instrument_await("preview")
