@@ -115,7 +115,7 @@ impl CompilationHandle for CompilationHandleImpl {
 #[cfg(feature = "embed-html")]
 const HTML: &str = include_str!("index.html");
 #[cfg(not(feature = "embed-html"))]
-const HTML: &str = "HTML not embedded.";
+const HTML: &str = "<html><body>Typst Preview needs to be built with the `embed-html` feature to work!</body></html>";
 
 pub struct Previewer {
     frontend_html_factory: Box<dyn Fn(PreviewMode) -> ImmutStr>,
