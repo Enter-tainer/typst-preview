@@ -171,6 +171,7 @@ jobs:
           path: addons/vscode/typst-preview-${{ env.target }}.vsix
       - name: Upload frontend html
         uses: actions/upload-artifact@v4
+        if: matrix.platform == 'linux' && matrix.arch == 'x64'
         with:
           name: index.html
           path: addons/vscode/out/frontend/index.html
