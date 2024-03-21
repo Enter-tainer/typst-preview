@@ -8,6 +8,7 @@ import * as path from 'path';
 import { WebSocket } from 'ws';
 import { version, name } from '../package.json';
 import type fetchFunc from 'node-fetch';
+import { getTargetViewColumn } from './util';
 
 const vscodeVariables = require('vscode-variables');
 
@@ -446,7 +447,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		const panel = vscode.window.createWebviewPanel(
 			'typst-preview', // 标识符
 			`${basename} (Preview)`, // 面板标题
-			vscode.ViewColumn.Beside, // 显示在编辑器的哪一侧
+			getTargetViewColumn(activeEditor.viewColumn),
 			{
 				enableScripts: true, // 启用 JS
 				retainContextWhenHidden: true,
