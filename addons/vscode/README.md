@@ -38,6 +38,13 @@ This project is not affiliated with, created by, or endorsed by Typst the brand.
 
 ## Release Notes
 
+### v0.11.2 - [2024-03-21]
+
+- Fix:
+  - #254 Zoom regression in 0.10.8 is now fixed
+  - #270 Wrong webview panel location when using 2-row layout
+  - Fix preview button being slow when using tinymist
+
 ### v0.11.1 - [2024-03-18]
 
 - Fix:
