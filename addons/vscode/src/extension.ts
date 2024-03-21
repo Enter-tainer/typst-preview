@@ -374,7 +374,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 	// interact with typst-lsp
 	if (vscode.workspace.getConfiguration().get<boolean>('typst-preview.pinPreviewFile')) {
 		console.log('pinPreviewFile');
-		await vscode.commands.executeCommand('typst-lsp.pinMainToCurrent');
+		vscode.commands.executeCommand('typst-lsp.pinMainToCurrent');
 	}
 
 	if (enableCursor) {
