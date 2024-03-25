@@ -22,12 +22,12 @@ doc = false
 [dependencies]
 typst = "0.11.0"
 typst-assets = { version = "0.11.0", features = ["fonts"] }
-typst-ts-svg-exporter = { version = "0.5.0-rc1" }
-typst-ts-core = { version = "0.5.0-rc1", default-features = false, features = [
+typst-ts-svg-exporter = { version = "0.5.0-rc2" }
+typst-ts-core = { version = "0.5.0-rc2", default-features = false, features = [
   "flat-vector",
   "vector-bbox",
 ] }
-typst-ts-compiler = { version = "0.5.0-rc1", optional = true }
+typst-ts-compiler = { version = "0.5.0-rc2", optional = true }
 comemo = "0.4"
 elsa = "1.10"
 memmap2 = "0.9.4"
