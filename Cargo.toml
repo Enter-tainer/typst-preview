@@ -3,7 +3,7 @@ name = "typst-preview"
 description = "A previewer for the Typst typesetting system."
 license = "MIT"
 repository = "https://github.com/Enter-tainer/typst-preview"
-version = "0.11.2"
+version = "0.11.3"
 authors = ["The Typst Project Developers"]
 edition = "2021"
 build = "build.rs"
@@ -22,12 +22,12 @@ doc = false
 [dependencies]
 typst = "0.11.0"
 typst-assets = { version = "0.11.0", features = ["fonts"] }
-typst-ts-svg-exporter = { version = "0.4.2-rc9" }
-typst-ts-core = { version = "0.4.2-rc9", default-features = false, features = [
+typst-ts-svg-exporter = { version = "0.5.0-rc1" }
+typst-ts-core = { version = "0.5.0-rc1", default-features = false, features = [
   "flat-vector",
   "vector-bbox",
 ] }
-typst-ts-compiler = { version = "0.4.2-rc9", optional = true }
+typst-ts-compiler = { version = "0.5.0-rc1", optional = true }
 comemo = "0.4"
 elsa = "1.10"
 memmap2 = "0.9.4"

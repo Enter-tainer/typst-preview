@@ -77,11 +77,9 @@ impl<H: CompilationHandle> CompileServer<H> {
         // editor_conn_sender: mpsc::UnboundedSender<EditorActorRequest>,
     ) -> Self {
         // CompileExporter + DynamicLayoutCompiler + WatchDriver
-        let root = compiler_driver.world.root.clone();
-        // let r = renderer_sender.clone();
         let driver = CompileExporter::new(compiler_driver);
         let driver = Reporter { inner: driver, cb };
-        let inner = CompileActor::new(driver, root.as_ref().to_owned()).with_watch(true);
+        let inner = CompileActor::new(driver).with_watch(true);
 
         Self {
             inner,

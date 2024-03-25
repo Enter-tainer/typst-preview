@@ -38,6 +38,10 @@ This project is not affiliated with, created by, or endorsed by Typst the brand.
 
 ## Release Notes
 
+### v0.11.3 - [2024-03-25]
+
+- Bump to typst.ts 0.5.0-rc1
+
 ### v0.11.2 - [2024-03-21]
 
 - Fix:
