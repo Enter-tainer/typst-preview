@@ -6,7 +6,7 @@ use log::{error, info};
 
 use typst_ts_compiler::service::CompileDriver;
 use typst_ts_compiler::TypstSystemWorld;
-use typst_ts_core::config::CompileOpts;
+use typst_ts_core::config::{compiler::EntryOpts, CompileOpts};
 
 use crate::compiler::CompileServer;
 
@@ -108,7 +108,7 @@ async fn main() {
 
     let compiler_driver = {
         let world = TypstSystemWorld::new(CompileOpts {
-            root_dir: root.clone(),
+            entry: EntryOpts::new_rooted(root.clone(), Some(entry.clone())),
             font_paths: arguments.font_paths.clone(),
             with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
             ..CompileOpts::default()

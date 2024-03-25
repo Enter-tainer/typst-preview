@@ -28,9 +28,10 @@
 		},
 		{
 			"label": "Build Binary",
-			"type": "cargo",
-			"command": "build",
+			"type": "shell",
+			"command": "cargo",
 			"args": [
+				"build",
 				"--profile=release"
 			],
 			"problemMatcher": [

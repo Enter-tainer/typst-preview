@@ -4,6 +4,10 @@ All notable changes to the "typst-preview" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.3 - [2024-03-25]
+
+- Bump to typst.ts 0.5.0-rc1
+
 ## v0.11.2 - [2024-03-21]
 
 - Fix:
