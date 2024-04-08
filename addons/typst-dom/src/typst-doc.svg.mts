@@ -201,14 +201,11 @@ export function provideSvgDoc<
           let minTop = 1e33,
             maxBottom = -1e33,
             accumulatedHeight = 0;
-          const translateRegex = /translate\(([-0-9.]+), ([-0-9.]+)\)/;
           for (const page of pages) {
             const pageHeight = Number.parseFloat(
               page.getAttribute("data-page-height")!
             );
-            const translate = page.getAttribute("transform")!;
-            const translateMatch = translate.match(translateRegex)!;
-            const translateY = Number.parseFloat(translateMatch[2]);
+            const translateY = Number.parseFloat(page.getAttribute("data-y")!);
             if (translateY + pageHeight > topEstimate) {
               minTop = Math.min(minTop, accumulatedHeight);
             }
@@ -492,6 +489,8 @@ export function provideSvgDoc<
 
         /// Move page to the correct position
         pageElem.setAttribute("transform", translateAttr);
+        pageElem.setAttribute("data-x", `${calculatedPaddedX}`)
+        pageElem.setAttribute("data-y", `${calculatedPaddedY}`)
 
         /// Insert rectangles
         // todo: this is buggy not preserving order?
