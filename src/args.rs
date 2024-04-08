@@ -110,6 +110,7 @@ pub struct CliArguments {
 pub static LONG_VERSION: Lazy<String> = Lazy::new(|| {
     format!(
         "
+Version:             {}
 Build Timestamp:     {}
 Build Git Describe:  {}
 Commit SHA:          {}
@@ -117,6 +118,7 @@ Commit Date:         {}
 Commit Branch:       {}
 Cargo Target Triple: {}
 ",
+        env!("CARGO_PKG_VERSION"),
         env!("VERGEN_BUILD_TIMESTAMP"),
         env!("VERGEN_GIT_DESCRIBE"),
         option_env!("VERGEN_GIT_SHA").unwrap_or("None"),
