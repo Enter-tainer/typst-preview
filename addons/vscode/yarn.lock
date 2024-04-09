@@ -65,15 +65,15 @@
     wrap-ansi "^8.1.0"
     wrap-ansi-cjs "npm:wrap-ansi@^7.0.0"
 
-"@myriaddreamin/typst-ts-renderer@0.4.2-rc7":
-  version "0.4.2-rc7"
-  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst-ts-renderer/-/typst-ts-renderer-0.4.2-rc7.tgz#2d991b72c652948f04e46cf9151b4edf49fd2863"
-  integrity sha512-Yga0tW2MD4oZeyYNHKZQKTIBznRYP4OpQ6XffCtzKLpDqrQn3RkFn1bW6qkmlV3fta2IcPCHACTWeMIpyRhsng==
+"@myriaddreamin/typst-ts-renderer@0.4.2-rc10":
+  version "0.4.2-rc10"
+  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst-ts-renderer/-/typst-ts-renderer-0.4.2-rc10.tgz#bc546c042c60c97025509b171be6ba047583be73"
+  integrity sha512-WGkYeyXXGNeL4VWYzsW+S/9b0W7mvTr7bTjt/ZQHOs/FyOl8q2S6QivqlzKTutdXzGZ+5EB8SA86757hYtkDFA==
 
-"@myriaddreamin/typst.ts@0.4.2-rc7":
-  version "0.4.2-rc7"
-  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst.ts/-/typst.ts-0.4.2-rc7.tgz#4498833b3171104fe212ad1621521f0962ab14aa"
-  integrity sha512-URrAboRdDSZoxONwWIXl9M1ROo5k8NJupBwFW0Y4ukOeTVZhv1yd4KN8LJFYGnp3LJxDZX5P6RwIfVVUTaT2rg==
+"@myriaddreamin/typst.ts@0.4.2-rc10":
+  version "0.4.2-rc10"
+  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst.ts/-/typst.ts-0.4.2-rc10.tgz#b4714914428bdd6540d7b178b4f1342e5cd19509"
+  integrity sha512-cgBcX961mBnUHVFTcbffhm7V6Am3RGD3Rwm/UsDBSwMrsTC1Qde4qVfsg5o2vKjA/idAff3Uf0D3mo0bcsicjw==
   dependencies:
     idb "^7.1.1"
 
@@ -2086,10 +2086,10 @@ typescript@^5.0.2:
 "typst-preview-frontend@file:../frontend":
   version "0.0.0"
   dependencies:
-    "@myriaddreamin/typst-ts-renderer" "0.4.2-rc7"
-    "@myriaddreamin/typst.ts" "0.4.2-rc7"
+    "@myriaddreamin/typst-ts-renderer" "0.4.2-rc10"
+    "@myriaddreamin/typst.ts" "0.4.2-rc10"
     rxjs "^7.8.1"
-    typst-dom "link:../../../../.cache/yarn/v6/npm-typst-preview-frontend-0.0.0-8fdfa86e-566e-4d86-9f15-95362a215f3b-1710053066906/node_modules/typst-dom"
+    typst-dom "link:../../../../../AppData/Local/Yarn/Cache/v6/npm-typst-preview-frontend-0.0.0-799653a2-ecc4-4b42-88b5-016ee892c84d-1712592255802/node_modules/typst-dom"
 
 uc.micro@^1.0.1, uc.micro@^1.0.5:
   version "1.0.6"
