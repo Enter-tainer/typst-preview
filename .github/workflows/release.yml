@@ -270,6 +270,7 @@ jobs:
           omitDraftDuringUpdate: true
           omitNameDuringUpdate: true
           omitPrereleaseDuringUpdate: true
+          bodyFile: "addons/vscode/CHANGELOG.md"
 
   publish:
     runs-on: ubuntu-latest

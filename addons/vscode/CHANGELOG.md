@@ -4,6 +4,11 @@ All notable changes to the "typst-preview" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.4 - [2024-04-09]
+
+- Fix version in nix build
+- Fix desync in firefox
+
 ## v0.11.3 - [2024-03-25]
 
 - Bump to typst.ts 0.5.0-rc1
