@@ -4,7 +4,6 @@ Preview your Typst files in vscode instantly!
 
 Install this extension from [marketplace](https://marketplace.visualstudio.com/items?itemName=mgt19937.typst-preview), open command palette (Ctrl+Shift+P), and type `>Typst Preview:`.
 
-
 https://github.com/Enter-tainer/typst-preview/assets/25521218/7a151b3d-fe50-4440-8aab-2cc9a9abcf37
 
 https://github.com/Enter-tainer/typst-preview/assets/25521218/600529ce-8f42-4c2f-a224-b6b73e6ad017
@@ -35,10 +34,20 @@ If you are interested in the details, please refer to [Typst-Preview Architectur
 
 You can use the binary `typst-preview` as a standalone typst preview server. It can be used to preview your document in browser. For example: `typst-preview ./assets/demo/main.typ --partial-rendering`. This should be useful if you don't use VSCode but still want to experience the low latency preview.
 
+## Use with other editors
+
+- nvim: [typst-preview.nvim](https://github.com/chomosuke/typst-preview.nvim)
+- emacs: [typst-preview.el](https://github.com/havarddj/typst-preview.el)
+
 ## Acknowledgements
 
 - [typst.ts](https://github.com/Myriad-Dreamin/typst.ts): typst.ts provide incremental svg export.
 - [typst-lsp](https://github.com/nvarner/typst-lsp): The CI and the vscode extension are heavily inspired by typst-lsp.
+
+## Related projects
+
+- [typstyle](https://github.com/Enter-tainer/typstyle): Beautiful and reliable typst code formatter
+- [tinymist](https://github.com/Myriad-Dreamin/tinymist): Feature rich typst language server
 
 ## Legal
 
