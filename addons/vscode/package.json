@@ -121,12 +121,12 @@
           "id": "typst-preview.content-preview",
           "type": "webview",
           "name": "Content",
-          "when": "config.typst-preview.showInActivityBar"
+          "when": "config.typst-preview.showInActivityBar && resourceLangId == typst"
         },
         {
           "id": "typst-preview.outline",
           "name": "Outline",
-          "when": "config.typst-preview.showInActivityBar"
+          "when": "config.typst-preview.showInActivityBar && resourceLangId == typst"
         }
       ]
     },
