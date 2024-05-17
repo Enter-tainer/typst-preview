@@ -20,8 +20,8 @@ bench = false
 doc = false
 
 [dependencies]
-typst = "0.11.0"
-typst-assets = { version = "0.11.0", features = ["fonts"] }
+typst = "0.11.1"
+typst-assets = { version = "0.11.1", features = ["fonts"] }
 typst-ts-svg-exporter = { version = "0.5.0-rc2" }
 typst-ts-core = { version = "0.5.0-rc2", default-features = false, features = [
   "flat-vector",
@@ -33,19 +33,19 @@ elsa = "1.10"
 memmap2 = "0.9.4"
 notify = "6"
 once_cell = "1"
-tokio = { version = "1.36.0", features = ["full"] }
+tokio = { version = "1.37.0", features = ["full"] }
 tokio-tungstenite = "0.21.0"
 tiny-skia = "0.11"
 env_logger = "0.11.3"
 log = "0.4.21"
-serde_json = "1.0.114"
+serde_json = "1.0.117"
 futures = "0.3.30"
 indexmap = "2"
-serde = "1.0.197"
+serde = "1.0.202"
 await-tree = "0.1.2"
 
-clap = { version = "4.5.3", features = ["derive", "env"], optional = true }
-open = { version = "5.1.2", optional = true }
+clap = { version = "4.5.4", features = ["derive", "env"], optional = true }
+open = { version = "5.1.3", optional = true }
 hyper = { version = "0.14", features = ["full"], optional = true }
 [patch.crates-io]
 
@@ -57,8 +57,8 @@ hyper = { version = "0.14", features = ["full"], optional = true }
 # typst-ts-core = { path = "../../core" }
 
 [build-dependencies]
-clap = { version = "4.5.2", features = ["derive", "string"] }
-clap_complete = "4.5.1"
+clap = { version = "4.5.4", features = ["derive", "string"] }
+clap_complete = "4.5.2"
 clap_mangen = "0.2.20"
 vergen = { version = "8.3.1", features = [
   "build",
@@ -67,7 +67,7 @@ vergen = { version = "8.3.1", features = [
   "git2",
   "rustc",
 ] }
-anyhow = "1.0.80"
+anyhow = "1.0.83"
 
 [features]
 
