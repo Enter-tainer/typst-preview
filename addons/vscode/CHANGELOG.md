@@ -4,6 +4,10 @@ All notable changes to the "typst-preview" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.6 - [2024-05-19]
+
+- Add extension icon designed by Zoknatwrd
+
 ## v0.11.5 - [2024-05-19]
 
 - Bump to typst v0.11.1
