@@ -4,6 +4,11 @@ All notable changes to the "typst-preview" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.5 - [2024-05-19]
+
+- Bump to typst v0.11.1
+- Show activity bar icon only when current file is a typst file
+
 ## v0.11.4 - [2024-04-09]
 
 - Fix version in nix build
