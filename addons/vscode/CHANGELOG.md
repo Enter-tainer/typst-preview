@@ -6,7 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## v0.11.6 - [2024-05-19]
 
-- Add extension icon designed by Zoknatwrd
+- Add extension icon designed by Zoknatwrd and QuarticCat🔮
 
 ## v0.11.5 - [2024-05-19]
 
