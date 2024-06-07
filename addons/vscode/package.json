@@ -139,6 +139,14 @@
           "default": "",
           "description": "Path to typst-preview executable. If not set, the extension will use bundled typst-preview. If bundled binary is not found, it will use typst-preview installed in PATH"
         },
+        "typst-preview.typstInputs": {
+          "type": "object",
+          "items": {
+            "type": "string"
+          },
+          "default": {},
+          "description": "key-value pairs visible through `sys.inputs`, corresponds to `--input` argument of typst cli"
+        },
         "typst-preview.fontPaths": {
           "type": "array",
           "items": {

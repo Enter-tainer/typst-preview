@@ -122,6 +122,18 @@ export async function getCliPath(extensionPath?: string): Promise<string> {
 	return (state.resolved = await resolvePath());
 }
 
+function getCliInputArgs(inputs?: { [key: string]: string }): string[] {
+	return Object.entries(inputs ?? {})
+		.filter(([k, _]) => k.trim() !== "")
+		.map(([k, v]) => ["--input", `${k}=${vscodeVariables(v)}`])
+		.flat();
+}
+
+function codeGetCliInputArgs(): string[] {
+	return getCliInputArgs(vscode.workspace.getConfiguration().get<{ [key: string]: string }>(
+		'typst-preview.typstInputs'));
+}
+
 export function getCliFontArgs(fontPaths?: string[]): string[] {
 	return (fontPaths ?? []).flatMap((fontPath) => ["--font-path", vscodeVariables(fontPath)]);
 }
@@ -533,6 +545,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 			...partialRenderingArgs,
 			...invertColorsArgs,
 			...previewInSlideModeArgs,
+			...codeGetCliInputArgs(),
 			...codeGetCliFontArgs(),
 			filePath,
 		], outputChannel, openInBrowser);

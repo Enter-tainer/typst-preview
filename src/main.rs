@@ -4,6 +4,7 @@ use await_tree::InstrumentAwait;
 use clap::Parser;
 use log::{error, info};
 
+use typst::foundations::{Str, Value};
 use typst_ts_compiler::service::CompileDriver;
 use typst_ts_compiler::TypstSystemWorld;
 use typst_ts_core::config::{compiler::EntryOpts, CompileOpts};
@@ -92,6 +93,9 @@ async fn main() {
     } else {
         std::env::current_dir().unwrap().join(&arguments.input)
     };
+    let inputs = arguments.inputs.iter().map(|(k, v)| {
+        (Str::from(k.as_str()), Value::Str(Str::from(v.as_str())))
+    }).collect();
     let root = if let Some(root) = &arguments.root {
         if root.is_absolute() {
             root.clone()
@@ -109,6 +113,7 @@ async fn main() {
     let compiler_driver = {
         let world = TypstSystemWorld::new(CompileOpts {
             entry: EntryOpts::new_rooted(root.clone(), Some(entry.clone())),
+            inputs,
             font_paths: arguments.font_paths.clone(),
             with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
             ..CompileOpts::default()
