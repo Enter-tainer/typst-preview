@@ -125,7 +125,7 @@ export async function getCliPath(extensionPath?: string): Promise<string> {
 function getCliInputArgs(inputs?: { [key: string]: string }): string[] {
 	return Object.entries(inputs ?? {})
 		.filter(([k, _]) => k.trim() !== "")
-		.map(([k, v]) => ["--input", `${k}=${vscodeVariables(v)}`])
+		.map(([k, v]) => ["--input", `${k}=${v}`])
 		.flat();
 }
 
