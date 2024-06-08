@@ -134,13 +134,19 @@ function codeGetCliInputArgs(): string[] {
 		'typst-preview.sysInputs'));
 }
 
-export function getCliFontArgs(fontPaths?: string[]): string[] {
+export function getCliFontPathArgs(fontPaths?: string[]): string[] {
 	return (fontPaths ?? []).flatMap((fontPath) => ["--font-path", vscodeVariables(fontPath)]);
 }
 
 export function codeGetCliFontArgs(): string[] {
-	return getCliFontArgs(vscode.workspace.getConfiguration().get<string[]>(
+	let ignoreSystemFonts = vscode.workspace.getConfiguration().get<boolean>(
+		'typst-preview.ignoreSystemFonts');
+	let fontPaths = getCliFontPathArgs(vscode.workspace.getConfiguration().get<string[]>(
 		'typst-preview.fontPaths'));
+	return [
+		...(ignoreSystemFonts ? ["--ignore-system-fonts"] : []),
+		...fontPaths
+	];
 }
 
 function getProjectRoot(currentPath: string): string {

@@ -96,6 +96,11 @@ pub struct CliArguments {
     )]
     pub inputs: Vec<(String, String)>,
 
+    /// Ensures system fonts won't be searched, unless explicitly included via
+    /// `--font-path`
+    #[arg(long)]
+    pub ignore_system_fonts: bool,
+
     /// Add additional directories to search for fonts
     #[cfg_attr(
         feature = "clap",

@@ -147,6 +147,11 @@
           "default": {},
           "description": "key-value pairs visible through `sys.inputs`, corresponds to `--input` argument of typst cli"
         },
+        "typst-preview.ignoreSystemFonts": {
+          "type": "boolean",
+          "default": false,
+          "description": "Ensures system fonts won't be searched, unless explicitly included via `typst-preview.fontPath`"
+        },
         "typst-preview.fontPaths": {
           "type": "array",
           "items": {
