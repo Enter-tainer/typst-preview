@@ -125,7 +125,7 @@ export async function getCliPath(extensionPath?: string): Promise<string> {
 function getCliInputArgs(inputs?: { [key: string]: string }): string[] {
 	return Object.entries(inputs ?? {})
 		.filter(([k, _]) => k.trim() !== "")
-		.map(([k, v]) => ["--input", `${k}=${vscodeVariables(v)}`])
+		.map(([k, v]) => ["--input", `${k}=${v}`])
 		.flat();
 }
 
@@ -134,13 +134,19 @@ function codeGetCliInputArgs(): string[] {
 		'typst-preview.sysInputs'));
 }
 
-export function getCliFontArgs(fontPaths?: string[]): string[] {
+export function getCliFontPathArgs(fontPaths?: string[]): string[] {
 	return (fontPaths ?? []).flatMap((fontPath) => ["--font-path", vscodeVariables(fontPath)]);
 }
 
 export function codeGetCliFontArgs(): string[] {
-	return getCliFontArgs(vscode.workspace.getConfiguration().get<string[]>(
+	let needSystemFonts = vscode.workspace.getConfiguration().get<boolean>(
+		'typst-preview.systemFonts');
+	let fontPaths = getCliFontPathArgs(vscode.workspace.getConfiguration().get<string[]>(
 		'typst-preview.fontPaths'));
+	return [
+		...(needSystemFonts ? [] : ["--ignore-system-fonts"]),
+		...fontPaths,
+	];
 }
 
 function getProjectRoot(currentPath: string): string {

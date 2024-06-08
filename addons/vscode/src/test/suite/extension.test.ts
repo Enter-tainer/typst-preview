@@ -52,7 +52,13 @@ suite('Extension Test Suite', () => {
     }
   });
 
-  test("FontPaths Configuration Test", async () => {
+  test("Font Configuration Test", async () => {
+
+    /// check default not ignore system fonts
+    jsonIs(assert.strictEqual)(
+      false,
+      vscode.workspace.getConfiguration().get<boolean>("typst-preview.ignoreSystemFonts")
+    );
 
     /// check that default font paths should be []
     jsonIs(assert.strictEqual)(
@@ -61,16 +67,16 @@ suite('Extension Test Suite', () => {
     );
 
     jsonIs(assert.strictEqual)(
-      [], ext.getCliFontArgs(undefined));
+      [], ext.getCliFontPathArgs(undefined));
 
     jsonIs(assert.strictEqual)(
-      [], ext.getCliFontArgs([]));
+      [], ext.getCliFontPathArgs([]));
 
     jsonIs(assert.strictEqual)(
       [], ext.codeGetCliFontArgs());
 
     jsonIs(assert.strictEqual)(
-      ["--font-path", "/path/to/font1", "--font-path", "/path/to/font2"], 
-      ext.getCliFontArgs(["/path/to/font1", "/path/to/font2"]));
+      ["--font-path", "/path/to/font1", "--font-path", "/path/to/font2"],
+      ext.getCliFontPathArgs(["/path/to/font1", "/path/to/font2"]));
   });
 });

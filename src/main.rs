@@ -114,6 +114,7 @@ async fn main() {
         let world = TypstSystemWorld::new(CompileOpts {
             entry: EntryOpts::new_rooted(root.clone(), Some(entry.clone())),
             inputs,
+            no_system_fonts: arguments.ignore_system_fonts,
             font_paths: arguments.font_paths.clone(),
             with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
             ..CompileOpts::default()
