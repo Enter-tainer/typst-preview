@@ -87,6 +87,15 @@ pub struct CliArguments {
     #[cfg_attr(feature = "clap", clap(long = "no-open"))]
     pub dont_open_in_browser: bool,
 
+    /// Add a string key-value pair visible through `sys.inputs`
+    #[clap(
+        long = "input",
+        value_name = "key=value",
+        action = clap::ArgAction::Append,
+        value_parser = clap::builder::ValueParser::new(parse_input_pair),
+    )]
+    pub inputs: Vec<(String, String)>,
+
     /// Add additional directories to search for fonts
     #[cfg_attr(
         feature = "clap",
@@ -105,6 +114,23 @@ pub struct CliArguments {
     pub root: Option<PathBuf>,
 
     pub input: PathBuf,
+}
+
+// This parse function comes from typst-cli
+/// Parses key/value pairs split by the first equal sign.
+///
+/// This function will return an error if the argument contains no equals sign
+/// or contains the key (before the equals sign) is empty.
+fn parse_input_pair(raw: &str) -> Result<(String, String), String> {
+    let (key, val) = raw
+        .split_once('=')
+        .ok_or("input must be a key and a value separated by an equal sign")?;
+    let key = key.trim().to_owned();
+    if key.is_empty() {
+        return Err("the key was missing or empty".to_owned());
+    }
+    let val = val.trim().to_owned();
+    Ok((key, val))
 }
 
 pub static LONG_VERSION: Lazy<String> = Lazy::new(|| {
