@@ -139,12 +139,12 @@ export function getCliFontPathArgs(fontPaths?: string[]): string[] {
 }
 
 export function codeGetCliFontArgs(): string[] {
-	let ignoreSystemFonts = vscode.workspace.getConfiguration().get<boolean>(
-		'typst-preview.ignoreSystemFonts');
+	let needSystemFonts = vscode.workspace.getConfiguration().get<boolean>(
+		'typst-preview.systemFonts');
 	let fontPaths = getCliFontPathArgs(vscode.workspace.getConfiguration().get<string[]>(
 		'typst-preview.fontPaths'));
 	return [
-		...(ignoreSystemFonts ? ["--ignore-system-fonts"] : []),
+		...(needSystemFonts ? [] : ["--ignore-system-fonts"]),
 		...fontPaths
 	];
 }
