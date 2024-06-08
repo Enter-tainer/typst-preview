@@ -131,7 +131,7 @@ function getCliInputArgs(inputs?: { [key: string]: string }): string[] {
 
 function codeGetCliInputArgs(): string[] {
 	return getCliInputArgs(vscode.workspace.getConfiguration().get<{ [key: string]: string }>(
-		'typst-preview.typstInputs'));
+		'typst-preview.sysInputs'));
 }
 
 export function getCliFontArgs(fontPaths?: string[]): string[] {
