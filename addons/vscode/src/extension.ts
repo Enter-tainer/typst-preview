@@ -145,7 +145,7 @@ export function codeGetCliFontArgs(): string[] {
 		'typst-preview.fontPaths'));
 	return [
 		...(needSystemFonts ? [] : ["--ignore-system-fonts"]),
-		...fontPaths
+		...fontPaths,
 	];
 }
 
