@@ -4,6 +4,13 @@ All notable changes to the "typst-preview" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.7 - [2024-06-09]
+
+Thanks @7sDream for this release!
+
+- Add supports for setting `sys.inputs` in configuration
+- Add support for ignoring system fonts.
+
 ## v0.11.6 - [2024-05-19]
 
 - Add extension icon designed by Zoknatwrd and QuarticCat🔮
