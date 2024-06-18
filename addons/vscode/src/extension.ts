@@ -339,6 +339,7 @@ interface LaunchTask {
 	activeEditor: vscode.TextEditor,
 	bindDocument: vscode.TextDocument,
 	mode: 'doc' | 'slide',
+	webviewPanel?: vscode.WebviewPanel
 }
 
 interface LaunchInBrowserTask extends LaunchTask {
@@ -357,6 +358,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		outputChannel,
 		activeEditor,
 		bindDocument,
+		webviewPanel
 	} = task;
 	const filePath = bindDocument.uri.fsPath;
 
@@ -462,7 +464,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 	async function launchPreviewInWebView() {
 		const basename = path.basename(activeEditor.document.fileName);
 		// Create and show a new WebView
-		const panel = vscode.window.createWebviewPanel(
+		const panel = webviewPanel !== undefined ? webviewPanel : vscode.window.createWebviewPanel(
 			'typst-preview', // 标识符
 			`${basename} (Preview)`, // 面板标题
 			getTargetViewColumn(activeEditor.viewColumn),
@@ -493,7 +495,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		html = html.replace(
 			"preview-arg:previewMode:Doc",
 			`preview-arg:previewMode:${previewMode}`
-		);
+		).replace("VSCODE_STATE", JSON.stringify({ mode: task.mode, fsPath: bindDocument.uri.fsPath }));
 		panel.webview.html = html.replace("ws://127.0.0.1:23625", `ws://127.0.0.1:${dataPlanePort}`);
 		// 虽然配置的是 http，但是如果是桌面客户端，任何 tcp 连接都支持，这也就包括了 ws
 		// https://code.visualstudio.com/api/advanced-topics/remote-extensions#forwarding-localhost
@@ -761,6 +763,37 @@ export class OutlineItem extends vscode.TreeItem {
 	contextValue = 'outline-item';
 }
 
+class TypstPreviewSerializer implements vscode.WebviewPanelSerializer {
+	context: vscode.ExtensionContext;
+	outputChannel: vscode.OutputChannel;
+
+	constructor(context: vscode.ExtensionContext, outputChannel: vscode.OutputChannel) {
+		this.context = context;
+		this.outputChannel = outputChannel;
+	}
+
+	async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel, state: any) {
+		const activeEditor = vscode.window.visibleTextEditors.find(editor => editor.document.uri.fsPath === state.fsPath);
+
+		if (!activeEditor) {
+			return;
+		}
+
+		const bindDocument = activeEditor.document;
+		const mode = state.mode;
+
+		launchPreview({
+			kind: "webview",
+			context: this.context,
+			outputChannel: this.outputChannel,
+			activeEditor,
+			bindDocument,
+			mode,
+			webviewPanel
+		});
+	}
+}
+
 let statusBarItem: vscode.StatusBarItem;
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -854,8 +887,9 @@ export function activate(context: vscode.ExtensionContext) {
 	let showLogDisposable = vscode.commands.registerCommand('typst-preview.showLog', async () => {
 		outputChannel.show();
 	});
+	let serializerDisposable = vscode.window.registerWebviewPanelSerializer('typst-preview', new TypstPreviewSerializer(context, outputChannel));
 
-	context.subscriptions.push(webviewDisposable, browserDisposable, webviewSlideDisposable, browserSlideDisposable, syncDisposable, showLogDisposable, statusBarItem, revealDocumentDisposable, awaitTreeDisposable);
+	context.subscriptions.push(webviewDisposable, browserDisposable, webviewSlideDisposable, browserSlideDisposable, syncDisposable, showLogDisposable, statusBarItem, revealDocumentDisposable, awaitTreeDisposable, serializerDisposable);
 	process.on('SIGINT', () => {
 		for (const serverProcess of serverProcesses) {
 			serverProcess.kill();
