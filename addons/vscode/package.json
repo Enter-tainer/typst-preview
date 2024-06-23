@@ -16,7 +16,9 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onWebviewPanel:typst-preview"
+  ],
   "main": "./out/src/extension.js",
   "contributes": {
     "icons": {
