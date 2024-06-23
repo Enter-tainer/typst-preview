@@ -492,10 +492,12 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 				.toString()}/typst-webview-assets`
 		);
 		const previewMode = task.mode === 'doc' ? "Doc" : "Slide";
+		const previewState = { mode: task.mode, fsPath: bindDocument.uri.fsPath };
+		const previewStateEncoded = Buffer.from(JSON.stringify(previewState), 'utf-8').toString('base64');
 		html = html.replace(
 			"preview-arg:previewMode:Doc",
 			`preview-arg:previewMode:${previewMode}`
-		).replace("preview-arg:state:{}", `preview-arg:state:${JSON.stringify({ mode: task.mode, fsPath: Buffer.from(bindDocument.uri.fsPath).toString("base64") })}`);
+		).replace("preview-arg:state:", `preview-arg:state:${previewStateEncoded}`);
 
 		panel.webview.html = html.replace("ws://127.0.0.1:23625", `ws://127.0.0.1:${dataPlanePort}`);
 		// 虽然配置的是 http，但是如果是桌面客户端，任何 tcp 连接都支持，这也就包括了 ws
