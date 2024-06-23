@@ -495,7 +495,9 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		html = html.replace(
 			"preview-arg:previewMode:Doc",
 			`preview-arg:previewMode:${previewMode}`
-		).replace("preview-arg:state:{}", `preview-arg:state:${JSON.stringify({ mode: task.mode, fsPath: bindDocument.uri.fsPath.replace(/`/g, "").replace(/"/g, "") })}`);
+		).replace("preview-arg:state:{}", `preview-arg:state:${JSON.stringify({ mode: task.mode, fsPath: bindDocument.uri.fsPath.replace(/`/g, "\\`") })}`);
+		// Replace all the backticks here ^ to avoid the backtick "escaping" the string in the JS itself and executing other code.
+
 		panel.webview.html = html.replace("ws://127.0.0.1:23625", `ws://127.0.0.1:${dataPlanePort}`);
 		// 虽然配置的是 http，但是如果是桌面客户端，任何 tcp 连接都支持，这也就包括了 ws
 		// https://code.visualstudio.com/api/advanced-topics/remote-extensions#forwarding-localhost
