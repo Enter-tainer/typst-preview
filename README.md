@@ -2,7 +2,6 @@
 
 The contents of this repository have been consolidated into [tinymist](https://github.com/Myriad-Dreamin/tinymist). It is an all-in-one language server for typst.
 
-
 We recommend all users migrate to tinymist for the following benefits:
 
 - More centralized resource management
@@ -11,7 +10,7 @@ We recommend all users migrate to tinymist for the following benefits:
 
 This repository will no longer be updated in future. All development will move to tinymist. Thank you for your support and understanding!
 
-- We still maintain the typst-preview extension for a while (until we allow run lsp with only typst-preview feature)
+- We still maintain the typst-preview extension for a while in a best effort way.
    - The lazy people can continue using their setting, as all old things are still working.
    - This respect people who love minimal env, like a treesitter plugin plus preview.
 - Tinymist will ensure compatibility to typst-preview as much as possible.
