@@ -1,3 +1,24 @@
+# Important Notice
+
+The contents of this repository have been consolidated into [tinymist](https://github.com/Myriad-Dreamin/tinymist). It is an all-in-one language server for typst.
+
+We recommend all users migrate to tinymist for the following benefits:
+
+- More centralized resource management
+- Reduced redundancy and lower resource usage
+- Easier updates and maintenance
+
+This repository will no longer be updated in future. All development will move to tinymist. Thank you for your support and understanding!
+
+- We still maintain the typst-preview extension for a while in a best effort way.
+   - The lazy people can continue using their setting, as all old things are still working.
+   - This respect people who love minimal env, like a treesitter plugin plus preview.
+- Tinymist will ensure compatibility to typst-preview as much as possible.
+   - for vscode users: uninstall the preview extension and install the tinymist extension.
+   - for standalone cli users: `typst-preview -> tinymist preview`
+
+If you have any questions, please open an issue in the new repository.
+
 # Typst Preview VSCode
 
 Preview your Typst files in vscode instantly!
