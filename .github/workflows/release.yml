@@ -1,4 +1,4 @@
-# stolen from https://github.com/nvarner/typst-lsp/blob/master/.github/workflows/release.yml
+# stolen from https://github.com/nvarner/tinymist/blob/master/.github/workflows/release.yml
 name: CI
 on:
   push:
@@ -15,8 +15,6 @@ on:
 env:
   CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
   CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABIHF_LINKER: arm-linux-gnueabihf-gcc
-  SCCACHE_GHA_ENABLED: "true"
-  RUSTC_WRAPPER: "sccache"
 
 jobs:
   pre_build:
@@ -40,6 +38,7 @@ jobs:
             rust-target: x86_64-pc-windows-msvc
             platform: win32
             arch: x64
+            regular_build: 'true'
           - os: windows-latest
             rust-target: aarch64-pc-windows-msvc
             platform: win32
@@ -48,6 +47,7 @@ jobs:
             rust-target: x86_64-unknown-linux-gnu
             platform: linux
             arch: x64
+            regular_build: 'true'
           - os: ubuntu-20.04
             rust-target: aarch64-unknown-linux-gnu
             platform: linux
@@ -56,15 +56,15 @@ jobs:
             rust-target: arm-unknown-linux-gnueabihf
             platform: linux
             arch: armhf
-          - os: macos-11
+          - os: macos-13
             rust-target: x86_64-apple-darwin
             platform: darwin
             arch: x64
-          - os: macos-11
+          - os: macos-13
             rust-target: aarch64-apple-darwin
             platform: darwin
             arch: arm64
-
+            regular_build: 'true'
     name: build (${{ matrix.platform }}-${{ matrix.arch }})
     runs-on: ${{ matrix.os }}
     env:
@@ -72,118 +72,136 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          repository: Myriad-Dreamin/tinymist
           submodules: recursive
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.4
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 16
-      - name: Build typst-dom
-        run: |
-          yarn
-          yarn build
-        working-directory: ./addons/typst-dom
-      - name: Build frontend
-        run: yarn
-        working-directory: ./addons/frontend
-      - name: Build vscode extension
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+      - name: Install deps
+        run: yarn install
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+      - name: Build typst-preview vscode extension
         run: |
           yarn
           yarn run compile
-        working-directory: ./addons/vscode
+        working-directory: ./contrib/typst-preview/editors/vscode
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+      - name: Build tinymist vscode extension
+        run: |
+          yarn
+          yarn run compile
+        working-directory: ./editors/vscode
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - name: rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.rust-target }}
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - name: Install llvm
-        if: matrix.platform == 'linux'
+        if: matrix.platform == 'linux' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         run: |
           sudo apt-get update
           sudo apt-get install llvm
       - name: Install AArch64 target toolchain
-        if: matrix.rust-target == 'aarch64-unknown-linux-gnu'
+        if: matrix.rust-target == 'aarch64-unknown-linux-gnu' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         run: |
           sudo apt-get update
           sudo apt-get install gcc-aarch64-linux-gnu
       - name: Install ARM target toolchain
-        if: matrix.rust-target == 'arm-unknown-linux-gnueabihf'
+        if: matrix.rust-target == 'arm-unknown-linux-gnueabihf' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         run: |
           sudo apt-get update
           sudo apt-get install gcc-arm-linux-gnueabihf
-      - name: Build typst-preview binary
+      - name: Run rust-cache
+        uses: Swatinem/rust-cache@v2
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+      - name: Build tinymist binary
         shell: pwsh
         run: |
-          cargo build --release -p typst-preview --target ${{ matrix.rust-target }}
+          cargo build --profile=gh-release -p tinymist --target ${{ matrix.rust-target }}
+        if: startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true'
       - name: Rename debug symbols for windows
-        if: matrix.platform == 'win32'
+        if: matrix.platform == 'win32' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         run: |
-          cd target/${{ matrix.rust-target }}/release
-          cp typst_preview.pdb typst_preview-${{ env.target }}.pdb
-      - name: Upload split debug symbols for windows
-        if: matrix.platform == 'win32'
-        uses: actions/upload-artifact@v4
-        with:
-          name: typst_preview-${{ env.target }}.pdb
-          path: target/${{ matrix.rust-target }}/release/typst_preview-${{ env.target }}.pdb
+          cd target/${{ matrix.rust-target }}/gh-release
+          cp tinymist.pdb tinymist-${{ env.target }}.pdb
       - name: Split debug symbols for linux
-        if: matrix.platform == 'linux'
+        if: matrix.platform == 'linux' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         run: |
-          cd target/${{ matrix.rust-target }}/release
-          llvm-objcopy --compress-debug-sections --only-keep-debug "typst-preview" "typst-preview-${{ env.target }}.debug"
-          llvm-objcopy --strip-debug --add-gnu-debuglink="typst-preview-${{ env.target }}.debug" "typst-preview"
-      - name: Upload split debug symbols for linux
-        if: matrix.platform == 'linux'
-        uses: actions/upload-artifact@v4
-        with:
-          name: typst-preview-${{ env.target }}.debug
-          path: target/${{ matrix.rust-target }}/release/typst-preview-${{ env.target }}.debug
-          compression-level: 0
+          cd target/${{ matrix.rust-target }}/gh-release
+          llvm-objcopy --compress-debug-sections --only-keep-debug "tinymist" "tinymist-${{ env.target }}.debug"
+          llvm-objcopy --strip-debug --add-gnu-debuglink="tinymist-${{ env.target }}.debug" "tinymist"
       - name: Collect debug symbols for mac
-        if: matrix.platform == 'darwin'
+        if: matrix.platform == 'darwin' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         run: |
-          dsymutil -f "target/${{ matrix.rust-target }}/release/typst-preview"
-          mv "target/${{ matrix.rust-target }}/release/typst-preview.dwarf" "target/${{ matrix.rust-target }}/release/typst-preview-${{ env.target }}.dwarf"
-      - name: Upload split debug symbols for mac
-        if: matrix.platform == 'darwin'
-        uses: actions/upload-artifact@v4
-        with:
-          name: typst-preview-${{ env.target }}.dwarf
-          path: target/${{ matrix.rust-target }}/release/typst-preview-${{ env.target }}.dwarf
+          dsymutil -f "target/${{ matrix.rust-target }}/gh-release/tinymist"
+          mv "target/${{ matrix.rust-target }}/gh-release/tinymist.dwarf" "target/${{ matrix.rust-target }}/gh-release/tinymist-${{ env.target }}.dwarf"
       - name: Copy binary to output directory
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         shell: pwsh
         run: |
-          cp "target/${{ matrix.rust-target }}/release/typst-preview$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "addons/vscode/out/"
-          cp "target/${{ matrix.rust-target }}/release/typst-preview$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "typst-preview-${{ env.target }}$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )"
-      - name: Upload binary artifact
+          cp "target/${{ matrix.rust-target }}/gh-release/tinymist$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "editors/vscode/out/"
+          cp "target/${{ matrix.rust-target }}/gh-release/tinymist$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "contrib/typst-preview/editors/vscode/out/"
+          cp "target/${{ matrix.rust-target }}/gh-release/tinymist$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "tinymist-${{ env.target }}$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )"
+      - name: Test tinymist
+        run: |
+          cargo test --profile=gh-release --workspace --target ${{ matrix.rust-target }}
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true') && (matrix.platform == 'linux') && (matrix.arch == 'x64')
+      - name: Upload split debug symbols for windows
+        if: matrix.platform == 'win32' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         uses: actions/upload-artifact@v4
         with:
-          name: typst-preview-${{ env.target }}
-          path: typst-preview-${{ env.target }}${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
-      - name: Package extension
+          name: tinymist-${{ env.target }}.pdb
+          path: target/${{ matrix.rust-target }}/gh-release/tinymist-${{ env.target }}.pdb
+      - name: Upload split debug symbols for linux
+        if: matrix.platform == 'linux' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinymist-${{ env.target }}.debug
+          path: target/${{ matrix.rust-target }}/gh-release/tinymist-${{ env.target }}.debug
+          compression-level: 0
+      - name: Upload split debug symbols for mac
+        if: matrix.platform == 'darwin' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinymist-${{ env.target }}.dwarf
+          path: target/${{ matrix.rust-target }}/gh-release/tinymist-${{ env.target }}.dwarf
+      - name: Upload binary artifact
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinymist-${{ env.target }}
+          path: tinymist-${{ env.target }}${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
+      - name: Package typst-preview extension
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         shell: pwsh
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
-        working-directory: ./addons/vscode
-      - name: Upload VSIX artifact
+        working-directory: ./contrib/typst-preview/editors/vscode
+      - name: Package tinymist extension
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        shell: pwsh
+        run: yarn run package -- --target ${{ env.target }} -o tinymist-${{ env.target }}.vsix
+        working-directory: ./editors/vscode
+      - name: Upload typst-preview VSIX artifact
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         uses: actions/upload-artifact@v4
         with:
           name: typst-preview-${{ env.target }}.vsix
-          path: addons/vscode/typst-preview-${{ env.target }}.vsix
-      - name: Upload frontend html
+          path: contrib/typst-preview/editors/vscode/typst-preview-${{ env.target }}.vsix
+      - name: Upload VSIX artifact
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         uses: actions/upload-artifact@v4
-        if: matrix.platform == 'linux' && matrix.arch == 'x64'
         with:
-          name: index.html
-          path: addons/vscode/out/frontend/index.html
-          overwrite: true
-      - name: Publish crates
-        if: matrix.platform == 'linux' && matrix.arch == 'x64' && startsWith(github.ref, 'refs/tags/')
-        run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }} --allow-dirty
-
+          name: tinymist-${{ env.target }}.vsix
+          path: editors/vscode/tinymist-${{ env.target }}.vsix
 
   build_alpine:
     name: build (x86_64-unknown-linux-musl)
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
     container:
       image: rust:alpine
       volumes:
@@ -199,52 +217,61 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.4
-      - name: Build typst-dom
-        run: |
-          yarn
-          yarn build
-        working-directory: ./addons/typst-dom
-      - name: Build frontend
-        run: yarn
-        working-directory: ./addons/frontend
-      - name: Build vscode extension
+      - name: Run rust-cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install deps
+        run: yarn install
+      - name: Build typst-preview vscode extension
         run: |
           yarn
           yarn run compile
-        working-directory: ./addons/vscode
-      - name: Build typst-preview binary
+        working-directory: ./contrib/typst-preview/editors/vscode
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+      - name: Build tinymist vscode extension
         run: |
-          cargo build --release -p typst-preview --target $RUST_TARGET
-          mkdir -p addons/vscode/out
+          yarn
+          yarn run compile
+        working-directory: ./editors/vscode
+      - name: Build tinymist binary
+        run: |
+          cargo build --profile=gh-release -p tinymist --target $RUST_TARGET
       - name: Split debug symbols
         run: |
-          cd target/$RUST_TARGET/release
-          objcopy --compress-debug-sections --only-keep-debug "typst-preview" "typst-preview-${{ env.target }}.debug"
-          objcopy --strip-debug --add-gnu-debuglink="typst-preview-${{ env.target }}.debug" "typst-preview"
+          cd target/$RUST_TARGET/gh-release
+          objcopy --compress-debug-sections --only-keep-debug "tinymist" "tinymist-${{ env.target }}.debug"
+          objcopy --strip-debug --add-gnu-debuglink="tinymist-${{ env.target }}.debug" "tinymist"
       - name: Upload split debug symbols
         uses: actions/upload-artifact@v4
         with:
-          name: typst-preview-${{ env.target }}.debug
-          path: target/${{ env.RUST_TARGET }}/release/typst-preview-${{ env.target }}.debug
+          name: tinymist-${{ env.target }}.debug
+          path: target/${{ env.RUST_TARGET }}/gh-release/tinymist-${{ env.target }}.debug
       - name: Copy binary to output directory
         run: |
-          cp "target/${{ env.RUST_TARGET }}/release/typst-preview" "addons/vscode/out/"
-          cp "target/${{ env.RUST_TARGET }}/release/typst-preview" "typst-preview-${{ env.target }}"
+          mkdir -p editors/vscode/out
+          cp "target/${{ env.RUST_TARGET }}/gh-release/tinymist" "editors/vscode/out/"
+          cp "target/${{ env.RUST_TARGET }}/gh-release/tinymist" "contrib/typst-preview/editors/vscode/out/"
+          cp "target/${{ env.RUST_TARGET }}/gh-release/tinymist" "tinymist-${{ env.target }}"
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: typst-preview-${{ env.target }}
-          path: typst-preview-${{ env.target }}
-      - name: Package extension
+          name: tinymist-${{ env.target }}
+          path: tinymist-${{ env.target }}
+      - name: Package typst-preview extension
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
-        working-directory: ./addons/vscode
-      - name: Upload VSIX artifact
+        working-directory: ./contrib/typst-preview/editors/vscode
+      - name: Package extension
+        run: yarn run package -- --target ${{ env.target }} -o tinymist-${{ env.target }}.vsix
+        working-directory: ./editors/vscode
+      - name: Upload typst-preview VSIX artifact
         uses: actions/upload-artifact@v4
         with:
           name: typst-preview-${{ env.target }}.vsix
-          path: addons/vscode/typst-preview-${{ env.target }}.vsix
+          path: contrib/typst-preview/editors/vscode/typst-preview-${{ env.target }}.vsix
+      - name: Upload tinymist VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinymist-${{ env.target }}.vsix
+          path: editors/vscode/tinymist-${{ env.target }}.vsix
 
   release:
     runs-on: ubuntu-latest
@@ -270,7 +297,6 @@ jobs:
           omitDraftDuringUpdate: true
           omitNameDuringUpdate: true
           omitPrereleaseDuringUpdate: true
-          bodyFile: "addons/vscode/CHANGELOG.md"
 
   publish:
     runs-on: ubuntu-latest
@@ -278,13 +304,14 @@ jobs:
     if: success() && startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/download-artifact@v4
-
+      - name: Install deps
+        run: yarn install
       - name: Deploy to VS Code Marketplace
-        run: npx vsce publish --packagePath $(find . -type f -iname '*.vsix')
+        run: npx @vscode/vsce publish --packagePath $(find . -type f -iname 'typst-preview-*.vsix') --skip-duplicate 
         env:
           VSCE_PAT: ${{ secrets.VSCODE_MARKETPLACE_TOKEN }}
 
       - name: Deploy to OpenVSX
-        run: npx ovsx publish --packagePath $(find . -type f -iname '*.vsix')
+        run: npx ovsx publish --packagePath $(find . -type f -iname 'typst-preview-*.vsix') --skip-duplicate 
         env:
           OVSX_PAT: ${{ secrets.OPENVSX_ACCESS_TOKEN }}
